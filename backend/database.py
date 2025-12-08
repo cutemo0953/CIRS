@@ -60,7 +60,7 @@ def write_db():
 
 
 def init_db():
-    """Initialize database with schema"""
+    """Initialize database with schema and apply migrations"""
     with get_db() as conn:
         # Read and execute schema
         schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
@@ -70,6 +70,30 @@ def init_db():
             print(f"Database initialized at {DB_PATH}")
         else:
             print(f"Warning: schema.sql not found at {schema_path}")
+
+        # Apply migrations for existing databases
+        apply_migrations(conn)
+
+
+def apply_migrations(conn):
+    """Apply schema migrations for existing databases"""
+    cursor = conn.execute("PRAGMA table_info(inventory)")
+    columns = [row['name'] for row in cursor.fetchall()]
+
+    # Migration: Add specification column
+    if 'specification' not in columns:
+        print("Migration: Adding 'specification' column to inventory")
+        conn.execute("ALTER TABLE inventory ADD COLUMN specification TEXT")
+
+    # Migration: Add equipment check columns
+    if 'last_check_date' not in columns:
+        print("Migration: Adding equipment check columns to inventory")
+        conn.execute("ALTER TABLE inventory ADD COLUMN last_check_date DATE")
+        conn.execute("ALTER TABLE inventory ADD COLUMN check_interval_days INTEGER")
+        conn.execute("ALTER TABLE inventory ADD COLUMN check_status TEXT")
+
+    conn.commit()
+    print("Migrations applied successfully")
 
 
 def dict_from_row(row):
