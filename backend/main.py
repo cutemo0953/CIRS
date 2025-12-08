@@ -5,10 +5,17 @@ FastAPI Backend Entry Point
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import os
 
 from database import init_db
+
+# Paths
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
+PORTAL_DIR = os.path.join(BASE_DIR, 'portal')
+FILES_DIR = os.path.join(BASE_DIR, 'files')
 
 # Import routes
 from routes import auth, inventory, person, events, messages, system
@@ -122,6 +129,34 @@ async def get_stats():
             },
             "inventory_alerts": alerts
         }
+
+
+# Mount static files for frontend and portal
+# Note: Mount these AFTER all API routes to avoid conflicts
+
+# Portal entry page
+@app.get("/portal")
+@app.get("/portal/")
+async def serve_portal():
+    """Serve portal index.html"""
+    return FileResponse(os.path.join(PORTAL_DIR, 'index.html'))
+
+# Frontend PWA
+@app.get("/frontend")
+@app.get("/frontend/")
+async def serve_frontend():
+    """Serve frontend index.html"""
+    return FileResponse(os.path.join(FRONTEND_DIR, 'index.html'))
+
+# Mount static directories
+if os.path.exists(FRONTEND_DIR):
+    app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+
+if os.path.exists(PORTAL_DIR):
+    app.mount("/portal", StaticFiles(directory=PORTAL_DIR, html=True), name="portal")
+
+if os.path.exists(FILES_DIR):
+    app.mount("/files", StaticFiles(directory=FILES_DIR), name="files")
 
 
 if __name__ == "__main__":
