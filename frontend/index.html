@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="theme-color" content="#4c826b">
+    <title>CIRS - 社區韌性物資管理</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            100: '#eaf3d7',
+                            400: '#a6c3ac',
+                            600: '#4c826b',
+                            700: '#3d6a58',
+                        },
+                        neutral: {
+                            200: '#eee2d3',
+                            600: '#8f7e61',
+                        },
+                        cool: {
+                            100: '#e8ebf1',
+                            400: '#a0b1cd',
+                        },
+                        triage: {
+                            green: '#22c55e',
+                            yellow: '#eab308',
+                            red: '#ef4444',
+                            black: '#1f2937',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .tab-active { background-color: #4c826b; color: white; }
+        .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
+        .card-press:active { transform: scale(0.98); }
+        input, select, textarea {
+            font-size: 16px !important; /* Prevent iOS zoom */
+        }
+    </style>
+</head>
+<body class="bg-gray-50" x-data="cirsApp()" x-init="init()">
+    <!-- Top Bar -->
+    <header class="bg-primary-600 text-white px-4 py-3 sticky top-0 z-40 shadow-md">
+        <div class="flex items-center justify-between max-w-lg mx-auto">
+            <div class="flex items-center">
+                <a href="/" class="mr-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                    </svg>
+                </a>
+                <h1 class="text-lg font-semibold" x-text="pageTitle">CIRS</h1>
+            </div>
+            <div class="flex items-center space-x-3">
+                <!-- Auth Status -->
+                <template x-if="currentUser">
+                    <span class="text-sm bg-primary-700 px-2 py-1 rounded" x-text="currentUser.display_name"></span>
+                </template>
+                <template x-if="!currentUser">
+                    <button @click="showLoginModal = true" class="text-sm bg-primary-700 px-2 py-1 rounded">
+                        登入
+                    </button>
+                </template>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="pb-20 max-w-lg mx-auto">
+        <!-- Home Tab -->
+        <div x-show="currentTab === 'home'" x-cloak class="p-4">
+            <!-- Broadcast -->
+            <div x-show="broadcast" class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg mb-4">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                    </svg>
+                    <p class="text-sm text-amber-700" x-text="broadcast"></p>
+                </div>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+                    <p class="text-3xl font-bold text-primary-600" x-text="stats.headcount?.checked_in || 0"></p>
+                    <p class="text-sm text-gray-500">在場人數</p>
+                </div>
+                <div class="bg-white rounded-xl p-4 shadow-sm text-center">
+                    <div class="flex justify-center space-x-2 text-lg">
+                        <span>💧<span class="font-bold" x-text="stats.survival_days?.water || '-'"></span></span>
+                        <span>🍚<span class="font-bold" x-text="stats.survival_days?.food || '-'"></span></span>
+                    </div>
+                    <p class="text-sm text-gray-500">維生天數</p>
+                </div>
+            </div>
+
+            <!-- Triage Summary -->
+            <div class="bg-white rounded-xl p-4 shadow-sm mb-4">
+                <h3 class="font-semibold mb-3">檢傷統計</h3>
+                <div class="flex justify-around">
+                    <div class="text-center">
+                        <div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.green || 0"></div>
+                        <p class="text-xs text-gray-500 mt-1">輕傷</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.yellow || 0"></div>
+                        <p class="text-xs text-gray-500 mt-1">延遲</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.red || 0"></div>
+                        <p class="text-xs text-gray-500 mt-1">立即</p>
+                    </div>
+                    <div class="text-center">
+                        <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.black || 0"></div>
+                        <p class="text-xs text-gray-500 mt-1">死亡</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Alerts -->
+            <div x-show="stats.inventory_alerts?.length > 0" class="bg-red-50 rounded-xl p-4 border border-red-200 mb-4">
+                <h3 class="font-semibold text-red-800 mb-2 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    物資警示
+                </h3>
+                <ul class="space-y-1">
+                    <template x-for="alert in stats.inventory_alerts" :key="alert.id">
+                        <li class="text-sm text-red-700">
+                            <span x-text="alert.name"></span> 剩 <span class="font-medium" x-text="alert.quantity"></span> <span x-text="alert.unit || '個'"></span>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="grid grid-cols-3 gap-3">
+                <button @click="currentTab = 'people'; showAddPerson = true" class="bg-primary-600 text-white rounded-xl p-4 text-center card-press">
+                    <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                    </svg>
+                    <span class="text-xs">快速報到</span>
+                </button>
+                <button @click="currentTab = 'inventory'" class="bg-primary-600 text-white rounded-xl p-4 text-center card-press">
+                    <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                    <span class="text-xs">物資發放</span>
+                </button>
+                <button @click="showBroadcastModal = true" x-show="currentUser?.role === 'admin'" class="bg-amber-500 text-white rounded-xl p-4 text-center card-press">
+                    <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                    </svg>
+                    <span class="text-xs">發布公告</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Inventory Tab -->
+        <div x-show="currentTab === 'inventory'" x-cloak class="p-4">
+            <!-- Search & Filter -->
+            <div class="flex space-x-2 mb-4">
+                <input type="text" x-model="inventorySearch" placeholder="搜尋物資..." class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <button @click="showAddInventory = true" x-show="currentUser" class="bg-primary-600 text-white px-4 py-2 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="flex space-x-2 overflow-x-auto pb-2 mb-4">
+                <button @click="inventoryCategory = ''" :class="inventoryCategory === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">全部</button>
+                <button @click="inventoryCategory = 'water'" :class="inventoryCategory === 'water' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">水</button>
+                <button @click="inventoryCategory = 'food'" :class="inventoryCategory === 'food' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">食物</button>
+                <button @click="inventoryCategory = 'medical'" :class="inventoryCategory === 'medical' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">醫療</button>
+                <button @click="inventoryCategory = 'power'" :class="inventoryCategory === 'power' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">電力</button>
+                <button @click="inventoryCategory = 'daily'" :class="inventoryCategory === 'daily' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">日用品</button>
+            </div>
+
+            <!-- Inventory List -->
+            <div class="space-y-3">
+                <template x-for="item in filteredInventory" :key="item.id">
+                    <div class="bg-white rounded-xl p-4 shadow-sm" :class="item.quantity < item.min_quantity && item.min_quantity > 0 ? 'border-l-4 border-red-500' : ''">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="font-semibold" x-text="item.name"></h4>
+                                <p class="text-sm text-gray-500">
+                                    <span x-text="item.quantity"></span> <span x-text="item.unit || '個'"></span>
+                                    <span x-show="item.location" class="ml-2">📍<span x-text="item.location"></span></span>
+                                </p>
+                                <p x-show="item.expiry_date" class="text-xs text-gray-400 mt-1">
+                                    效期: <span x-text="item.expiry_date"></span>
+                                </p>
+                            </div>
+                            <button @click="startDistribute(item)" x-show="currentUser" class="bg-primary-100 text-primary-600 px-3 py-1 rounded-lg text-sm">
+                                發放
+                            </button>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="filteredInventory.length === 0" class="text-center text-gray-400 py-8">無物資資料</p>
+            </div>
+        </div>
+
+        <!-- People Tab -->
+        <div x-show="currentTab === 'people'" x-cloak class="p-4">
+            <!-- Search & Add -->
+            <div class="flex space-x-2 mb-4">
+                <input type="text" x-model="peopleSearch" placeholder="搜尋姓名/ID..." class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <button @click="showAddPerson = true" x-show="currentUser" class="bg-primary-600 text-white px-4 py-2 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Triage Filter -->
+            <div class="flex space-x-2 mb-4">
+                <button @click="triageFilter = ''" :class="triageFilter === '' ? 'bg-gray-800 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm">全部</button>
+                <button @click="triageFilter = 'GREEN'" :class="triageFilter === 'GREEN' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700'" class="px-3 py-1 rounded-full text-sm">輕傷</button>
+                <button @click="triageFilter = 'YELLOW'" :class="triageFilter === 'YELLOW' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'" class="px-3 py-1 rounded-full text-sm">延遲</button>
+                <button @click="triageFilter = 'RED'" :class="triageFilter === 'RED' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700'" class="px-3 py-1 rounded-full text-sm">立即</button>
+            </div>
+
+            <!-- People List -->
+            <div class="space-y-3">
+                <template x-for="person in filteredPeople" :key="person.id">
+                    <div class="bg-white rounded-xl p-4 shadow-sm flex items-center">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold mr-3"
+                             :class="{
+                                 'bg-green-500': person.triage_status === 'GREEN',
+                                 'bg-yellow-500': person.triage_status === 'YELLOW',
+                                 'bg-red-500': person.triage_status === 'RED',
+                                 'bg-gray-800': person.triage_status === 'BLACK',
+                                 'bg-gray-300': !person.triage_status
+                             }">
+                            <span x-text="person.display_name?.charAt(0) || '?'"></span>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-semibold" x-text="person.display_name"></h4>
+                            <p class="text-xs text-gray-500">
+                                ID: <span x-text="person.id"></span>
+                                <span x-show="person.current_location" class="ml-2">📍<span x-text="person.current_location"></span></span>
+                            </p>
+                        </div>
+                        <button @click="startTriage(person)" x-show="currentUser && (currentUser.role === 'admin' || currentUser.role === 'medic')" class="text-primary-600 p-2">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                        </button>
+                    </div>
+                </template>
+                <p x-show="filteredPeople.length === 0" class="text-center text-gray-400 py-8">無人員資料</p>
+            </div>
+        </div>
+
+        <!-- Messages Tab -->
+        <div x-show="currentTab === 'messages'" x-cloak class="p-4">
+            <!-- Category Filter -->
+            <div class="flex space-x-2 overflow-x-auto pb-2 mb-4">
+                <button @click="messageCategory = ''" :class="messageCategory === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">全部</button>
+                <button @click="messageCategory = 'seek_person'" :class="messageCategory === 'seek_person' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">尋人</button>
+                <button @click="messageCategory = 'offer_help'" :class="messageCategory === 'offer_help' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">互助</button>
+                <button @click="messageCategory = 'report'" :class="messageCategory === 'report' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">回報</button>
+            </div>
+
+            <!-- Messages List -->
+            <div class="space-y-3 mb-20">
+                <template x-for="msg in filteredMessages" :key="msg.id">
+                    <div class="bg-white rounded-xl p-4 shadow-sm" :class="msg.is_resolved ? 'opacity-60' : ''">
+                        <div class="flex items-start justify-between mb-2">
+                            <span class="text-xs px-2 py-0.5 rounded-full"
+                                  :class="{
+                                      'bg-blue-100 text-blue-700': msg.category === 'seek_person',
+                                      'bg-green-100 text-green-700': msg.category === 'offer_help',
+                                      'bg-amber-100 text-amber-700': msg.category === 'report',
+                                      'bg-gray-100 text-gray-700': !msg.category || msg.category === 'general'
+                                  }"
+                                  x-text="getCategoryName(msg.category)"></span>
+                            <span x-show="msg.is_resolved" class="text-xs text-green-600">✓ 已解決</span>
+                        </div>
+                        <p class="text-gray-800" x-text="msg.content"></p>
+                        <div class="flex justify-between items-center mt-2 text-xs text-gray-400">
+                            <span x-text="msg.author_name || '匿名'"></span>
+                            <span x-text="formatTime(msg.created_at)"></span>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="filteredMessages.length === 0" class="text-center text-gray-400 py-8">暫無留言</p>
+            </div>
+
+            <!-- New Message FAB -->
+            <button @click="showAddMessage = true" class="fixed bottom-24 right-4 w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg flex items-center justify-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+            </button>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 bottom-nav z-50">
+        <div class="flex justify-around max-w-lg mx-auto">
+            <button @click="currentTab = 'home'" :class="currentTab === 'home' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+                </svg>
+                <span class="text-xs mt-1">首頁</span>
+            </button>
+            <button @click="currentTab = 'inventory'; loadInventory()" :class="currentTab === 'inventory' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                <span class="text-xs mt-1">物資</span>
+            </button>
+            <button @click="currentTab = 'people'; loadPeople()" :class="currentTab === 'people' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <span class="text-xs mt-1">人員</span>
+            </button>
+            <button @click="currentTab = 'messages'; loadMessages()" :class="currentTab === 'messages' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
+                </svg>
+                <span class="text-xs mt-1">留言板</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Login Modal -->
+    <div x-show="showLoginModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showLoginModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">登入</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">使用者 ID</label>
+                    <input type="text" x-model="loginForm.person_id" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="admin001">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">PIN</label>
+                    <input type="password" x-model="loginForm.pin" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="****" inputmode="numeric" maxlength="6">
+                </div>
+                <p x-show="loginError" class="text-red-500 text-sm" x-text="loginError"></p>
+                <div class="flex space-x-3">
+                    <button @click="showLoginModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="doLogin()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">登入</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Triage Modal -->
+    <div x-show="showTriageModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showTriageModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">檢傷分類: <span x-text="triageTarget?.display_name"></span></h3>
+            <div class="grid grid-cols-2 gap-3 mb-4">
+                <button @click="doTriage('GREEN')" class="bg-green-500 text-white rounded-xl p-6 text-center">
+                    <span class="text-2xl font-bold">輕傷</span>
+                    <p class="text-sm opacity-80">Minor</p>
+                </button>
+                <button @click="doTriage('YELLOW')" class="bg-yellow-500 text-white rounded-xl p-6 text-center">
+                    <span class="text-2xl font-bold">延遲</span>
+                    <p class="text-sm opacity-80">Delayed</p>
+                </button>
+                <button @click="doTriage('RED')" class="bg-red-500 text-white rounded-xl p-6 text-center">
+                    <span class="text-2xl font-bold">立即</span>
+                    <p class="text-sm opacity-80">Immediate</p>
+                </button>
+                <button @click="doTriage('BLACK')" class="bg-gray-800 text-white rounded-xl p-6 text-center">
+                    <span class="text-2xl font-bold">死亡</span>
+                    <p class="text-sm opacity-80">Deceased</p>
+                </button>
+            </div>
+            <button @click="showTriageModal = false" class="w-full px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+        </div>
+    </div>
+
+    <!-- Distribute Modal -->
+    <div x-show="showDistributeModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDistributeModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">發放物資: <span x-text="distributeItem?.name"></span></h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">領取人 ID</label>
+                    <input type="text" x-model="distributeForm.person_id" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="輸入 ID">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">數量 (庫存: <span x-text="distributeItem?.quantity"></span>)</label>
+                    <div class="flex items-center space-x-3">
+                        <button @click="distributeForm.quantity = Math.max(1, distributeForm.quantity - 1)" class="w-10 h-10 bg-gray-100 rounded-lg">-</button>
+                        <input type="number" x-model.number="distributeForm.quantity" class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-center" min="1">
+                        <button @click="distributeForm.quantity++" class="w-10 h-10 bg-gray-100 rounded-lg">+</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">備註</label>
+                    <input type="text" x-model="distributeForm.notes" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="選填">
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="showDistributeModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="doDistribute()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">確認發放</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Person Modal -->
+    <div x-show="showAddPerson" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showAddPerson = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">新增人員</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">姓名 *</label>
+                    <input type="text" x-model="newPerson.display_name" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">位置</label>
+                    <input type="text" x-model="newPerson.current_location" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 主收容區">
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="showAddPerson = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="doAddPerson()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">新增</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Message Modal -->
+    <div x-show="showAddMessage" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showAddMessage = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">發布留言</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">分類</label>
+                    <select x-model="newMessage.category" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                        <option value="general">一般</option>
+                        <option value="seek_person">尋人</option>
+                        <option value="seek_item">尋物</option>
+                        <option value="offer_help">互助</option>
+                        <option value="report">狀況回報</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">內容 *</label>
+                    <textarea x-model="newMessage.content" class="w-full border border-gray-200 rounded-lg px-3 py-2 h-24" placeholder="輸入留言內容..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">顯示名稱</label>
+                    <input type="text" x-model="newMessage.author_name" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="匿名">
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="showAddMessage = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="doAddMessage()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">發布</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Broadcast Modal -->
+    <div x-show="showBroadcastModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBroadcastModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">發布公告</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">公告內容</label>
+                    <textarea x-model="newBroadcast" class="w-full border border-gray-200 rounded-lg px-3 py-2 h-24" placeholder="輸入公告內容..."></textarea>
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="showBroadcastModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="doBroadcast()" class="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg">發布</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div x-show="toast.show" x-cloak
+         x-transition:enter="transition ease-out duration-200"
+         x-transition:enter-start="opacity-0 translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-150"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 translate-y-2"
+         class="fixed bottom-28 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-lg shadow-lg z-50"
+         :class="toast.type === 'success' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'"
+         x-text="toast.message">
+    </div>
+
+    <script>
+        function cirsApp() {
+            return {
+                currentTab: 'home',
+                currentUser: null,
+                token: null,
+
+                // Data
+                stats: {},
+                broadcast: null,
+                inventory: [],
+                people: [],
+                messages: [],
+
+                // Filters
+                inventorySearch: '',
+                inventoryCategory: '',
+                peopleSearch: '',
+                triageFilter: '',
+                messageCategory: '',
+
+                // Modals
+                showLoginModal: false,
+                showTriageModal: false,
+                showDistributeModal: false,
+                showAddPerson: false,
+                showAddMessage: false,
+                showBroadcastModal: false,
+                showAddInventory: false,
+
+                // Forms
+                loginForm: { person_id: '', pin: '' },
+                loginError: '',
+                triageTarget: null,
+                distributeItem: null,
+                distributeForm: { person_id: '', quantity: 1, notes: '' },
+                newPerson: { display_name: '', current_location: '' },
+                newMessage: { category: 'general', content: '', author_name: '' },
+                newBroadcast: '',
+
+                // Toast
+                toast: { show: false, message: '', type: 'success' },
+
+                async init() {
+                    // Check for saved token
+                    const savedToken = localStorage.getItem('cirs_token');
+                    if (savedToken) {
+                        this.token = savedToken;
+                        await this.verifyToken();
+                    }
+
+                    await this.loadStats();
+                    await this.loadBroadcast();
+
+                    // Polling
+                    setInterval(() => {
+                        this.loadStats();
+                        this.loadBroadcast();
+                    }, 10000);
+                },
+
+                get pageTitle() {
+                    const titles = {
+                        'home': '首頁',
+                        'inventory': '物資管理',
+                        'people': '人員管理',
+                        'messages': '互助留言板'
+                    };
+                    return titles[this.currentTab] || 'CIRS';
+                },
+
+                get filteredInventory() {
+                    return this.inventory.filter(item => {
+                        const matchSearch = !this.inventorySearch ||
+                            item.name.toLowerCase().includes(this.inventorySearch.toLowerCase());
+                        const matchCategory = !this.inventoryCategory || item.category === this.inventoryCategory;
+                        return matchSearch && matchCategory;
+                    });
+                },
+
+                get filteredPeople() {
+                    return this.people.filter(p => {
+                        const matchSearch = !this.peopleSearch ||
+                            p.display_name.toLowerCase().includes(this.peopleSearch.toLowerCase()) ||
+                            p.id.includes(this.peopleSearch);
+                        const matchTriage = !this.triageFilter || p.triage_status === this.triageFilter;
+                        return matchSearch && matchTriage;
+                    });
+                },
+
+                get filteredMessages() {
+                    return this.messages.filter(m => {
+                        return !this.messageCategory || m.category === this.messageCategory;
+                    });
+                },
+
+                async apiCall(url, options = {}) {
+                    if (this.token) {
+                        options.headers = {
+                            ...options.headers,
+                            'Authorization': `Bearer ${this.token}`
+                        };
+                    }
+                    if (options.body && typeof options.body === 'object') {
+                        options.headers = {
+                            ...options.headers,
+                            'Content-Type': 'application/json'
+                        };
+                        options.body = JSON.stringify(options.body);
+                    }
+                    const res = await fetch(url, options);
+                    return res;
+                },
+
+                async verifyToken() {
+                    try {
+                        const res = await this.apiCall('/api/auth/verify', { method: 'POST' });
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.valid) {
+                                this.currentUser = data.person;
+                            } else {
+                                this.logout();
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Token verify failed:', e);
+                    }
+                },
+
+                async doLogin() {
+                    this.loginError = '';
+                    try {
+                        const res = await fetch('/api/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.loginForm)
+                        });
+                        const data = await res.json();
+                        if (res.ok) {
+                            this.token = data.token;
+                            this.currentUser = data.person;
+                            localStorage.setItem('cirs_token', data.token);
+                            this.showLoginModal = false;
+                            this.showToast('登入成功', 'success');
+                        } else {
+                            this.loginError = data.detail || '登入失敗';
+                        }
+                    } catch (e) {
+                        this.loginError = '網路錯誤';
+                    }
+                },
+
+                logout() {
+                    this.token = null;
+                    this.currentUser = null;
+                    localStorage.removeItem('cirs_token');
+                },
+
+                async loadStats() {
+                    try {
+                        const res = await fetch('/api/stats');
+                        if (res.ok) this.stats = await res.json();
+                    } catch (e) {}
+                },
+
+                async loadBroadcast() {
+                    try {
+                        const res = await fetch('/api/messages/broadcast');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.broadcast = data.broadcast?.content || null;
+                        }
+                    } catch (e) {}
+                },
+
+                async loadInventory() {
+                    try {
+                        const res = await fetch('/api/inventory');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.inventory = data.items || [];
+                        }
+                    } catch (e) {}
+                },
+
+                async loadPeople() {
+                    try {
+                        const res = await this.apiCall('/api/person');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.people = data.persons || [];
+                        }
+                    } catch (e) {}
+                },
+
+                async loadMessages() {
+                    try {
+                        const res = await fetch('/api/messages');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.messages = data.messages || [];
+                        }
+                    } catch (e) {}
+                },
+
+                startTriage(person) {
+                    this.triageTarget = person;
+                    this.showTriageModal = true;
+                },
+
+                async doTriage(status) {
+                    try {
+                        const res = await this.apiCall(`/api/person/${this.triageTarget.id}/triage`, {
+                            method: 'POST',
+                            body: { status }
+                        });
+                        if (res.ok) {
+                            this.showTriageModal = false;
+                            this.showToast('檢傷分類完成', 'success');
+                            await this.loadPeople();
+                            await this.loadStats();
+                        }
+                    } catch (e) {
+                        this.showToast('操作失敗', 'error');
+                    }
+                },
+
+                startDistribute(item) {
+                    this.distributeItem = item;
+                    this.distributeForm = { person_id: '', quantity: 1, notes: '' };
+                    this.showDistributeModal = true;
+                },
+
+                async doDistribute() {
+                    if (!this.distributeForm.person_id) {
+                        this.showToast('請輸入領取人 ID', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await this.apiCall(`/api/inventory/${this.distributeItem.id}/distribute`, {
+                            method: 'POST',
+                            body: this.distributeForm
+                        });
+                        if (res.ok) {
+                            this.showDistributeModal = false;
+                            this.showToast('發放成功', 'success');
+                            await this.loadInventory();
+                            await this.loadStats();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '發放失敗', 'error');
+                        }
+                    } catch (e) {
+                        this.showToast('操作失敗', 'error');
+                    }
+                },
+
+                async doAddPerson() {
+                    if (!this.newPerson.display_name) {
+                        this.showToast('請輸入姓名', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await this.apiCall('/api/person', {
+                            method: 'POST',
+                            body: this.newPerson
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.showAddPerson = false;
+                            this.newPerson = { display_name: '', current_location: '' };
+                            this.showToast(`新增成功 ID: ${data.id}`, 'success');
+                            await this.loadPeople();
+                            await this.loadStats();
+                        }
+                    } catch (e) {
+                        this.showToast('操作失敗', 'error');
+                    }
+                },
+
+                async doAddMessage() {
+                    if (!this.newMessage.content) {
+                        this.showToast('請輸入內容', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await fetch('/api/messages', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.newMessage)
+                        });
+                        if (res.ok) {
+                            this.showAddMessage = false;
+                            this.newMessage = { category: 'general', content: '', author_name: '' };
+                            this.showToast('發布成功', 'success');
+                            await this.loadMessages();
+                        }
+                    } catch (e) {
+                        this.showToast('操作失敗', 'error');
+                    }
+                },
+
+                async doBroadcast() {
+                    if (!this.newBroadcast) return;
+                    try {
+                        const res = await this.apiCall('/api/messages/broadcast', {
+                            method: 'POST',
+                            body: { content: this.newBroadcast, is_pinned: true }
+                        });
+                        if (res.ok) {
+                            this.showBroadcastModal = false;
+                            this.newBroadcast = '';
+                            this.showToast('公告已發布', 'success');
+                            await this.loadBroadcast();
+                        }
+                    } catch (e) {
+                        this.showToast('操作失敗', 'error');
+                    }
+                },
+
+                getCategoryName(cat) {
+                    const names = {
+                        'seek_person': '尋人',
+                        'seek_item': '尋物',
+                        'offer_help': '互助',
+                        'report': '狀況回報',
+                        'general': '一般'
+                    };
+                    return names[cat] || '一般';
+                },
+
+                formatTime(isoStr) {
+                    if (!isoStr) return '';
+                    const d = new Date(isoStr);
+                    const now = new Date();
+                    const diff = (now - d) / 1000;
+                    if (diff < 60) return '剛剛';
+                    if (diff < 3600) return `${Math.floor(diff/60)} 分鐘前`;
+                    if (diff < 86400) return `${Math.floor(diff/3600)} 小時前`;
+                    return `${Math.floor(diff/86400)} 天前`;
+                },
+
+                showToast(message, type = 'success') {
+                    this.toast = { show: true, message, type };
+                    setTimeout(() => this.toast.show = false, 3000);
+                }
+            };
+        }
+    </script>
+</body>
+</html>
