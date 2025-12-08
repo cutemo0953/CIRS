@@ -34,8 +34,13 @@ CIRS 是社區級災難韌性管理系統，整合物資管理、人員報到、
 ## 技術棧
 
 - **Frontend**: Alpine.js + Tailwind CSS + PWA
-- **Backend**: Python FastAPI + SQLite (WAL mode)
+- **Backend**: Python 3.11+ / FastAPI + SQLite (WAL mode)
 - **Deployment**: Raspberry Pi 4/5 + Nginx
+
+## 系統需求
+
+- Python 3.11, 3.12, 或 3.13
+- 建議使用虛擬環境 (venv)
 
 ## 快速開始
 
@@ -51,8 +56,9 @@ python3 -m venv venv
 source venv/bin/activate  # Linux/macOS
 # Windows: venv\Scripts\activate
 
-# 3. 安裝 Python 依賴
+# 3. 安裝 Python 依賴 (需先升級 pip)
 cd backend
+pip install --upgrade pip
 pip install -r requirements.txt
 
 # 4. 初始化資料庫
@@ -73,12 +79,13 @@ cd ~
 git clone https://github.com/cutemo0953/CIRS.git
 cd CIRS
 
-# 2. 建立虛擬環境
+# 2. 建立虛擬環境 (在專案根目錄)
 python3 -m venv venv
 source venv/bin/activate
 
-# 3. 安裝依賴
+# 3. 安裝依賴 (需先升級 pip)
 cd backend
+pip install --upgrade pip
 pip install -r requirements.txt
 
 # 4. 初始化資料庫
