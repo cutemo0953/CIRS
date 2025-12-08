@@ -39,30 +39,85 @@ CIRS 是社區級災難韌性管理系統，整合物資管理、人員報到、
 
 ## 快速開始
 
-### 開發環境
+### 開發環境 (macOS/Linux)
 
 ```bash
 # 1. Clone
 git clone https://github.com/cutemo0953/CIRS.git
 cd CIRS
 
-# 2. 安裝 Python 依賴
+# 2. 建立虛擬環境
+python3 -m venv venv
+source venv/bin/activate  # Linux/macOS
+# Windows: venv\Scripts\activate
+
+# 3. 安裝 Python 依賴
 cd backend
 pip install -r requirements.txt
 
-# 3. 初始化資料庫
+# 4. 初始化資料庫
 python init_db.py
 
-# 4. 啟動後端
+# 5. 啟動後端
 uvicorn main:app --host 0.0.0.0 --port 8090 --reload
 
-# 5. 開啟瀏覽器
+# 6. 開啟瀏覽器
 open http://localhost:8090
 ```
 
 ### Raspberry Pi 部署
 
-詳見 [CIRS_DEV_SPEC.md](./CIRS_DEV_SPEC.md) 第 9 節。
+```bash
+# 1. Clone
+cd ~
+git clone https://github.com/cutemo0953/CIRS.git
+cd CIRS
+
+# 2. 建立虛擬環境
+python3 -m venv venv
+source venv/bin/activate
+
+# 3. 安裝依賴
+cd backend
+pip install -r requirements.txt
+
+# 4. 初始化資料庫
+python init_db.py
+
+# 5. 測試啟動
+uvicorn main:app --host 0.0.0.0 --port 8090
+
+# 6. 設定 systemd 服務 (開機自動啟動)
+sudo nano /etc/systemd/system/cirs.service
+```
+
+**cirs.service 範例：**
+```ini
+[Unit]
+Description=CIRS Backend API
+After=network.target
+
+[Service]
+Type=simple
+User=dno
+WorkingDirectory=/home/dno/CIRS/backend
+ExecStart=/home/dno/CIRS/venv/bin/uvicorn main:app --host 0.0.0.0 --port 8090
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# 啟用服務
+sudo systemctl daemon-reload
+sudo systemctl enable cirs
+sudo systemctl start cirs
+sudo systemctl status cirs
+```
+
+詳細部署說明請參閱 [CIRS_DEV_SPEC.md](./CIRS_DEV_SPEC.md)。
 
 ## 專案結構
 
