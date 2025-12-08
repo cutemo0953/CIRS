@@ -7,7 +7,8 @@
 CREATE TABLE IF NOT EXISTS inventory (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    category TEXT NOT NULL,          -- 'water', 'food', 'medical', 'power', 'daily', 'other'
+    specification TEXT,              -- 規格：'600ml', '5公斤裝', 'AA電池'
+    category TEXT NOT NULL,          -- 'water', 'food', 'medical', 'power', 'daily', 'equipment', 'other'
     quantity REAL DEFAULT 0,
     unit TEXT,                       -- '瓶', '箱', '個', '公斤'
     location TEXT,                   -- '倉庫A', '入口處'
@@ -15,12 +16,17 @@ CREATE TABLE IF NOT EXISTS inventory (
     min_quantity REAL DEFAULT 0,     -- 安全庫存
     tags TEXT,                       -- JSON: ["急救", "嬰兒用品"]
     notes TEXT,
+    -- Equipment-specific fields
+    last_check_date DATE,            -- 設備最後檢查日期
+    check_interval_days INTEGER,     -- 檢查週期（天）
+    check_status TEXT,               -- 'OK', 'NEEDS_REPAIR', 'OUT_OF_SERVICE'
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_inventory_category ON inventory(category);
 CREATE INDEX IF NOT EXISTS idx_inventory_expiry ON inventory(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_inventory_check ON inventory(last_check_date);
 
 -- ============================================
 -- 2. Person (人員表)

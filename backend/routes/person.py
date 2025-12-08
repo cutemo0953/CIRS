@@ -27,6 +27,7 @@ class PersonCreate(BaseModel):
     pin: Optional[str] = None
     metadata: Optional[str] = None
     current_location: Optional[str] = None
+    triage_status: Optional[str] = None  # 'GREEN', 'YELLOW', 'RED', 'BLACK'
 
 
 class PersonUpdate(BaseModel):
@@ -104,25 +105,39 @@ async def create_person(person: PersonCreate):
     new_id = generate_id()
     pin_hash = hash_pin(person.pin) if person.pin else None
 
+    # Validate triage status if provided
+    if person.triage_status and person.triage_status not in ['GREEN', 'YELLOW', 'RED', 'BLACK']:
+        raise HTTPException(status_code=400, detail="Invalid triage status")
+
     with write_db() as conn:
         try:
             conn.execute(
                 """
-                INSERT INTO person (id, display_name, phone_hash, role, pin_hash, metadata, current_location, checked_in_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                INSERT INTO person (id, display_name, phone_hash, role, pin_hash, metadata, current_location, triage_status, checked_in_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
                 """,
                 (new_id, person.display_name, person.phone_hash, person.role,
-                 pin_hash, person.metadata, person.current_location)
+                 pin_hash, person.metadata, person.current_location, person.triage_status)
             )
 
             # Log check-in event
             conn.execute(
                 """
-                INSERT INTO event_log (event_type, person_id, location, notes)
-                VALUES ('CHECK_IN', ?, ?, ?)
+                INSERT INTO event_log (event_type, person_id, location, status_value, notes)
+                VALUES ('CHECK_IN', ?, ?, ?, ?)
                 """,
-                (new_id, person.current_location, f"Registered: {person.display_name}")
+                (new_id, person.current_location, person.triage_status, f"Registered: {person.display_name}")
             )
+
+            # Log triage event if status provided
+            if person.triage_status:
+                conn.execute(
+                    """
+                    INSERT INTO event_log (event_type, person_id, status_value, notes)
+                    VALUES ('TRIAGE', ?, ?, ?)
+                    """,
+                    (new_id, person.triage_status, "Initial triage on check-in")
+                )
         except Exception as e:
             if "UNIQUE constraint" in str(e):
                 raise HTTPException(status_code=400, detail="Phone number already registered")

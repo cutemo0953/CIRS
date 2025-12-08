@@ -121,13 +121,26 @@ async def get_stats():
         water_days = (resources.get('water', 0) / (config.get('water_per_person_per_day', 3) * people_count)) if people_count > 0 else 0
         food_days = (resources.get('food', 0) / (config.get('food_per_person_per_day', 2100) * people_count)) if people_count > 0 else 0
 
+        # Equipment pending checks count
+        cursor = conn.execute("""
+            SELECT COUNT(*) as count FROM inventory
+            WHERE category = 'equipment'
+            AND check_interval_days IS NOT NULL
+            AND (
+                last_check_date IS NULL
+                OR DATE(last_check_date, '+' || check_interval_days || ' days') <= DATE('now')
+            )
+        """)
+        equipment_pending = cursor.fetchone()['count']
+
         return {
             "headcount": headcount,
             "survival_days": {
                 "water": round(water_days, 1),
                 "food": round(food_days, 1)
             },
-            "inventory_alerts": alerts
+            "inventory_alerts": alerts,
+            "equipment_pending": equipment_pending
         }
 
 

@@ -10,6 +10,7 @@
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script>
         tailwind.config = {
@@ -21,20 +22,6 @@
                             400: '#a6c3ac',
                             600: '#4c826b',
                             700: '#3d6a58',
-                        },
-                        neutral: {
-                            200: '#eee2d3',
-                            600: '#8f7e61',
-                        },
-                        cool: {
-                            100: '#e8ebf1',
-                            400: '#a0b1cd',
-                        },
-                        triage: {
-                            green: '#22c55e',
-                            yellow: '#eab308',
-                            red: '#ef4444',
-                            black: '#1f2937',
                         }
                     }
                 }
@@ -46,9 +33,7 @@
         .tab-active { background-color: #4c826b; color: white; }
         .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
         .card-press:active { transform: scale(0.98); }
-        input, select, textarea {
-            font-size: 16px !important; /* Prevent iOS zoom */
-        }
+        input, select, textarea { font-size: 16px !important; }
     </style>
 </head>
 <body class="bg-gray-50" x-data="cirsApp()" x-init="init()">
@@ -56,7 +41,7 @@
     <header class="bg-primary-600 text-white px-4 py-3 sticky top-0 z-40 shadow-md">
         <div class="flex items-center justify-between max-w-lg mx-auto">
             <div class="flex items-center">
-                <a href="/" class="mr-3">
+                <a href="/portal" class="mr-3">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
                     </svg>
@@ -64,14 +49,14 @@
                 <h1 class="text-lg font-semibold" x-text="pageTitle">CIRS</h1>
             </div>
             <div class="flex items-center space-x-3">
-                <!-- Auth Status -->
                 <template x-if="currentUser">
-                    <span class="text-sm bg-primary-700 px-2 py-1 rounded" x-text="currentUser.display_name"></span>
+                    <div class="flex items-center space-x-2">
+                        <span class="text-sm bg-primary-700 px-2 py-1 rounded" x-text="currentUser.display_name"></span>
+                        <button @click="logout()" class="text-xs opacity-75 hover:opacity-100">登出</button>
+                    </div>
                 </template>
                 <template x-if="!currentUser">
-                    <button @click="showLoginModal = true" class="text-sm bg-primary-700 px-2 py-1 rounded">
-                        登入
-                    </button>
+                    <button @click="showLoginModal = true" class="text-sm bg-primary-700 px-2 py-1 rounded">登入</button>
                 </template>
             </div>
         </div>
@@ -79,167 +64,70 @@
 
     <!-- Main Content -->
     <main class="pb-20 max-w-lg mx-auto">
-        <!-- Home Tab -->
-        <div x-show="currentTab === 'home'" x-cloak class="p-4">
-            <!-- Broadcast -->
-            <div x-show="broadcast" class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-lg mb-4">
-                <div class="flex items-start">
-                    <svg class="w-5 h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+        <!-- ==================== 人員 Tab ==================== -->
+        <div x-show="currentTab === 'people'" x-cloak class="p-4">
+            <!-- Quick Check-in Card -->
+            <div class="bg-white rounded-xl p-4 shadow-sm mb-4" x-show="currentUser">
+                <h3 class="font-semibold mb-3 flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
                     </svg>
-                    <p class="text-sm text-amber-700" x-text="broadcast"></p>
-                </div>
-            </div>
-
-            <!-- Stats Cards -->
-            <div class="grid grid-cols-2 gap-3 mb-4">
-                <div class="bg-white rounded-xl p-4 shadow-sm text-center">
-                    <p class="text-3xl font-bold text-primary-600" x-text="stats.headcount?.checked_in || 0"></p>
-                    <p class="text-sm text-gray-500">在場人數</p>
-                </div>
-                <div class="bg-white rounded-xl p-4 shadow-sm text-center">
-                    <div class="flex justify-center space-x-2 text-lg">
-                        <span>💧<span class="font-bold" x-text="stats.survival_days?.water || '-'"></span></span>
-                        <span>🍚<span class="font-bold" x-text="stats.survival_days?.food || '-'"></span></span>
+                    快速報到
+                </h3>
+                <div class="space-y-3">
+                    <input type="text" x-model="newPerson.display_name" placeholder="姓名" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                    <div class="flex space-x-2">
+                        <input type="text" x-model="newPerson.current_location" placeholder="位置 (選填)" class="flex-1 border border-gray-200 rounded-lg px-3 py-2">
                     </div>
-                    <p class="text-sm text-gray-500">維生天數</p>
+                    <!-- Triage Selection -->
+                    <div class="grid grid-cols-4 gap-2">
+                        <button @click="newPerson.triage_status = 'GREEN'" :class="newPerson.triage_status === 'GREEN' ? 'ring-2 ring-offset-2 ring-green-500' : ''" class="bg-green-500 text-white rounded-lg py-2 text-sm font-medium">輕傷</button>
+                        <button @click="newPerson.triage_status = 'YELLOW'" :class="newPerson.triage_status === 'YELLOW' ? 'ring-2 ring-offset-2 ring-yellow-500' : ''" class="bg-yellow-500 text-white rounded-lg py-2 text-sm font-medium">延遲</button>
+                        <button @click="newPerson.triage_status = 'RED'" :class="newPerson.triage_status === 'RED' ? 'ring-2 ring-offset-2 ring-red-500' : ''" class="bg-red-500 text-white rounded-lg py-2 text-sm font-medium">立即</button>
+                        <button @click="newPerson.triage_status = 'BLACK'" :class="newPerson.triage_status === 'BLACK' ? 'ring-2 ring-offset-2 ring-gray-800' : ''" class="bg-gray-800 text-white rounded-lg py-2 text-sm font-medium">死亡</button>
+                    </div>
+                    <button @click="doQuickCheckIn()" class="w-full bg-primary-600 text-white rounded-lg py-2 font-medium">報到登記</button>
                 </div>
             </div>
 
             <!-- Triage Summary -->
-            <div class="bg-white rounded-xl p-4 shadow-sm mb-4">
-                <h3 class="font-semibold mb-3">檢傷統計</h3>
-                <div class="flex justify-around">
-                    <div class="text-center">
-                        <div class="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.green || 0"></div>
-                        <p class="text-xs text-gray-500 mt-1">輕傷</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="w-10 h-10 rounded-full bg-yellow-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.yellow || 0"></div>
-                        <p class="text-xs text-gray-500 mt-1">延遲</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="w-10 h-10 rounded-full bg-red-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.red || 0"></div>
-                        <p class="text-xs text-gray-500 mt-1">立即</p>
-                    </div>
-                    <div class="text-center">
-                        <div class="w-10 h-10 rounded-full bg-gray-800 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.black || 0"></div>
-                        <p class="text-xs text-gray-500 mt-1">死亡</p>
-                    </div>
+            <div class="flex justify-center space-x-3 mb-4">
+                <div class="text-center">
+                    <div class="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.green || 0"></div>
+                    <p class="text-xs text-gray-500 mt-1">輕傷</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.yellow || 0"></div>
+                    <p class="text-xs text-gray-500 mt-1">延遲</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.red || 0"></div>
+                    <p class="text-xs text-gray-500 mt-1">立即</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.black || 0"></div>
+                    <p class="text-xs text-gray-500 mt-1">死亡</p>
                 </div>
             </div>
 
-            <!-- Inventory Alerts -->
-            <div x-show="stats.inventory_alerts?.length > 0" class="bg-red-50 rounded-xl p-4 border border-red-200 mb-4">
-                <h3 class="font-semibold text-red-800 mb-2 flex items-center">
-                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                    </svg>
-                    物資警示
-                </h3>
-                <ul class="space-y-1">
-                    <template x-for="alert in stats.inventory_alerts" :key="alert.id">
-                        <li class="text-sm text-red-700">
-                            <span x-text="alert.name"></span> 剩 <span class="font-medium" x-text="alert.quantity"></span> <span x-text="alert.unit || '個'"></span>
-                        </li>
-                    </template>
-                </ul>
-            </div>
-
-            <!-- Quick Actions -->
-            <div class="grid grid-cols-3 gap-3">
-                <button @click="currentTab = 'people'; showAddPerson = true" class="bg-primary-600 text-white rounded-xl p-4 text-center card-press">
-                    <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
-                    </svg>
-                    <span class="text-xs">快速報到</span>
-                </button>
-                <button @click="currentTab = 'inventory'" class="bg-primary-600 text-white rounded-xl p-4 text-center card-press">
-                    <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                    </svg>
-                    <span class="text-xs">物資發放</span>
-                </button>
-                <button @click="showBroadcastModal = true" x-show="currentUser?.role === 'admin'" class="bg-amber-500 text-white rounded-xl p-4 text-center card-press">
-                    <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
-                    </svg>
-                    <span class="text-xs">發布公告</span>
-                </button>
-            </div>
-        </div>
-
-        <!-- Inventory Tab -->
-        <div x-show="currentTab === 'inventory'" x-cloak class="p-4">
-            <!-- Search & Filter -->
-            <div class="flex space-x-2 mb-4">
-                <input type="text" x-model="inventorySearch" placeholder="搜尋物資..." class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
-                <button @click="showAddInventory = true" x-show="currentUser" class="bg-primary-600 text-white px-4 py-2 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                </button>
-            </div>
-
-            <!-- Category Filter -->
-            <div class="flex space-x-2 overflow-x-auto pb-2 mb-4">
-                <button @click="inventoryCategory = ''" :class="inventoryCategory === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">全部</button>
-                <button @click="inventoryCategory = 'water'" :class="inventoryCategory === 'water' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">水</button>
-                <button @click="inventoryCategory = 'food'" :class="inventoryCategory === 'food' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">食物</button>
-                <button @click="inventoryCategory = 'medical'" :class="inventoryCategory === 'medical' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">醫療</button>
-                <button @click="inventoryCategory = 'power'" :class="inventoryCategory === 'power' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">電力</button>
-                <button @click="inventoryCategory = 'daily'" :class="inventoryCategory === 'daily' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">日用品</button>
-            </div>
-
-            <!-- Inventory List -->
-            <div class="space-y-3">
-                <template x-for="item in filteredInventory" :key="item.id">
-                    <div class="bg-white rounded-xl p-4 shadow-sm" :class="item.quantity < item.min_quantity && item.min_quantity > 0 ? 'border-l-4 border-red-500' : ''">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <h4 class="font-semibold" x-text="item.name"></h4>
-                                <p class="text-sm text-gray-500">
-                                    <span x-text="item.quantity"></span> <span x-text="item.unit || '個'"></span>
-                                    <span x-show="item.location" class="ml-2">📍<span x-text="item.location"></span></span>
-                                </p>
-                                <p x-show="item.expiry_date" class="text-xs text-gray-400 mt-1">
-                                    效期: <span x-text="item.expiry_date"></span>
-                                </p>
-                            </div>
-                            <button @click="startDistribute(item)" x-show="currentUser" class="bg-primary-100 text-primary-600 px-3 py-1 rounded-lg text-sm">
-                                發放
-                            </button>
-                        </div>
-                    </div>
-                </template>
-                <p x-show="filteredInventory.length === 0" class="text-center text-gray-400 py-8">無物資資料</p>
-            </div>
-        </div>
-
-        <!-- People Tab -->
-        <div x-show="currentTab === 'people'" x-cloak class="p-4">
-            <!-- Search & Add -->
+            <!-- Search -->
             <div class="flex space-x-2 mb-4">
                 <input type="text" x-model="peopleSearch" placeholder="搜尋姓名/ID..." class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
-                <button @click="showAddPerson = true" x-show="currentUser" class="bg-primary-600 text-white px-4 py-2 rounded-lg">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                    </svg>
-                </button>
             </div>
 
             <!-- Triage Filter -->
-            <div class="flex space-x-2 mb-4">
-                <button @click="triageFilter = ''" :class="triageFilter === '' ? 'bg-gray-800 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm">全部</button>
-                <button @click="triageFilter = 'GREEN'" :class="triageFilter === 'GREEN' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700'" class="px-3 py-1 rounded-full text-sm">輕傷</button>
-                <button @click="triageFilter = 'YELLOW'" :class="triageFilter === 'YELLOW' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'" class="px-3 py-1 rounded-full text-sm">延遲</button>
-                <button @click="triageFilter = 'RED'" :class="triageFilter === 'RED' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700'" class="px-3 py-1 rounded-full text-sm">立即</button>
+            <div class="flex space-x-2 mb-4 overflow-x-auto">
+                <button @click="triageFilter = ''" :class="triageFilter === '' ? 'bg-gray-800 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">全部</button>
+                <button @click="triageFilter = 'GREEN'" :class="triageFilter === 'GREEN' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">輕傷</button>
+                <button @click="triageFilter = 'YELLOW'" :class="triageFilter === 'YELLOW' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">延遲</button>
+                <button @click="triageFilter = 'RED'" :class="triageFilter === 'RED' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">立即</button>
+                <button @click="triageFilter = 'BLACK'" :class="triageFilter === 'BLACK' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">死亡</button>
             </div>
 
             <!-- People List -->
-            <div class="space-y-3">
+            <div class="space-y-2">
                 <template x-for="person in filteredPeople" :key="person.id">
-                    <div class="bg-white rounded-xl p-4 shadow-sm flex items-center">
+                    <div class="bg-white rounded-xl p-3 shadow-sm flex items-center">
                         <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold mr-3"
                              :class="{
                                  'bg-green-500': person.triage_status === 'GREEN',
@@ -250,11 +138,11 @@
                              }">
                             <span x-text="person.display_name?.charAt(0) || '?'"></span>
                         </div>
-                        <div class="flex-1">
-                            <h4 class="font-semibold" x-text="person.display_name"></h4>
-                            <p class="text-xs text-gray-500">
-                                ID: <span x-text="person.id"></span>
-                                <span x-show="person.current_location" class="ml-2">📍<span x-text="person.current_location"></span></span>
+                        <div class="flex-1 min-w-0">
+                            <h4 class="font-semibold truncate" x-text="person.display_name"></h4>
+                            <p class="text-xs text-gray-500 truncate">
+                                <span x-text="person.id"></span>
+                                <span x-show="person.current_location" class="ml-1">· <span x-text="person.current_location"></span></span>
                             </p>
                         </div>
                         <button @click="startTriage(person)" x-show="currentUser && (currentUser.role === 'admin' || currentUser.role === 'medic')" class="text-primary-600 p-2">
@@ -268,8 +156,207 @@
             </div>
         </div>
 
-        <!-- Messages Tab -->
+        <!-- ==================== 物資 Tab ==================== -->
+        <div x-show="currentTab === 'inventory'" x-cloak class="p-4">
+            <!-- Intake/Distribute Cards (MIRS style) -->
+            <div class="grid grid-cols-2 gap-3 mb-4" x-show="currentUser">
+                <button @click="showIntakeModal = true" class="bg-emerald-500 text-white rounded-xl p-4 text-center card-press shadow-sm">
+                    <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    <span class="font-medium">入庫</span>
+                </button>
+                <button @click="showDistributeSelectModal = true" class="bg-orange-500 text-white rounded-xl p-4 text-center card-press shadow-sm">
+                    <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                    </svg>
+                    <span class="font-medium">發放</span>
+                </button>
+            </div>
+
+            <!-- Expiry Alerts -->
+            <div x-show="expiringItems.length > 0" class="bg-amber-50 rounded-xl p-3 border border-amber-200 mb-4">
+                <h4 class="font-semibold text-amber-800 text-sm mb-2 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    即將到期
+                </h4>
+                <div class="space-y-1">
+                    <template x-for="item in expiringItems.slice(0, 3)" :key="item.id">
+                        <p class="text-xs text-amber-700">
+                            <span x-text="item.name"></span>
+                            <span x-show="item.specification" class="text-amber-500">(<span x-text="item.specification"></span>)</span>
+                            - <span x-text="item.expiry_date"></span>
+                        </p>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Low Stock Alerts -->
+            <div x-show="stats.inventory_alerts?.length > 0" class="bg-red-50 rounded-xl p-3 border border-red-200 mb-4">
+                <h4 class="font-semibold text-red-800 text-sm mb-2 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                    </svg>
+                    庫存不足
+                </h4>
+                <div class="space-y-1">
+                    <template x-for="alert in stats.inventory_alerts?.slice(0, 3)" :key="alert.id">
+                        <p class="text-xs text-red-700">
+                            <span x-text="alert.name"></span>: 剩 <span class="font-medium" x-text="alert.quantity"></span> <span x-text="alert.unit || '個'"></span>
+                        </p>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Search & Filter -->
+            <div class="flex space-x-2 mb-3">
+                <input type="text" x-model="inventorySearch" placeholder="搜尋物資..." class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <button @click="showAddInventoryModal = true" x-show="currentUser" class="bg-primary-600 text-white px-3 py-2 rounded-lg">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Category Filter -->
+            <div class="flex space-x-2 overflow-x-auto pb-2 mb-3">
+                <button @click="inventoryCategory = ''" :class="inventoryCategory === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">全部</button>
+                <button @click="inventoryCategory = 'water'" :class="inventoryCategory === 'water' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">水</button>
+                <button @click="inventoryCategory = 'food'" :class="inventoryCategory === 'food' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">食物</button>
+                <button @click="inventoryCategory = 'medical'" :class="inventoryCategory === 'medical' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">醫療</button>
+                <button @click="inventoryCategory = 'power'" :class="inventoryCategory === 'power' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">電力</button>
+                <button @click="inventoryCategory = 'daily'" :class="inventoryCategory === 'daily' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">日用品</button>
+            </div>
+
+            <!-- Inventory List -->
+            <div class="space-y-2">
+                <template x-for="item in filteredInventory" :key="item.id">
+                    <div class="bg-white rounded-xl p-3 shadow-sm" :class="item.quantity < item.min_quantity && item.min_quantity > 0 ? 'border-l-4 border-red-500' : ''">
+                        <div class="flex justify-between items-start">
+                            <div class="flex-1 min-w-0">
+                                <h4 class="font-semibold truncate">
+                                    <span x-text="item.name"></span>
+                                    <span x-show="item.specification" class="text-gray-500 font-normal text-sm">(<span x-text="item.specification"></span>)</span>
+                                </h4>
+                                <p class="text-sm text-gray-600">
+                                    <span class="font-medium" x-text="item.quantity"></span> <span x-text="item.unit || '個'"></span>
+                                    <span x-show="item.location" class="text-gray-400 ml-2">· <span x-text="item.location"></span></span>
+                                </p>
+                                <p x-show="item.expiry_date" class="text-xs text-gray-400">
+                                    效期: <span x-text="item.expiry_date"></span>
+                                </p>
+                            </div>
+                            <div class="flex space-x-1" x-show="currentUser">
+                                <button @click="quickIntake(item)" class="text-emerald-600 p-1.5 bg-emerald-50 rounded-lg">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                </button>
+                                <button @click="startDistribute(item)" class="text-orange-600 p-1.5 bg-orange-50 rounded-lg">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="filteredInventory.length === 0" class="text-center text-gray-400 py-8">無物資資料</p>
+            </div>
+        </div>
+
+        <!-- ==================== 設備 Tab ==================== -->
+        <div x-show="currentTab === 'equipment'" x-cloak class="p-4">
+            <!-- Pending Checks Alert -->
+            <div x-show="equipmentPending.length > 0" class="bg-orange-50 rounded-xl p-4 border border-orange-200 mb-4">
+                <h3 class="font-semibold text-orange-800 mb-2 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    待檢設備 (<span x-text="equipmentPending.length"></span>)
+                </h3>
+                <div class="space-y-2">
+                    <template x-for="eq in equipmentPending" :key="eq.id">
+                        <div class="bg-white rounded-lg p-3 flex items-center justify-between">
+                            <div>
+                                <p class="font-medium" x-text="eq.name"></p>
+                                <p class="text-xs text-gray-500">
+                                    上次檢查: <span x-text="eq.last_check_date || '從未'"></span>
+                                </p>
+                            </div>
+                            <button @click="startEquipmentCheck(eq)" x-show="currentUser" class="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm">
+                                檢查
+                            </button>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- All Equipment -->
+            <h3 class="font-semibold mb-3">所有設備</h3>
+            <div class="space-y-2">
+                <template x-for="eq in equipment" :key="eq.id">
+                    <div class="bg-white rounded-xl p-3 shadow-sm">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="font-semibold">
+                                    <span x-text="eq.name"></span>
+                                    <span x-show="eq.specification" class="text-gray-500 font-normal text-sm">(<span x-text="eq.specification"></span>)</span>
+                                </h4>
+                                <p class="text-sm text-gray-600">
+                                    數量: <span x-text="eq.quantity"></span> <span x-text="eq.unit || '台'"></span>
+                                    <span x-show="eq.location" class="text-gray-400">· <span x-text="eq.location"></span></span>
+                                </p>
+                                <div class="flex items-center mt-1 text-xs">
+                                    <span class="px-2 py-0.5 rounded-full mr-2"
+                                          :class="{
+                                              'bg-green-100 text-green-700': eq.check_status === 'OK',
+                                              'bg-yellow-100 text-yellow-700': eq.check_status === 'NEEDS_REPAIR',
+                                              'bg-red-100 text-red-700': eq.check_status === 'OUT_OF_SERVICE',
+                                              'bg-gray-100 text-gray-500': !eq.check_status
+                                          }"
+                                          x-text="getCheckStatusText(eq.check_status)"></span>
+                                    <span class="text-gray-400">
+                                        檢查週期: <span x-text="eq.check_interval_days || '-'"></span>天
+                                    </span>
+                                </div>
+                            </div>
+                            <button @click="startEquipmentCheck(eq)" x-show="currentUser" class="text-primary-600 p-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="equipment.length === 0" class="text-center text-gray-400 py-8">無設備資料</p>
+            </div>
+
+            <!-- Add Equipment Button -->
+            <button @click="showAddEquipmentModal = true" x-show="currentUser" class="fixed bottom-24 right-4 w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg flex items-center justify-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- ==================== 留言板 Tab ==================== -->
         <div x-show="currentTab === 'messages'" x-cloak class="p-4">
+            <!-- Broadcast -->
+            <div x-show="broadcast" class="bg-amber-50 border-l-4 border-amber-400 p-3 rounded-r-lg mb-4">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                    </svg>
+                    <div>
+                        <p class="text-sm font-medium text-amber-800">公告</p>
+                        <p class="text-sm text-amber-700" x-text="broadcast"></p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Category Filter -->
             <div class="flex space-x-2 overflow-x-auto pb-2 mb-4">
                 <button @click="messageCategory = ''" :class="messageCategory === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">全部</button>
@@ -291,7 +378,7 @@
                                       'bg-gray-100 text-gray-700': !msg.category || msg.category === 'general'
                                   }"
                                   x-text="getCategoryName(msg.category)"></span>
-                            <span x-show="msg.is_resolved" class="text-xs text-green-600">✓ 已解決</span>
+                            <span x-show="msg.is_resolved" class="text-xs text-green-600">已解決</span>
                         </div>
                         <p class="text-gray-800" x-text="msg.content"></p>
                         <div class="flex justify-between items-center mt-2 text-xs text-gray-400">
@@ -312,28 +399,29 @@
         </div>
     </main>
 
-    <!-- Bottom Navigation -->
+    <!-- Bottom Navigation (4 tabs) -->
     <nav class="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 bottom-nav z-50">
         <div class="flex justify-around max-w-lg mx-auto">
-            <button @click="currentTab = 'home'" :class="currentTab === 'home' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
-                </svg>
-                <span class="text-xs mt-1">首頁</span>
-            </button>
-            <button @click="currentTab = 'inventory'; loadInventory()" :class="currentTab === 'inventory' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
-                </svg>
-                <span class="text-xs mt-1">物資</span>
-            </button>
-            <button @click="currentTab = 'people'; loadPeople()" :class="currentTab === 'people' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
+            <button @click="switchTab('people')" :class="currentTab === 'people' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
                 <span class="text-xs mt-1">人員</span>
             </button>
-            <button @click="currentTab = 'messages'; loadMessages()" :class="currentTab === 'messages' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
+            <button @click="switchTab('inventory')" :class="currentTab === 'inventory' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                </svg>
+                <span class="text-xs mt-1">物資</span>
+            </button>
+            <button @click="switchTab('equipment')" :class="currentTab === 'equipment' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+                <span class="text-xs mt-1">設備</span>
+            </button>
+            <button @click="switchTab('messages')" :class="currentTab === 'messages' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
                 </svg>
@@ -341,6 +429,8 @@
             </button>
         </div>
     </nav>
+
+    <!-- ==================== Modals ==================== -->
 
     <!-- Login Modal -->
     <div x-show="showLoginModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showLoginModal = false">
@@ -390,10 +480,60 @@
         </div>
     </div>
 
+    <!-- Intake Modal -->
+    <div x-show="showIntakeModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showIntakeModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">入庫</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">選擇物資</label>
+                    <select x-model="intakeForm.item_id" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                        <option value="">-- 選擇 --</option>
+                        <template x-for="item in inventory.filter(i => i.category !== 'equipment')" :key="item.id">
+                            <option :value="item.id" x-text="item.name + (item.specification ? ' (' + item.specification + ')' : '')"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">入庫數量</label>
+                    <div class="flex items-center space-x-3">
+                        <button @click="intakeForm.quantity = Math.max(1, intakeForm.quantity - 1)" class="w-10 h-10 bg-gray-100 rounded-lg text-lg">-</button>
+                        <input type="number" x-model.number="intakeForm.quantity" class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-center" min="1">
+                        <button @click="intakeForm.quantity++" class="w-10 h-10 bg-gray-100 rounded-lg text-lg">+</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">備註</label>
+                    <input type="text" x-model="intakeForm.notes" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="選填">
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="showIntakeModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="doIntake()" class="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg">確認入庫</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Distribute Select Modal -->
+    <div x-show="showDistributeSelectModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDistributeSelectModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">選擇發放物資</h3>
+            <div class="space-y-2 max-h-80 overflow-y-auto">
+                <template x-for="item in inventory.filter(i => i.category !== 'equipment' && i.quantity > 0)" :key="item.id">
+                    <button @click="startDistribute(item); showDistributeSelectModal = false" class="w-full bg-gray-50 hover:bg-gray-100 rounded-lg p-3 text-left">
+                        <p class="font-medium" x-text="item.name + (item.specification ? ' (' + item.specification + ')' : '')"></p>
+                        <p class="text-sm text-gray-500">庫存: <span x-text="item.quantity"></span> <span x-text="item.unit || '個'"></span></p>
+                    </button>
+                </template>
+            </div>
+            <button @click="showDistributeSelectModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+        </div>
+    </div>
+
     <!-- Distribute Modal -->
     <div x-show="showDistributeModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDistributeModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-4">發放物資: <span x-text="distributeItem?.name"></span></h3>
+            <h3 class="text-lg font-semibold mb-4">發放: <span x-text="distributeItem?.name"></span></h3>
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm text-gray-600 mb-1">領取人 ID</label>
@@ -413,28 +553,144 @@
                 </div>
                 <div class="flex space-x-3">
                     <button @click="showDistributeModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doDistribute()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">確認發放</button>
+                    <button @click="doDistribute()" class="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg">確認發放</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Add Person Modal -->
-    <div x-show="showAddPerson" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showAddPerson = false">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-4">新增人員</h3>
-            <div class="space-y-4">
+    <!-- Add Inventory Modal -->
+    <div x-show="showAddInventoryModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showAddInventoryModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
+            <h3 class="text-lg font-semibold mb-4">新增物資</h3>
+            <div class="space-y-3">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">姓名 *</label>
-                    <input type="text" x-model="newPerson.display_name" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                    <label class="block text-sm text-gray-600 mb-1">名稱 *</label>
+                    <input type="text" x-model="newInventory.name" @input="checkSimilarItems()" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 礦泉水">
+                </div>
+                <!-- Similar Items Suggestion -->
+                <div x-show="similarItems.length > 0" class="bg-blue-50 rounded-lg p-3">
+                    <p class="text-sm text-blue-700 mb-2">找到類似物資，是否直接入庫？</p>
+                    <template x-for="si in similarItems" :key="si.id">
+                        <button @click="quickIntake(si); showAddInventoryModal = false" class="w-full bg-white rounded p-2 mb-1 text-left text-sm hover:bg-blue-100">
+                            <span x-text="si.name"></span>
+                            <span x-show="si.specification" class="text-gray-500">(<span x-text="si.specification"></span>)</span>
+                            - <span x-text="si.quantity"></span> <span x-text="si.unit || '個'"></span>
+                        </button>
+                    </template>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">規格</label>
+                    <input type="text" x-model="newInventory.specification" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 600ml, 5公斤裝">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">分類 *</label>
+                    <select x-model="newInventory.category" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                        <option value="water">水</option>
+                        <option value="food">食物</option>
+                        <option value="medical">醫療</option>
+                        <option value="power">電力</option>
+                        <option value="daily">日用品</option>
+                        <option value="other">其他</option>
+                    </select>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">數量</label>
+                        <input type="number" x-model.number="newInventory.quantity" class="w-full border border-gray-200 rounded-lg px-3 py-2" min="0">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">單位</label>
+                        <input type="text" x-model="newInventory.unit" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="瓶/箱/個">
+                    </div>
                 </div>
                 <div>
                     <label class="block text-sm text-gray-600 mb-1">位置</label>
-                    <input type="text" x-model="newPerson.current_location" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 主收容區">
+                    <input type="text" x-model="newInventory.location" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="倉庫A">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">效期</label>
+                    <input type="date" x-model="newInventory.expiry_date" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="showAddPerson = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doAddPerson()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">新增</button>
+                    <button @click="showAddInventoryModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="doAddInventory()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">新增</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Equipment Check Modal -->
+    <div x-show="showEquipmentCheckModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showEquipmentCheckModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">設備檢查: <span x-text="checkTarget?.name"></span></h3>
+            <div class="space-y-4">
+                <div class="grid grid-cols-3 gap-2">
+                    <button @click="equipmentCheckForm.status = 'OK'" :class="equipmentCheckForm.status === 'OK' ? 'ring-2 ring-green-500' : ''" class="bg-green-100 text-green-700 rounded-xl p-4 text-center">
+                        <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                        </svg>
+                        <span class="text-sm font-medium">正常</span>
+                    </button>
+                    <button @click="equipmentCheckForm.status = 'NEEDS_REPAIR'" :class="equipmentCheckForm.status === 'NEEDS_REPAIR' ? 'ring-2 ring-yellow-500' : ''" class="bg-yellow-100 text-yellow-700 rounded-xl p-4 text-center">
+                        <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                        </svg>
+                        <span class="text-sm font-medium">待修</span>
+                    </button>
+                    <button @click="equipmentCheckForm.status = 'OUT_OF_SERVICE'" :class="equipmentCheckForm.status === 'OUT_OF_SERVICE' ? 'ring-2 ring-red-500' : ''" class="bg-red-100 text-red-700 rounded-xl p-4 text-center">
+                        <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        <span class="text-sm font-medium">停用</span>
+                    </button>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">備註</label>
+                    <input type="text" x-model="equipmentCheckForm.notes" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="選填">
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="showEquipmentCheckModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="doEquipmentCheck()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">確認</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Equipment Modal -->
+    <div x-show="showAddEquipmentModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showAddEquipmentModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">新增設備</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">名稱 *</label>
+                    <input type="text" x-model="newEquipment.name" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 發電機">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">規格</label>
+                    <input type="text" x-model="newEquipment.specification" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 3kW">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">數量</label>
+                        <input type="number" x-model.number="newEquipment.quantity" class="w-full border border-gray-200 rounded-lg px-3 py-2" min="1" value="1">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1">單位</label>
+                        <input type="text" x-model="newEquipment.unit" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="台">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">位置</label>
+                    <input type="text" x-model="newEquipment.location" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">檢查週期 (天)</label>
+                    <input type="number" x-model.number="newEquipment.check_interval_days" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="1 = 每日檢查" min="1">
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="showAddEquipmentModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="doAddEquipment()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">新增</button>
                 </div>
             </div>
         </div>
@@ -471,20 +727,18 @@
         </div>
     </div>
 
-    <!-- Broadcast Modal -->
-    <div x-show="showBroadcastModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBroadcastModal = false">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-4">發布公告</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm text-gray-600 mb-1">公告內容</label>
-                    <textarea x-model="newBroadcast" class="w-full border border-gray-200 rounded-lg px-3 py-2 h-24" placeholder="輸入公告內容..."></textarea>
-                </div>
-                <div class="flex space-x-3">
-                    <button @click="showBroadcastModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doBroadcast()" class="flex-1 px-4 py-2 bg-amber-500 text-white rounded-lg">發布</button>
-                </div>
-            </div>
+    <!-- Distribute QR Code Modal -->
+    <div x-show="showDistributeQRModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDistributeQRModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
+            <h3 class="text-lg font-semibold mb-2">發放成功</h3>
+            <p class="text-sm text-gray-600 mb-4">
+                <span x-text="lastDistributeResult?.item?.name"></span>
+                <span x-show="lastDistributeResult?.item?.specification" class="text-gray-400">(<span x-text="lastDistributeResult?.item?.specification"></span>)</span>
+                x <span x-text="lastDistributeResult?.quantity"></span>
+            </p>
+            <div id="distribute-qrcode" class="flex justify-center mb-4"></div>
+            <p class="text-sm text-gray-500 mb-4">讓領取人用 HIRS App 掃描此 QR Code 同步到家庭物資</p>
+            <button @click="showDistributeQRModal = false" class="w-full py-2 bg-primary-600 text-white rounded-lg font-medium">關閉</button>
         </div>
     </div>
 
@@ -504,7 +758,7 @@
     <script>
         function cirsApp() {
             return {
-                currentTab: 'home',
+                currentTab: 'people',
                 currentUser: null,
                 token: null,
 
@@ -512,8 +766,12 @@
                 stats: {},
                 broadcast: null,
                 inventory: [],
+                equipment: [],
+                equipmentPending: [],
+                expiringItems: [],
                 people: [],
                 messages: [],
+                similarItems: [],
 
                 // Filters
                 inventorySearch: '',
@@ -525,26 +783,40 @@
                 // Modals
                 showLoginModal: false,
                 showTriageModal: false,
+                showIntakeModal: false,
                 showDistributeModal: false,
-                showAddPerson: false,
+                showDistributeSelectModal: false,
+                showAddInventoryModal: false,
+                showEquipmentCheckModal: false,
+                showAddEquipmentModal: false,
                 showAddMessage: false,
-                showBroadcastModal: false,
-                showAddInventory: false,
+                showDistributeQRModal: false,
+                lastDistributeResult: null,
 
                 // Forms
                 loginForm: { person_id: '', pin: '' },
                 loginError: '',
                 triageTarget: null,
+                newPerson: { display_name: '', current_location: '', triage_status: 'GREEN' },
+                intakeForm: { item_id: '', quantity: 1, notes: '' },
                 distributeItem: null,
                 distributeForm: { person_id: '', quantity: 1, notes: '' },
-                newPerson: { display_name: '', current_location: '' },
+                newInventory: { name: '', specification: '', category: 'water', quantity: 0, unit: '', location: '', expiry_date: '' },
+                checkTarget: null,
+                equipmentCheckForm: { status: 'OK', notes: '' },
+                newEquipment: { name: '', specification: '', quantity: 1, unit: '台', location: '', check_interval_days: 1 },
                 newMessage: { category: 'general', content: '', author_name: '' },
-                newBroadcast: '',
 
                 // Toast
                 toast: { show: false, message: '', type: 'success' },
 
                 async init() {
+                    // Check URL hash for tab
+                    const hash = window.location.hash.replace('#', '');
+                    if (['people', 'inventory', 'equipment', 'messages'].includes(hash)) {
+                        this.currentTab = hash;
+                    }
+
                     // Check for saved token
                     const savedToken = localStorage.getItem('cirs_token');
                     if (savedToken) {
@@ -554,28 +826,39 @@
 
                     await this.loadStats();
                     await this.loadBroadcast();
+                    this.loadTabData();
 
-                    // Polling
+                    // Polling every 30 seconds
                     setInterval(() => {
                         this.loadStats();
                         this.loadBroadcast();
-                    }, 10000);
+                    }, 30000);
+                },
+
+                switchTab(tab) {
+                    this.currentTab = tab;
+                    window.location.hash = tab;
+                    this.loadTabData();
+                },
+
+                loadTabData() {
+                    switch(this.currentTab) {
+                        case 'people': this.loadPeople(); break;
+                        case 'inventory': this.loadInventory(); this.loadExpiringItems(); break;
+                        case 'equipment': this.loadEquipment(); this.loadEquipmentPending(); break;
+                        case 'messages': this.loadMessages(); break;
+                    }
                 },
 
                 get pageTitle() {
-                    const titles = {
-                        'home': '首頁',
-                        'inventory': '物資管理',
-                        'people': '人員管理',
-                        'messages': '互助留言板'
-                    };
+                    const titles = { 'people': '人員管理', 'inventory': '物資管理', 'equipment': '設備檢查', 'messages': '互助留言板' };
                     return titles[this.currentTab] || 'CIRS';
                 },
 
                 get filteredInventory() {
                     return this.inventory.filter(item => {
-                        const matchSearch = !this.inventorySearch ||
-                            item.name.toLowerCase().includes(this.inventorySearch.toLowerCase());
+                        if (item.category === 'equipment') return false;
+                        const matchSearch = !this.inventorySearch || item.name.toLowerCase().includes(this.inventorySearch.toLowerCase());
                         const matchCategory = !this.inventoryCategory || item.category === this.inventoryCategory;
                         return matchSearch && matchCategory;
                     });
@@ -583,36 +866,26 @@
 
                 get filteredPeople() {
                     return this.people.filter(p => {
-                        const matchSearch = !this.peopleSearch ||
-                            p.display_name.toLowerCase().includes(this.peopleSearch.toLowerCase()) ||
-                            p.id.includes(this.peopleSearch);
+                        if (p.role !== 'public') return false;
+                        const matchSearch = !this.peopleSearch || p.display_name.toLowerCase().includes(this.peopleSearch.toLowerCase()) || p.id.includes(this.peopleSearch);
                         const matchTriage = !this.triageFilter || p.triage_status === this.triageFilter;
                         return matchSearch && matchTriage;
                     });
                 },
 
                 get filteredMessages() {
-                    return this.messages.filter(m => {
-                        return !this.messageCategory || m.category === this.messageCategory;
-                    });
+                    return this.messages.filter(m => !this.messageCategory || m.category === this.messageCategory);
                 },
 
                 async apiCall(url, options = {}) {
                     if (this.token) {
-                        options.headers = {
-                            ...options.headers,
-                            'Authorization': `Bearer ${this.token}`
-                        };
+                        options.headers = { ...options.headers, 'Authorization': `Bearer ${this.token}` };
                     }
                     if (options.body && typeof options.body === 'object') {
-                        options.headers = {
-                            ...options.headers,
-                            'Content-Type': 'application/json'
-                        };
+                        options.headers = { ...options.headers, 'Content-Type': 'application/json' };
                         options.body = JSON.stringify(options.body);
                     }
-                    const res = await fetch(url, options);
-                    return res;
+                    return await fetch(url, options);
                 },
 
                 async verifyToken() {
@@ -620,15 +893,10 @@
                         const res = await this.apiCall('/api/auth/verify', { method: 'POST' });
                         if (res.ok) {
                             const data = await res.json();
-                            if (data.valid) {
-                                this.currentUser = data.person;
-                            } else {
-                                this.logout();
-                            }
+                            if (data.valid) this.currentUser = data.person;
+                            else this.logout();
                         }
-                    } catch (e) {
-                        console.error('Token verify failed:', e);
-                    }
+                    } catch (e) { console.error('Token verify failed:', e); }
                 },
 
                 async doLogin() {
@@ -649,9 +917,7 @@
                         } else {
                             this.loginError = data.detail || '登入失敗';
                         }
-                    } catch (e) {
-                        this.loginError = '網路錯誤';
-                    }
+                    } catch (e) { this.loginError = '網路錯誤'; }
                 },
 
                 logout() {
@@ -687,6 +953,36 @@
                     } catch (e) {}
                 },
 
+                async loadExpiringItems() {
+                    try {
+                        const res = await fetch('/api/inventory/expiring?days=7');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.expiringItems = data.items || [];
+                        }
+                    } catch (e) {}
+                },
+
+                async loadEquipment() {
+                    try {
+                        const res = await fetch('/api/inventory?category=equipment');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.equipment = data.items || [];
+                        }
+                    } catch (e) {}
+                },
+
+                async loadEquipmentPending() {
+                    try {
+                        const res = await fetch('/api/inventory/equipment-pending');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.equipmentPending = data.items || [];
+                        }
+                    } catch (e) {}
+                },
+
                 async loadPeople() {
                     try {
                         const res = await this.apiCall('/api/person');
@@ -707,6 +1003,31 @@
                     } catch (e) {}
                 },
 
+                // Quick check-in with triage
+                async doQuickCheckIn() {
+                    if (!this.newPerson.display_name) {
+                        this.showToast('請輸入姓名', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await this.apiCall('/api/person', {
+                            method: 'POST',
+                            body: {
+                                display_name: this.newPerson.display_name,
+                                current_location: this.newPerson.current_location,
+                                triage_status: this.newPerson.triage_status
+                            }
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.showToast(`報到成功 ID: ${data.id}`, 'success');
+                            this.newPerson = { display_name: '', current_location: '', triage_status: 'GREEN' };
+                            await this.loadPeople();
+                            await this.loadStats();
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
                 startTriage(person) {
                     this.triageTarget = person;
                     this.showTriageModal = true;
@@ -724,9 +1045,34 @@
                             await this.loadPeople();
                             await this.loadStats();
                         }
-                    } catch (e) {
-                        this.showToast('操作失敗', 'error');
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                // Inventory operations
+                quickIntake(item) {
+                    this.intakeForm = { item_id: item.id, quantity: 1, notes: '' };
+                    this.showIntakeModal = true;
+                },
+
+                async doIntake() {
+                    if (!this.intakeForm.item_id) {
+                        this.showToast('請選擇物資', 'error');
+                        return;
                     }
+                    try {
+                        const res = await this.apiCall(`/api/inventory/${this.intakeForm.item_id}/intake`, {
+                            method: 'POST',
+                            body: { quantity: this.intakeForm.quantity, notes: this.intakeForm.notes }
+                        });
+                        if (res.ok) {
+                            this.showIntakeModal = false;
+                            this.showToast('入庫成功', 'success');
+                            await this.loadInventory();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '入庫失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
                 },
 
                 startDistribute(item) {
@@ -746,42 +1092,149 @@
                             body: this.distributeForm
                         });
                         if (res.ok) {
+                            const result = await res.json();
                             this.showDistributeModal = false;
-                            this.showToast('發放成功', 'success');
+
+                            // 儲存發放結果，準備產生 QR Code
+                            this.lastDistributeResult = {
+                                item: this.distributeItem,
+                                quantity: this.distributeForm.quantity,
+                                person_id: this.distributeForm.person_id,
+                                timestamp: new Date().toISOString()
+                            };
+
+                            // 顯示 QR Code modal
+                            this.generateDistributeQR();
+
                             await this.loadInventory();
                             await this.loadStats();
                         } else {
                             const err = await res.json();
                             this.showToast(err.detail || '發放失敗', 'error');
                         }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                generateDistributeQR() {
+                    if (!this.lastDistributeResult) return;
+
+                    const r = this.lastDistributeResult;
+                    // 產生 HIRS 相容的封包格式
+                    const data = {
+                        type: 'cirs_distribute',
+                        source: 'CIRS 社區物資站',
+                        timestamp: r.timestamp,
+                        recipient: r.person_id,
+                        inventory: [{
+                            name: r.item.name,
+                            qty: r.quantity,
+                            unit: r.item.unit || '個',
+                            category: r.item.category,
+                            expiry: r.item.expiry_date || null,
+                            spec: r.item.specification || null
+                        }]
+                    };
+
+                    const jsonStr = JSON.stringify(data);
+
+                    try {
+                        const qr = qrcode(0, 'L');
+                        qr.addData(jsonStr, 'Byte');
+                        qr.make();
+
+                        const container = document.getElementById('distribute-qrcode');
+                        if (container) {
+                            container.innerHTML = qr.createImgTag(5);
+                        }
+                        this.showDistributeQRModal = true;
                     } catch (e) {
-                        this.showToast('操作失敗', 'error');
+                        console.error('QR generation error:', e);
+                        this.showToast('發放成功，QR Code 產生失敗', 'info');
                     }
                 },
 
-                async doAddPerson() {
-                    if (!this.newPerson.display_name) {
-                        this.showToast('請輸入姓名', 'error');
+                async checkSimilarItems() {
+                    if (this.newInventory.name.length < 2) {
+                        this.similarItems = [];
                         return;
                     }
                     try {
-                        const res = await this.apiCall('/api/person', {
-                            method: 'POST',
-                            body: this.newPerson
-                        });
+                        const res = await fetch(`/api/inventory/similar?name=${encodeURIComponent(this.newInventory.name)}`);
                         if (res.ok) {
                             const data = await res.json();
-                            this.showAddPerson = false;
-                            this.newPerson = { display_name: '', current_location: '' };
-                            this.showToast(`新增成功 ID: ${data.id}`, 'success');
-                            await this.loadPeople();
-                            await this.loadStats();
+                            this.similarItems = data.items || [];
                         }
-                    } catch (e) {
-                        this.showToast('操作失敗', 'error');
-                    }
+                    } catch (e) {}
                 },
 
+                async doAddInventory() {
+                    if (!this.newInventory.name) {
+                        this.showToast('請輸入名稱', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await this.apiCall('/api/inventory', {
+                            method: 'POST',
+                            body: this.newInventory
+                        });
+                        if (res.ok) {
+                            this.showAddInventoryModal = false;
+                            this.newInventory = { name: '', specification: '', category: 'water', quantity: 0, unit: '', location: '', expiry_date: '' };
+                            this.similarItems = [];
+                            this.showToast('新增成功', 'success');
+                            await this.loadInventory();
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                // Equipment operations
+                startEquipmentCheck(eq) {
+                    this.checkTarget = eq;
+                    this.equipmentCheckForm = { status: eq.check_status || 'OK', notes: '' };
+                    this.showEquipmentCheckModal = true;
+                },
+
+                async doEquipmentCheck() {
+                    try {
+                        const res = await this.apiCall(`/api/inventory/${this.checkTarget.id}/check`, {
+                            method: 'POST',
+                            body: this.equipmentCheckForm
+                        });
+                        if (res.ok) {
+                            this.showEquipmentCheckModal = false;
+                            this.showToast('檢查完成', 'success');
+                            await this.loadEquipment();
+                            await this.loadEquipmentPending();
+                            await this.loadStats();
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                async doAddEquipment() {
+                    if (!this.newEquipment.name) {
+                        this.showToast('請輸入名稱', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await this.apiCall('/api/inventory', {
+                            method: 'POST',
+                            body: {
+                                ...this.newEquipment,
+                                category: 'equipment',
+                                check_status: 'OK'
+                            }
+                        });
+                        if (res.ok) {
+                            this.showAddEquipmentModal = false;
+                            this.newEquipment = { name: '', specification: '', quantity: 1, unit: '台', location: '', check_interval_days: 1 };
+                            this.showToast('新增成功', 'success');
+                            await this.loadEquipment();
+                            await this.loadEquipmentPending();
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                // Messages
                 async doAddMessage() {
                     if (!this.newMessage.content) {
                         this.showToast('請輸入內容', 'error');
@@ -799,38 +1252,18 @@
                             this.showToast('發布成功', 'success');
                             await this.loadMessages();
                         }
-                    } catch (e) {
-                        this.showToast('操作失敗', 'error');
-                    }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
                 },
 
-                async doBroadcast() {
-                    if (!this.newBroadcast) return;
-                    try {
-                        const res = await this.apiCall('/api/messages/broadcast', {
-                            method: 'POST',
-                            body: { content: this.newBroadcast, is_pinned: true }
-                        });
-                        if (res.ok) {
-                            this.showBroadcastModal = false;
-                            this.newBroadcast = '';
-                            this.showToast('公告已發布', 'success');
-                            await this.loadBroadcast();
-                        }
-                    } catch (e) {
-                        this.showToast('操作失敗', 'error');
-                    }
-                },
-
+                // Helpers
                 getCategoryName(cat) {
-                    const names = {
-                        'seek_person': '尋人',
-                        'seek_item': '尋物',
-                        'offer_help': '互助',
-                        'report': '狀況回報',
-                        'general': '一般'
-                    };
+                    const names = { 'seek_person': '尋人', 'seek_item': '尋物', 'offer_help': '互助', 'report': '回報', 'general': '一般' };
                     return names[cat] || '一般';
+                },
+
+                getCheckStatusText(status) {
+                    const texts = { 'OK': '正常', 'NEEDS_REPAIR': '待修', 'OUT_OF_SERVICE': '停用' };
+                    return texts[status] || '未檢查';
                 },
 
                 formatTime(isoStr) {
