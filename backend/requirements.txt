@@ -1,0 +1,25 @@
+# CIRS Backend Dependencies
+
+# Web Framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Database (using built-in sqlite3)
+# No additional packages needed for SQLite
+
+# Utilities
+python-dateutil==2.8.2
+pydantic==2.5.2
+pydantic-settings==2.1.0
+
+# QR Code generation
+qrcode[pil]==7.4.2
+Pillow==10.1.0
+
+# CORS
+# (included in FastAPI)
