@@ -1,6 +1,6 @@
-# CIRS (Community Inventory Resilience System) v1.0 Development Specification
+# CIRS (Community Inventory Resilience System) v1.1 Development Specification
 
-**Version:** 1.0
+**Version:** 1.1
 **Target Environment:** Raspberry Pi (Backend) + Mobile PWA (Frontend)
 **Network Topology:** Raspberry Pi as Appliance (Ethernet to Mesh Router or WiFi Hotspot)
 **Core Philosophy:** Offline-First, Community-Scale, High Resilience
@@ -413,9 +413,12 @@ CREATE TABLE person (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 預設 Admin 帳號
-INSERT INTO person (id, display_name, role, pin_hash)
-VALUES ('admin001', '管理員', 'admin', '$2b$12$...');  -- PIN: 1234
+-- 預設帳號 (PIN 皆為 1234)
+-- bcrypt hash for '1234': $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC
+INSERT INTO person (id, display_name, role, pin_hash) VALUES
+    ('admin001', '管理員', 'admin', '$2b$12$...'),   -- 全部權限 + 站點設定 + 刪除
+    ('staff001', '志工小明', 'staff', '$2b$12$...'), -- 入庫/出庫/報到/設備檢查
+    ('medic001', '醫護小華', 'medic', '$2b$12$...'); -- 檢傷分類 + staff 權限
 ```
 
 ### 4.3 EventLog (事件紀錄表)
@@ -459,11 +462,12 @@ CREATE INDEX idx_event_time ON event_log(timestamp);
 ```sql
 CREATE TABLE message (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    message_type TEXT DEFAULT 'post', -- 'broadcast' (官方公告), 'post' (一般留言)
-    category TEXT,                    -- 'seek_person', 'seek_item', 'offer_help', 'report', 'general'
+    message_type TEXT DEFAULT 'post', -- 'broadcast' (官方公告), 'post' (一般留言), 'reply' (回覆)
+    category TEXT,                    -- 'seek_person', 'seek_item', 'offer_help', 'report', 'general', 'reply'
     content TEXT NOT NULL,
     author_name TEXT,                 -- 顯示名稱 (可匿名)
     author_id TEXT,                   -- FK to person.id (可為 NULL)
+    parent_id INTEGER,                -- FK to message.id (回覆用)
     image_data TEXT,                  -- Base64 壓縮圖片 (< 500KB)
     is_pinned BOOLEAN DEFAULT FALSE,  -- 置頂
     is_resolved BOOLEAN DEFAULT FALSE,-- 已解決 (尋人找到了)
@@ -561,8 +565,19 @@ GET    /api/events/item/:id              # 某物資的所有事件
 ### 5.5 Messages (留言板)
 
 ```
-GET    /api/messages                     # 最新 50 則
+GET    /api/messages                     # 最新 50 則 (含回覆)
 Query: ?category=seek_person&limit=20&offset=0
+Response: {
+    "messages": [
+        {
+            "id": 1,
+            "content": "...",
+            "replies": [
+                { "id": 10, "content": "回覆內容", "author_name": "匿名" }
+            ]
+        }
+    ]
+}
 
 GET    /api/messages/broadcast           # 目前置頂公告
 
@@ -577,8 +592,13 @@ Body: {
 POST   /api/messages/broadcast           # 發布公告 (Admin)
 Body: { "content": "物資車 14:00 抵達", "is_pinned": true }
 
-PUT    /api/messages/:id/resolve         # 標記已解決
-DELETE /api/messages/:id                 # 刪除 (Admin 或原作者)
+POST   /api/messages/:id/reply           # 回覆留言 (v1.1 新增)
+Body: { "content": "回覆內容", "author_name": "匿名" }
+
+POST   /api/messages/:id/resolve         # 標記已解決/取消解決 (v1.1 改為 POST)
+Body: { "is_resolved": true }
+
+DELETE /api/messages/:id                 # 刪除 (Admin only)
 ```
 
 ### 5.6 Sync & Stats
@@ -1808,6 +1828,25 @@ Additional Instructions:
 
 ---
 
-**Version:** 1.0
+**Version:** 1.1
 **Last Updated:** 2024-12
 **Author:** De Novo Orthopedics Inc. / 谷盺生物科技股份有限公司
+
+---
+
+## Changelog
+
+### v1.1 (2024-12)
+- **Database**: 新增 `parent_id` 欄位支援留言回覆
+- **API**: Messages resolve 改為 POST 方法
+- **API**: 新增 `/api/messages/:id/reply` 回覆路由
+- **API**: GET messages 回傳含 `replies` 陣列
+- **Accounts**: 預設新增 staff001 (志工) 和 medic001 (醫護) 帳號
+- **Frontend**: 設備管理新增檢查/編輯/刪除按鈕和統計
+- **Frontend**: 留言板新增回覆/解決/刪除功能
+- **Frontend**: 入庫/發放按鈕移至底部固定列
+- **Frontend**: 即時統計灰階顯示在上方
+- **Portal**: 管理員可編輯站點名稱和廣播公告
+
+### v1.0 (2024-12)
+- 初始版本
