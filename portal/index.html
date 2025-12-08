@@ -39,11 +39,14 @@
         .module-card:active {
             transform: scale(0.98);
         }
+        .stat-card {
+            transition: all 0.2s;
+        }
     </style>
 </head>
 <body class="bg-primary-100 min-h-screen" x-data="portalApp()" x-init="init()">
     <div class="max-w-lg mx-auto px-4 py-6">
-        <!-- Header -->
+        <!-- Header with Logo -->
         <header class="text-center mb-6">
             <div class="inline-flex items-center justify-center w-16 h-16 bg-primary-600 rounded-2xl mb-3">
                 <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -67,10 +70,94 @@
             </div>
         </div>
 
+        <!-- Stats Cards Row (above modules) -->
+        <div class="grid grid-cols-4 gap-2 mb-6">
+            <!-- Headcount -->
+            <div class="stat-card bg-white rounded-xl p-3 shadow-sm border border-primary-400/20 text-center">
+                <div class="w-8 h-8 bg-primary-100 rounded-lg flex items-center justify-center mx-auto mb-1">
+                    <svg class="w-5 h-5 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                </div>
+                <p class="text-xl font-bold text-primary-600" x-text="stats.headcount?.checked_in || 0"></p>
+                <p class="text-xs text-gray-500">在場</p>
+            </div>
+
+            <!-- Water Days -->
+            <div class="stat-card bg-white rounded-xl p-3 shadow-sm border border-blue-200 text-center">
+                <div class="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+                    <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                    </svg>
+                </div>
+                <p class="text-xl font-bold text-blue-600" x-text="stats.survival_days?.water || '-'"></p>
+                <p class="text-xs text-gray-500">水-天</p>
+            </div>
+
+            <!-- Food Days -->
+            <div class="stat-card bg-white rounded-xl p-3 shadow-sm border border-amber-200 text-center">
+                <div class="w-8 h-8 bg-amber-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+                    <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.701 2.701 0 00-1.5-.454M9 6v2m3-2v2m3-2v2M9 3h.01M12 3h.01M15 3h.01M21 21v-7a2 2 0 00-2-2H5a2 2 0 00-2 2v7h18zm-3-9v-2a2 2 0 00-2-2H8a2 2 0 00-2 2v2h12z"/>
+                    </svg>
+                </div>
+                <p class="text-xl font-bold text-amber-600" x-text="stats.survival_days?.food || '-'"></p>
+                <p class="text-xs text-gray-500">糧-天</p>
+            </div>
+
+            <!-- Equipment Pending -->
+            <div class="stat-card bg-white rounded-xl p-3 shadow-sm border border-orange-200 text-center">
+                <div class="w-8 h-8 bg-orange-50 rounded-lg flex items-center justify-center mx-auto mb-1">
+                    <svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
+                <p class="text-xl font-bold text-orange-600" x-text="stats.equipment_pending || 0"></p>
+                <p class="text-xs text-gray-500">待檢</p>
+            </div>
+        </div>
+
+        <!-- Triage Summary (if any people registered) -->
+        <div class="flex justify-center space-x-3 mb-6" x-show="stats.headcount?.total > 0" x-cloak>
+            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-green-100 text-green-800 border border-green-200">
+                <span class="w-2.5 h-2.5 bg-green-500 rounded-full mr-2"></span>
+                <span x-text="stats.headcount?.green || 0"></span>
+            </span>
+            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
+                <span class="w-2.5 h-2.5 bg-yellow-500 rounded-full mr-2"></span>
+                <span x-text="stats.headcount?.yellow || 0"></span>
+            </span>
+            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-red-100 text-red-800 border border-red-200">
+                <span class="w-2.5 h-2.5 bg-red-500 rounded-full mr-2"></span>
+                <span x-text="stats.headcount?.red || 0"></span>
+            </span>
+            <span class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium bg-gray-100 text-gray-800 border border-gray-300">
+                <span class="w-2.5 h-2.5 bg-gray-800 rounded-full mr-2"></span>
+                <span x-text="stats.headcount?.black || 0"></span>
+            </span>
+        </div>
+
+        <!-- Alerts (if any) -->
+        <div x-show="stats.inventory_alerts?.length > 0" x-cloak class="bg-red-50 rounded-xl p-4 border border-red-200 mb-6">
+            <h4 class="font-semibold text-red-800 mb-2 flex items-center text-sm">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+                物資警示
+            </h4>
+            <ul class="space-y-1">
+                <template x-for="alert in stats.inventory_alerts?.slice(0,3)" :key="alert.id">
+                    <li class="text-xs text-red-700">
+                        <span x-text="alert.name"></span>: 剩 <span class="font-medium" x-text="alert.quantity"></span><span x-text="alert.unit || '個'"></span>
+                    </li>
+                </template>
+            </ul>
+        </div>
+
         <!-- Module Grid -->
         <div class="grid grid-cols-2 gap-4 mb-6">
             <!-- Identity/Triage -->
-            <a href="/cirs/#/people" class="module-card bg-white rounded-2xl p-5 shadow-sm border border-primary-400/20 hover:shadow-md">
+            <a href="/frontend/#people" class="module-card bg-white rounded-2xl p-5 shadow-sm border border-primary-400/20 hover:shadow-md">
                 <div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mb-3">
                     <svg class="w-7 h-7 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
@@ -78,11 +165,10 @@
                 </div>
                 <h3 class="font-semibold text-gray-800">人員報到</h3>
                 <p class="text-xs text-gray-500 mt-1">Identity & Triage</p>
-                <p class="text-xs text-neutral-600 mt-2">志工/管理員</p>
             </a>
 
             <!-- Inventory -->
-            <a href="/cirs/#/inventory" class="module-card bg-white rounded-2xl p-5 shadow-sm border border-primary-400/20 hover:shadow-md">
+            <a href="/frontend/#inventory" class="module-card bg-white rounded-2xl p-5 shadow-sm border border-primary-400/20 hover:shadow-md">
                 <div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mb-3">
                     <svg class="w-7 h-7 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
@@ -90,11 +176,10 @@
                 </div>
                 <h3 class="font-semibold text-gray-800">物資管理</h3>
                 <p class="text-xs text-gray-500 mt-1">Inventory</p>
-                <p class="text-xs text-neutral-600 mt-2">志工/倉管</p>
             </a>
 
             <!-- Messages -->
-            <a href="/cirs/#/messages" class="module-card bg-white rounded-2xl p-5 shadow-sm border border-primary-400/20 hover:shadow-md">
+            <a href="/frontend/#messages" class="module-card bg-white rounded-2xl p-5 shadow-sm border border-primary-400/20 hover:shadow-md">
                 <div class="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center mb-3">
                     <svg class="w-7 h-7 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/>
@@ -102,7 +187,6 @@
                 </div>
                 <h3 class="font-semibold text-gray-800">互助留言板</h3>
                 <p class="text-xs text-gray-500 mt-1">Communication</p>
-                <p class="text-xs text-neutral-600 mt-2">所有人</p>
             </a>
 
             <!-- Files -->
@@ -114,92 +198,29 @@
                 </div>
                 <h3 class="font-semibold text-gray-800">防災資料庫</h3>
                 <p class="text-xs text-gray-500 mt-1">File Server</p>
-                <p class="text-xs text-neutral-600 mt-2">所有人</p>
             </a>
         </div>
 
-        <!-- Stats Panel -->
-        <div class="bg-white rounded-2xl p-5 shadow-sm border border-primary-400/20 mb-6">
-            <h3 class="font-semibold text-gray-800 mb-4 flex items-center">
-                <svg class="w-5 h-5 mr-2 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
-                </svg>
-                即時狀態
-            </h3>
-
-            <div class="grid grid-cols-2 gap-4 mb-4">
-                <!-- Headcount -->
-                <div class="bg-primary-100/50 rounded-xl p-4 text-center">
-                    <p class="text-3xl font-bold text-primary-600" x-text="stats.headcount?.checked_in || 0"></p>
-                    <p class="text-sm text-neutral-600">在場人數</p>
-                </div>
-
-                <!-- Survival Days -->
-                <div class="bg-primary-100/50 rounded-xl p-4 text-center">
-                    <div class="flex justify-center space-x-3">
-                        <span class="text-lg">
-                            <span class="text-blue-500">💧</span>
-                            <span class="font-bold" x-text="stats.survival_days?.water || '-'"></span>天
-                        </span>
-                        <span class="text-lg">
-                            <span class="text-amber-500">🍚</span>
-                            <span class="font-bold" x-text="stats.survival_days?.food || '-'"></span>天
-                        </span>
-                    </div>
-                    <p class="text-sm text-neutral-600 mt-1">維生天數</p>
-                </div>
-            </div>
-
-            <!-- Triage Summary -->
-            <div class="flex justify-center space-x-4 mb-4" x-show="stats.headcount?.total > 0">
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                    <span class="w-2 h-2 bg-green-500 rounded-full mr-1"></span>
-                    <span x-text="stats.headcount?.green || 0"></span>
+        <!-- Network Status -->
+        <div class="bg-white rounded-xl p-3 shadow-sm border border-primary-400/20 mb-6">
+            <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-500 flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                    </svg>
+                    網路狀態
                 </span>
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                    <span class="w-2 h-2 bg-yellow-500 rounded-full mr-1"></span>
-                    <span x-text="stats.headcount?.yellow || 0"></span>
-                </span>
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                    <span class="w-2 h-2 bg-red-500 rounded-full mr-1"></span>
-                    <span x-text="stats.headcount?.red || 0"></span>
-                </span>
-                <span class="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                    <span class="w-2 h-2 bg-gray-800 rounded-full mr-1"></span>
-                    <span x-text="stats.headcount?.black || 0"></span>
-                </span>
-            </div>
-
-            <!-- Network Status -->
-            <div class="flex items-center justify-between text-sm border-t border-gray-100 pt-3">
-                <span class="text-gray-500">網路狀態</span>
                 <span :class="networkStatus.lan ? 'text-green-600' : 'text-red-600'" x-text="networkStatusText"></span>
             </div>
         </div>
 
-        <!-- Alerts -->
-        <div x-show="stats.inventory_alerts?.length > 0" x-cloak class="bg-red-50 rounded-2xl p-4 border border-red-200 mb-6">
-            <h4 class="font-semibold text-red-800 mb-2 flex items-center">
-                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
-                </svg>
-                物資警示
-            </h4>
-            <ul class="space-y-1">
-                <template x-for="alert in stats.inventory_alerts" :key="alert.id">
-                    <li class="text-sm text-red-700">
-                        <span x-text="alert.name"></span>
-                        剩 <span class="font-medium" x-text="alert.quantity"></span> <span x-text="alert.unit || '個'"></span>
-                        (安全庫存: <span x-text="alert.min_quantity"></span>)
-                    </li>
-                </template>
-            </ul>
-        </div>
-
-        <!-- Footer -->
-        <footer class="text-center text-xs text-gray-400 mt-8">
-            <p>CIRS v1.0 - Community Inventory Resilience System</p>
-            <p class="mt-1">De Novo Orthopedics Inc.</p>
+        <!-- Footer with Logo -->
+        <footer class="text-center mt-8">
+            <img src="/frontend/assets/logo.png" alt="De Novo Orthopedics" class="h-10 mx-auto mb-3 opacity-60">
+            <p class="text-xs text-gray-500">Designed in Taiwan</p>
+            <p class="text-xs text-gray-400">By De Novo Orthopedics Inc.</p>
+            <p class="text-xs text-gray-400">谷盺生物科技股份有限公司</p>
+            <p class="text-xs text-gray-300 mt-2">CIRS v1.0</p>
         </footer>
     </div>
 
@@ -210,6 +231,7 @@
                 broadcast: null,
                 stats: {},
                 networkStatus: { lan: false, internet: false },
+                pollingInterval: null,
 
                 async init() {
                     await this.loadConfig();
@@ -217,14 +239,14 @@
                     await this.loadBroadcast();
                     await this.checkNetwork();
 
-                    // Polling every 10 seconds
-                    setInterval(() => {
+                    // Polling every 30 seconds (not 10 - reduce server load)
+                    this.pollingInterval = setInterval(() => {
                         this.loadStats();
                         this.loadBroadcast();
-                    }, 10000);
+                    }, 30000);
 
-                    // Network check every 30 seconds
-                    setInterval(() => this.checkNetwork(), 30000);
+                    // Network check every 60 seconds
+                    setInterval(() => this.checkNetwork(), 60000);
                 },
 
                 async loadConfig() {

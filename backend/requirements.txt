@@ -7,8 +7,8 @@ uvicorn[standard]>=0.24.0
 
 # Authentication
 python-jose[cryptography]>=3.3.0
-passlib[bcrypt]>=1.7.4
 python-multipart>=0.0.6
+# Note: Using hashlib (built-in) for PIN hashing instead of bcrypt for Python 3.13 compatibility
 
 # Database (using built-in sqlite3)
 # No additional packages needed for SQLite
