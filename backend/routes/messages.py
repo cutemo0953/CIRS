@@ -27,13 +27,22 @@ class BroadcastCreate(BaseModel):
     is_pinned: bool = True
 
 
+class ReplyCreate(BaseModel):
+    content: str
+    author_name: Optional[str] = "匿名"
+
+
+class ResolveRequest(BaseModel):
+    is_resolved: bool = True
+
+
 @router.get("")
 async def list_messages(
     category: Optional[str] = Query(None, description="Filter by category"),
     limit: int = Query(50, le=200),
     offset: int = Query(0)
 ):
-    """List messages (excluding broadcasts)"""
+    """List messages (excluding broadcasts) with replies"""
     with get_db() as conn:
         query = """
             SELECT * FROM message
@@ -50,6 +59,18 @@ async def list_messages(
 
         cursor = conn.execute(query, params)
         messages = rows_to_list(cursor.fetchall())
+
+        # Fetch replies for each message
+        for msg in messages:
+            cursor = conn.execute(
+                """
+                SELECT * FROM message
+                WHERE message_type = 'reply' AND parent_id = ?
+                ORDER BY created_at ASC
+                """,
+                (msg['id'],)
+            )
+            msg['replies'] = rows_to_list(cursor.fetchall())
 
     return {"messages": messages, "count": len(messages)}
 
@@ -136,20 +157,44 @@ async def create_broadcast(broadcast: BroadcastCreate):
     return {"id": new_id, "message": "Broadcast created successfully"}
 
 
-@router.put("/{message_id}/resolve")
-async def resolve_message(message_id: int):
-    """Mark a message as resolved (e.g., person found)"""
+@router.post("/{message_id}/resolve")
+async def resolve_message(message_id: int, request: ResolveRequest):
+    """Mark a message as resolved or unresolve it"""
     with write_db() as conn:
         cursor = conn.execute("SELECT * FROM message WHERE id = ?", (message_id,))
         if cursor.fetchone() is None:
             raise HTTPException(status_code=404, detail="Message not found")
 
         conn.execute(
-            "UPDATE message SET is_resolved = 1 WHERE id = ?",
-            (message_id,)
+            "UPDATE message SET is_resolved = ? WHERE id = ?",
+            (1 if request.is_resolved else 0, message_id)
         )
 
-    return {"message": "Message marked as resolved"}
+    return {"message": "Message resolved status updated"}
+
+
+@router.post("/{message_id}/reply")
+async def reply_to_message(message_id: int, reply: ReplyCreate, request: Request):
+    """Reply to a message"""
+    client_ip = request.client.host if request.client else "unknown"
+
+    with write_db() as conn:
+        # Check parent message exists
+        cursor = conn.execute("SELECT * FROM message WHERE id = ?", (message_id,))
+        if cursor.fetchone() is None:
+            raise HTTPException(status_code=404, detail="Message not found")
+
+        # Insert reply
+        cursor = conn.execute(
+            """
+            INSERT INTO message (message_type, category, content, author_name, parent_id, client_ip)
+            VALUES ('reply', 'reply', ?, ?, ?, ?)
+            """,
+            (reply.content, reply.author_name, message_id, client_ip)
+        )
+        new_id = cursor.lastrowid
+
+    return {"id": new_id, "message": "Reply posted successfully"}
 
 
 @router.delete("/{message_id}")

@@ -74,11 +74,12 @@ CREATE INDEX IF NOT EXISTS idx_event_item ON event_log(item_id);
 -- ============================================
 CREATE TABLE IF NOT EXISTS message (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    message_type TEXT DEFAULT 'post', -- 'broadcast' (官方公告), 'post' (一般留言)
-    category TEXT,                    -- 'seek_person', 'seek_item', 'offer_help', 'report', 'general'
+    message_type TEXT DEFAULT 'post', -- 'broadcast' (官方公告), 'post' (一般留言), 'reply' (回覆)
+    category TEXT,                    -- 'seek_person', 'seek_item', 'offer_help', 'report', 'general', 'reply'
     content TEXT NOT NULL,
     author_name TEXT,                 -- 顯示名稱 (可匿名)
     author_id TEXT,                   -- FK to person.id (可為 NULL)
+    parent_id INTEGER,                -- FK to message.id (回覆用)
     image_data TEXT,                  -- Base64 壓縮圖片 (< 500KB)
     is_pinned INTEGER DEFAULT 0,      -- 置頂
     is_resolved INTEGER DEFAULT 0,    -- 已解決
@@ -124,7 +125,9 @@ INSERT OR IGNORE INTO config (key, value) VALUES
     ('food_per_person_per_day', '2100'),
     ('polling_interval', '5000');
 
--- 預設 Admin 帳號 (PIN: 1234)
+-- 預設帳號 (PIN 皆為: 1234)
 -- bcrypt hash for '1234': $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC
 INSERT OR IGNORE INTO person (id, display_name, role, pin_hash) VALUES
-    ('admin001', '管理員', 'admin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC');
+    ('admin001', '管理員', 'admin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC'),
+    ('staff001', '志工小明', 'staff', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC'),
+    ('medic001', '醫護小華', 'medic', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC');

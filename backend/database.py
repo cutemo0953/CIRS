@@ -80,20 +80,30 @@ def init_db():
 
 def apply_migrations(conn):
     """Apply schema migrations for existing databases"""
+    # Inventory migrations
     cursor = conn.execute("PRAGMA table_info(inventory)")
-    columns = [row['name'] for row in cursor.fetchall()]
+    inv_columns = [row['name'] for row in cursor.fetchall()]
 
     # Migration: Add specification column
-    if 'specification' not in columns:
+    if 'specification' not in inv_columns:
         print("Migration: Adding 'specification' column to inventory")
         conn.execute("ALTER TABLE inventory ADD COLUMN specification TEXT")
 
     # Migration: Add equipment check columns
-    if 'last_check_date' not in columns:
+    if 'last_check_date' not in inv_columns:
         print("Migration: Adding equipment check columns to inventory")
         conn.execute("ALTER TABLE inventory ADD COLUMN last_check_date DATE")
         conn.execute("ALTER TABLE inventory ADD COLUMN check_interval_days INTEGER")
         conn.execute("ALTER TABLE inventory ADD COLUMN check_status TEXT")
+
+    # Message migrations
+    cursor = conn.execute("PRAGMA table_info(message)")
+    msg_columns = [row['name'] for row in cursor.fetchall()]
+
+    # Migration: Add parent_id column for replies
+    if msg_columns and 'parent_id' not in msg_columns:
+        print("Migration: Adding 'parent_id' column to message for replies")
+        conn.execute("ALTER TABLE message ADD COLUMN parent_id INTEGER")
 
     conn.commit()
     print("Migrations applied successfully")
