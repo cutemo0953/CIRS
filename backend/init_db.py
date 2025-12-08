@@ -1,0 +1,79 @@
+#!/usr/bin/env python3
+"""
+CIRS Database Initialization Script
+Creates the SQLite database and initializes schema
+"""
+import os
+import sqlite3
+import sys
+
+# Database path
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+DB_PATH = os.path.join(DATA_DIR, 'cirs.db')
+SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'schema.sql')
+
+
+def init_database():
+    """Initialize the database with schema"""
+
+    # Create data directory if not exists
+    if not os.path.exists(DATA_DIR):
+        os.makedirs(DATA_DIR)
+        print(f"Created data directory: {DATA_DIR}")
+
+    # Check if database already exists
+    db_exists = os.path.exists(DB_PATH)
+    if db_exists:
+        response = input(f"Database already exists at {DB_PATH}. Reinitialize? (y/N): ")
+        if response.lower() != 'y':
+            print("Aborted.")
+            return
+        # Backup existing database
+        import shutil
+        from datetime import datetime
+        backup_path = f"{DB_PATH}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        shutil.copy(DB_PATH, backup_path)
+        print(f"Backed up existing database to: {backup_path}")
+
+    # Read schema
+    if not os.path.exists(SCHEMA_PATH):
+        print(f"Error: Schema file not found at {SCHEMA_PATH}")
+        sys.exit(1)
+
+    with open(SCHEMA_PATH, 'r', encoding='utf-8') as f:
+        schema_sql = f.read()
+
+    # Create database and apply schema
+    conn = sqlite3.connect(DB_PATH)
+
+    # Enable WAL mode
+    conn.execute("PRAGMA journal_mode=WAL;")
+    conn.execute("PRAGMA synchronous=NORMAL;")
+
+    # Execute schema
+    conn.executescript(schema_sql)
+    conn.commit()
+
+    # Verify tables created
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name;")
+    tables = [row[0] for row in cursor.fetchall()]
+
+    print(f"\nDatabase initialized at: {DB_PATH}")
+    print(f"Tables created: {', '.join(tables)}")
+
+    # Show record counts
+    print("\nInitial data:")
+    for table in tables:
+        if table.startswith('sqlite_'):
+            continue
+        cursor = conn.execute(f"SELECT COUNT(*) FROM {table}")
+        count = cursor.fetchone()[0]
+        print(f"  {table}: {count} records")
+
+    conn.close()
+    print("\nDone! You can now start the server with:")
+    print("  uvicorn main:app --host 0.0.0.0 --port 8090")
+
+
+if __name__ == "__main__":
+    init_database()
