@@ -62,7 +62,13 @@ def write_db():
 def init_db():
     """Initialize database with schema and apply migrations"""
     with get_db() as conn:
-        # Read and execute schema
+        # First, check if inventory table exists and apply migrations BEFORE schema
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='inventory'")
+        if cursor.fetchone():
+            # Existing database - apply migrations first
+            apply_migrations(conn)
+
+        # Then execute schema (CREATE IF NOT EXISTS is safe)
         schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
         if os.path.exists(schema_path):
             with open(schema_path, "r") as f:
@@ -70,9 +76,6 @@ def init_db():
             print(f"Database initialized at {DB_PATH}")
         else:
             print(f"Warning: schema.sql not found at {schema_path}")
-
-        # Apply migrations for existing databases
-        apply_migrations(conn)
 
 
 def apply_migrations(conn):
