@@ -434,7 +434,7 @@
                                 'Content-Type': 'application/json',
                                 'Authorization': `Bearer ${this.token}`
                             },
-                            body: JSON.stringify({ site_name: this.settingsForm.site_name })
+                            body: JSON.stringify({ key: 'site_name', value: this.settingsForm.site_name })
                         });
                         if (res.ok) {
                             this.siteName = this.settingsForm.site_name;
