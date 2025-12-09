@@ -103,7 +103,30 @@
                         <input type="text" x-model="newPerson.national_id" placeholder="身分證 (選填)" class="border border-gray-200 rounded-lg px-3 py-2 uppercase" maxlength="10">
                         <input type="tel" x-model="newPerson.phone" placeholder="電話 (選填)" class="border border-gray-200 rounded-lg px-3 py-2">
                     </div>
-                    <input type="text" x-model="newPerson.current_location" placeholder="位置 (選填)" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                    <!-- 區域選擇 -->
+                    <div class="relative">
+                        <select x-model="newPerson.current_location" class="w-full border border-gray-200 rounded-lg px-3 py-2 appearance-none bg-white">
+                            <option value="">選擇區域 (選填)</option>
+                            <optgroup label="收容區">
+                                <template x-for="z in zones.filter(z => z.zone_type === 'shelter')" :key="z.id">
+                                    <option :value="z.id" x-text="z.name"></option>
+                                </template>
+                            </optgroup>
+                            <optgroup label="醫療區">
+                                <template x-for="z in zones.filter(z => z.zone_type === 'medical')" :key="z.id">
+                                    <option :value="z.id" x-text="z.name"></option>
+                                </template>
+                            </optgroup>
+                            <optgroup label="服務區">
+                                <template x-for="z in zones.filter(z => z.zone_type === 'service')" :key="z.id">
+                                    <option :value="z.id" x-text="z.name"></option>
+                                </template>
+                            </optgroup>
+                        </select>
+                        <svg class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
                     <!-- Photo capture for unidentified persons -->
                     <div x-show="!newPerson.national_id" class="border border-dashed border-gray-300 rounded-lg p-3">
                         <div class="flex items-center justify-between mb-2">
@@ -140,76 +163,58 @@
                 <div class="relative flex justify-center"><span class="bg-gray-50 px-3 text-sm text-gray-500">搜尋人員</span></div>
             </div>
 
-            <!-- Triage Summary -->
-            <div class="flex justify-center space-x-3 mb-4">
-                <div class="text-center">
-                    <div class="w-12 h-12 rounded-full bg-green-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.green || 0"></div>
-                    <p class="text-xs text-gray-500 mt-1">輕傷</p>
-                </div>
-                <div class="text-center">
-                    <div class="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.yellow || 0"></div>
-                    <p class="text-xs text-gray-500 mt-1">延遲</p>
-                </div>
-                <div class="text-center">
-                    <div class="w-12 h-12 rounded-full bg-red-500 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.red || 0"></div>
-                    <p class="text-xs text-gray-500 mt-1">立即</p>
-                </div>
-                <div class="text-center">
-                    <div class="w-12 h-12 rounded-full bg-gray-800 flex items-center justify-center text-white font-bold mx-auto" x-text="stats.headcount?.black || 0"></div>
-                    <p class="text-xs text-gray-500 mt-1">死亡</p>
-                </div>
-            </div>
-
             <!-- Zone Overview (Collapsible) -->
             <div class="bg-white rounded-xl shadow-sm mb-4 overflow-hidden">
-                <button @click="showZoneOverview = !showZoneOverview" class="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50">
-                    <div class="flex items-center">
-                        <svg class="w-5 h-5 mr-2 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <!-- Header Row: 展開按鈕左側，管理按鈕右側 -->
+                <div class="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                    <!-- 左側：展開按鈕 -->
+                    <button @click="showZoneOverview = !showZoneOverview" class="flex items-center text-left hover:text-primary-600 transition">
+                        <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                         </svg>
                         <span class="font-semibold">區域總覽</span>
-                        <span class="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full" x-text="zones.length + ' 區'"></span>
-                    </div>
-                    <div class="flex items-center">
-                        <button x-show="currentUser && currentUser.role === 'admin'" @click.stop="openZoneManageModal()" class="text-xs text-primary-600 mr-3">管理</button>
-                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="showZoneOverview ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <span class="ml-2 text-xs text-gray-500" x-text="zones.length + ' 區'"></span>
+                        <svg class="w-4 h-4 ml-1 text-gray-400 transition-transform" :class="showZoneOverview ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                         </svg>
-                    </div>
-                </button>
-                <div x-show="showZoneOverview" x-collapse class="px-4 pb-4">
-                    <!-- Zone Type Tabs -->
+                    </button>
+                    <!-- 右側：管理按鈕 (獨立) -->
+                    <button x-show="currentUser && currentUser.role === 'admin'"
+                            @click="openZoneManageModal()"
+                            class="flex items-center text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-3 py-1.5 rounded-lg transition">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        管理
+                    </button>
+                </div>
+                <div x-show="showZoneOverview" x-collapse class="px-4 pb-4 pt-3">
+                    <!-- Zone Type Tabs (單色風格) -->
                     <div class="flex space-x-1 mb-3 overflow-x-auto">
-                        <button @click="zoneTypeFilter = ''" :class="zoneTypeFilter === '' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap">全部</button>
-                        <button @click="zoneTypeFilter = 'shelter'" :class="zoneTypeFilter === 'shelter' ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-600'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap">收容區</button>
-                        <button @click="zoneTypeFilter = 'medical'" :class="zoneTypeFilter === 'medical' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap">醫療區</button>
-                        <button @click="zoneTypeFilter = 'service'" :class="zoneTypeFilter === 'service' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap">服務區</button>
-                        <button @click="zoneTypeFilter = 'restricted'" :class="zoneTypeFilter === 'restricted' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-600'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap">管制區</button>
+                        <button @click="zoneTypeFilter = ''" :class="zoneTypeFilter === '' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition">全部</button>
+                        <button @click="zoneTypeFilter = 'shelter'" :class="zoneTypeFilter === 'shelter' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition">收容區</button>
+                        <button @click="zoneTypeFilter = 'medical'" :class="zoneTypeFilter === 'medical' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition">醫療區</button>
+                        <button @click="zoneTypeFilter = 'service'" :class="zoneTypeFilter === 'service' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition">服務區</button>
+                        <button @click="zoneTypeFilter = 'restricted'" :class="zoneTypeFilter === 'restricted' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition">管制區</button>
                     </div>
-                    <!-- Zone Cards Grid -->
+                    <!-- Zone Cards Grid (單色 + heroicon) -->
                     <div class="grid grid-cols-2 gap-2">
                         <template x-for="zone in filteredZones" :key="zone.id">
                             <div @click="filterByZone(zone.id)" class="bg-gray-50 rounded-lg p-3 cursor-pointer hover:bg-gray-100 transition"
-                                 :class="zoneFilter === zone.id ? 'ring-2 ring-primary-500' : ''">
-                                <div class="flex items-center justify-between mb-1">
+                                 :class="zoneFilter === zone.id ? 'ring-2 ring-primary-500 bg-primary-50' : ''">
+                                <div class="flex items-center mb-1">
+                                    <!-- Zone Icon (heroicon based on zone.icon) -->
+                                    <span class="w-5 h-5 mr-2 text-gray-500 flex-shrink-0" x-html="getZoneIcon(zone.icon)"></span>
                                     <span class="font-medium text-sm truncate" x-text="zone.name"></span>
-                                    <span class="text-xs px-1.5 py-0.5 rounded"
-                                          :class="{
-                                              'bg-blue-100 text-blue-600': zone.zone_type === 'shelter',
-                                              'bg-red-100 text-red-600': zone.zone_type === 'medical',
-                                              'bg-green-100 text-green-600': zone.zone_type === 'service',
-                                              'bg-gray-200 text-gray-600': zone.zone_type === 'restricted'
-                                          }"
-                                          x-text="zoneTypeLabels[zone.zone_type] || zone.zone_type"></span>
                                 </div>
                                 <div class="flex items-center justify-between">
-                                    <span class="text-lg font-bold text-primary-600" x-text="zone.current_count || 0"></span>
+                                    <span class="text-lg font-bold text-gray-700" x-text="zone.current_count || 0"></span>
                                     <span x-show="zone.capacity > 0" class="text-xs text-gray-400" x-text="'/' + zone.capacity"></span>
                                 </div>
-                                <!-- Capacity Bar -->
+                                <!-- Capacity Bar (單色：primary) -->
                                 <div x-show="zone.capacity > 0" class="mt-1 h-1 bg-gray-200 rounded-full overflow-hidden">
-                                    <div class="h-full rounded-full transition-all"
-                                         :class="(zone.current_count / zone.capacity) > 0.9 ? 'bg-red-500' : (zone.current_count / zone.capacity) > 0.7 ? 'bg-yellow-500' : 'bg-green-500'"
+                                    <div class="h-full bg-primary-500 rounded-full transition-all"
                                          :style="'width: ' + Math.min(100, (zone.current_count || 0) / zone.capacity * 100) + '%'"></div>
                                 </div>
                             </div>
@@ -232,13 +237,23 @@
                 <input type="text" x-model="peopleSearch" placeholder="搜尋姓名/ID..." class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
             </div>
 
-            <!-- Triage Filter -->
+            <!-- Triage Filter with Stats -->
             <div class="flex space-x-2 mb-4 overflow-x-auto">
-                <button @click="triageFilter = ''" :class="triageFilter === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">全部</button>
-                <button @click="triageFilter = 'GREEN'" :class="triageFilter === 'GREEN' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">輕傷</button>
-                <button @click="triageFilter = 'YELLOW'" :class="triageFilter === 'YELLOW' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">延遲</button>
-                <button @click="triageFilter = 'RED'" :class="triageFilter === 'RED' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">立即</button>
-                <button @click="triageFilter = 'BLACK'" :class="triageFilter === 'BLACK' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">死亡</button>
+                <button @click="triageFilter = ''" :class="triageFilter === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 border'" class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap font-medium">
+                    全部 <span class="ml-1 opacity-75" x-text="stats.headcount?.total || 0"></span>
+                </button>
+                <button @click="triageFilter = 'GREEN'" :class="triageFilter === 'GREEN' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700'" class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap font-medium">
+                    輕傷 <span class="ml-1 opacity-75" x-text="stats.headcount?.green || 0"></span>
+                </button>
+                <button @click="triageFilter = 'YELLOW'" :class="triageFilter === 'YELLOW' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'" class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap font-medium">
+                    延遲 <span class="ml-1 opacity-75" x-text="stats.headcount?.yellow || 0"></span>
+                </button>
+                <button @click="triageFilter = 'RED'" :class="triageFilter === 'RED' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700'" class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap font-medium">
+                    立即 <span class="ml-1 opacity-75" x-text="stats.headcount?.red || 0"></span>
+                </button>
+                <button @click="triageFilter = 'BLACK'" :class="triageFilter === 'BLACK' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap font-medium">
+                    死亡 <span class="ml-1 opacity-75" x-text="stats.headcount?.black || 0"></span>
+                </button>
             </div>
 
             <!-- People List Header with Select All -->
@@ -1669,6 +1684,31 @@
                             this.zones = data.zones || [];
                         }
                     } catch (e) { console.error('Failed to load zones:', e); }
+                },
+
+                // Heroicon SVG map for zone icons
+                getZoneIcon(iconName) {
+                    const icons = {
+                        'moon': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>',
+                        'cake': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0A1.75 1.75 0 003 15.546v3.954a1.5 1.5 0 001.5 1.5h15a1.5 1.5 0 001.5-1.5v-3.954zM3 15.546v-3.796a1.5 1.5 0 011.5-1.5h15a1.5 1.5 0 011.5 1.5v3.796M12 3v6"/></svg>',
+                        'user-group': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>',
+                        'heart': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>',
+                        'face-smile': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+                        'clipboard-document-check': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>',
+                        'check-circle': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+                        'exclamation-triangle': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>',
+                        'exclamation-circle': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+                        'eye': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>',
+                        'clipboard-document-list': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>',
+                        'cube': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>',
+                        'information-circle': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+                        'building-storefront': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z"/></svg>',
+                        'building-office': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg>',
+                        'cog-6-tooth': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
+                        'home': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>',
+                        'lock-closed': '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>'
+                    };
+                    return icons[iconName] || icons['home'];
                 },
 
                 filterByZone(zoneId) {
