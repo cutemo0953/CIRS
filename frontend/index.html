@@ -160,6 +160,73 @@
                 </div>
             </div>
 
+            <!-- Zone Overview (Collapsible) -->
+            <div class="bg-white rounded-xl shadow-sm mb-4 overflow-hidden">
+                <button @click="showZoneOverview = !showZoneOverview" class="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-gray-50">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
+                        </svg>
+                        <span class="font-semibold">區域總覽</span>
+                        <span class="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full" x-text="zones.length + ' 區'"></span>
+                    </div>
+                    <div class="flex items-center">
+                        <button x-show="currentUser && currentUser.role === 'admin'" @click.stop="openZoneManageModal()" class="text-xs text-primary-600 mr-3">管理</button>
+                        <svg class="w-5 h-5 text-gray-400 transition-transform" :class="showZoneOverview ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                        </svg>
+                    </div>
+                </button>
+                <div x-show="showZoneOverview" x-collapse class="px-4 pb-4">
+                    <!-- Zone Type Tabs -->
+                    <div class="flex space-x-1 mb-3 overflow-x-auto">
+                        <button @click="zoneTypeFilter = ''" :class="zoneTypeFilter === '' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap">全部</button>
+                        <button @click="zoneTypeFilter = 'shelter'" :class="zoneTypeFilter === 'shelter' ? 'bg-blue-500 text-white' : 'bg-blue-100 text-blue-600'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap">收容區</button>
+                        <button @click="zoneTypeFilter = 'medical'" :class="zoneTypeFilter === 'medical' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-600'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap">醫療區</button>
+                        <button @click="zoneTypeFilter = 'service'" :class="zoneTypeFilter === 'service' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap">服務區</button>
+                        <button @click="zoneTypeFilter = 'restricted'" :class="zoneTypeFilter === 'restricted' ? 'bg-gray-600 text-white' : 'bg-gray-200 text-gray-600'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap">管制區</button>
+                    </div>
+                    <!-- Zone Cards Grid -->
+                    <div class="grid grid-cols-2 gap-2">
+                        <template x-for="zone in filteredZones" :key="zone.id">
+                            <div @click="filterByZone(zone.id)" class="bg-gray-50 rounded-lg p-3 cursor-pointer hover:bg-gray-100 transition"
+                                 :class="zoneFilter === zone.id ? 'ring-2 ring-primary-500' : ''">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="font-medium text-sm truncate" x-text="zone.name"></span>
+                                    <span class="text-xs px-1.5 py-0.5 rounded"
+                                          :class="{
+                                              'bg-blue-100 text-blue-600': zone.zone_type === 'shelter',
+                                              'bg-red-100 text-red-600': zone.zone_type === 'medical',
+                                              'bg-green-100 text-green-600': zone.zone_type === 'service',
+                                              'bg-gray-200 text-gray-600': zone.zone_type === 'restricted'
+                                          }"
+                                          x-text="zoneTypeLabels[zone.zone_type] || zone.zone_type"></span>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <span class="text-lg font-bold text-primary-600" x-text="zone.current_count || 0"></span>
+                                    <span x-show="zone.capacity > 0" class="text-xs text-gray-400" x-text="'/' + zone.capacity"></span>
+                                </div>
+                                <!-- Capacity Bar -->
+                                <div x-show="zone.capacity > 0" class="mt-1 h-1 bg-gray-200 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full transition-all"
+                                         :class="(zone.current_count / zone.capacity) > 0.9 ? 'bg-red-500' : (zone.current_count / zone.capacity) > 0.7 ? 'bg-yellow-500' : 'bg-green-500'"
+                                         :style="'width: ' + Math.min(100, (zone.current_count || 0) / zone.capacity * 100) + '%'"></div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                    <!-- Batch Move Button -->
+                    <button x-show="currentUser && selectedPeople.length > 0"
+                            @click="openBatchMoveModal()"
+                            class="w-full mt-3 bg-primary-600 text-white rounded-lg py-2 text-sm font-medium flex items-center justify-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
+                        </svg>
+                        移動 <span x-text="selectedPeople.length"></span> 人
+                    </button>
+                </div>
+            </div>
+
             <!-- Search -->
             <div class="flex space-x-2 mb-4">
                 <input type="text" x-model="peopleSearch" placeholder="搜尋姓名/ID..." class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
@@ -174,10 +241,30 @@
                 <button @click="triageFilter = 'BLACK'" :class="triageFilter === 'BLACK' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">死亡</button>
             </div>
 
+            <!-- People List Header with Select All -->
+            <div x-show="currentUser" class="flex items-center justify-between mb-2">
+                <button @click="selectAllFiltered()" class="text-xs text-primary-600 flex items-center">
+                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    全選/取消
+                </button>
+                <span x-show="selectedPeople.length > 0" class="text-xs text-gray-500">
+                    已選 <span class="font-semibold text-primary-600" x-text="selectedPeople.length"></span> 人
+                    <button @click="openBatchMoveModal()" class="ml-2 text-primary-600 underline">移動</button>
+                </span>
+            </div>
+
             <!-- People List -->
             <div class="space-y-2">
                 <template x-for="person in filteredPeople" :key="person.id">
-                    <div class="bg-white rounded-xl p-3 shadow-sm flex items-center">
+                    <div class="bg-white rounded-xl p-3 shadow-sm flex items-center"
+                         :class="selectedPeople.includes(person.id) ? 'ring-2 ring-primary-500' : ''">
+                        <!-- Checkbox for selection -->
+                        <input x-show="currentUser" type="checkbox"
+                               :checked="selectedPeople.includes(person.id)"
+                               @change="togglePersonSelect(person.id)"
+                               class="w-4 h-4 mr-2 rounded border-gray-300 text-primary-600 focus:ring-primary-500">
                         <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold mr-3"
                              :class="{
                                  'bg-green-500': person.triage_status === 'GREEN',
@@ -192,7 +279,7 @@
                             <h4 class="font-semibold truncate" x-text="person.display_name"></h4>
                             <p class="text-xs text-gray-500 truncate">
                                 <span x-text="person.id"></span>
-                                <span x-show="person.current_location" class="ml-1">· <span x-text="person.current_location"></span></span>
+                                <span x-show="person.current_location" class="ml-1">· <span x-text="zones.find(z => z.id === person.current_location)?.name || person.current_location"></span></span>
                             </p>
                         </div>
                         <div class="flex items-center space-x-1">
@@ -215,6 +302,13 @@
                     </div>
                 </template>
                 <p x-show="filteredPeople.length === 0" class="text-center text-gray-400 py-8">無人員資料</p>
+            </div>
+
+            <!-- Zone Filter Clear Button -->
+            <div x-show="zoneFilter" class="mt-4 text-center">
+                <button @click="zoneFilter = ''" class="text-sm text-primary-600 underline">
+                    清除區域篩選
+                </button>
             </div>
         </div>
 
@@ -996,6 +1090,119 @@
         </div>
     </div>
 
+    <!-- Zone Manage Modal (區域管理 - Admin) -->
+    <div x-show="showZoneManageModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showZoneManageModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">區域管理</h3>
+                <button @click="showZoneManageModal = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- New Zone Form -->
+            <div class="bg-gray-50 rounded-xl p-4 mb-4">
+                <h4 class="font-medium text-sm mb-3">新增區域</h4>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <input type="text" x-model="newZone.id" placeholder="區域代碼 *" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                    <input type="text" x-model="newZone.name" placeholder="區域名稱 *" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+                <div class="grid grid-cols-2 gap-2 mb-2">
+                    <select x-model="newZone.zone_type" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                        <option value="shelter">收容區域</option>
+                        <option value="medical">醫療區域</option>
+                        <option value="service">服務區域</option>
+                        <option value="restricted">管制區域</option>
+                    </select>
+                    <input type="number" x-model="newZone.capacity" placeholder="容量 (0=無限)" class="border border-gray-200 rounded-lg px-3 py-2 text-sm" min="0">
+                </div>
+                <input type="text" x-model="newZone.description" placeholder="說明 (選填)" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2">
+                <button @click="createZone()" class="w-full bg-primary-600 text-white rounded-lg py-2 text-sm font-medium">新增區域</button>
+            </div>
+
+            <!-- Zone List -->
+            <div class="space-y-2 overflow-y-auto flex-1">
+                <template x-for="zoneType in ['shelter', 'medical', 'service', 'restricted']" :key="zoneType">
+                    <div>
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase mb-2 flex items-center">
+                            <span :class="{
+                                'bg-blue-100 text-blue-600': zoneType === 'shelter',
+                                'bg-red-100 text-red-600': zoneType === 'medical',
+                                'bg-green-100 text-green-600': zoneType === 'service',
+                                'bg-gray-200 text-gray-600': zoneType === 'restricted'
+                            }" class="px-2 py-0.5 rounded mr-2" x-text="zoneTypeLabels[zoneType]"></span>
+                        </h4>
+                        <template x-for="zone in zones.filter(z => z.zone_type === zoneType)" :key="zone.id">
+                            <div class="bg-white border border-gray-100 rounded-lg p-3 mb-2 flex items-center justify-between">
+                                <div class="flex-1 min-w-0">
+                                    <p class="font-medium text-sm truncate" x-text="zone.name"></p>
+                                    <p class="text-xs text-gray-400">
+                                        <span x-text="zone.id"></span>
+                                        <span x-show="zone.capacity > 0"> · 容量: <span x-text="zone.capacity"></span></span>
+                                    </p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-sm font-semibold text-primary-600" x-text="zone.current_count || 0"></span>
+                                    <button @click="deleteZone(zone.id)" class="text-red-500 p-1.5 hover:bg-red-50 rounded-lg" title="刪除">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Move Modal (批次移動人員) -->
+    <div x-show="showBatchMoveModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBatchMoveModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4">批次移動人員</h3>
+            <p class="text-sm text-gray-600 mb-4">
+                將 <span class="font-semibold text-primary-600" x-text="selectedPeople.length"></span> 人移動至...
+            </p>
+
+            <!-- Target Zone Selection -->
+            <div class="space-y-2 max-h-60 overflow-y-auto mb-4">
+                <template x-for="zone in zones" :key="zone.id">
+                    <label class="flex items-center p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition"
+                           :class="batchMoveForm.target_zone_id === zone.id ? 'ring-2 ring-primary-500 bg-primary-50' : ''">
+                        <input type="radio" name="target_zone" :value="zone.id" x-model="batchMoveForm.target_zone_id" class="mr-3">
+                        <div class="flex-1">
+                            <p class="font-medium text-sm" x-text="zone.name"></p>
+                            <p class="text-xs text-gray-400">
+                                <span x-text="zone.current_count || 0"></span>
+                                <span x-show="zone.capacity > 0">/<span x-text="zone.capacity"></span></span>
+                            </p>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded"
+                              :class="{
+                                  'bg-blue-100 text-blue-600': zone.zone_type === 'shelter',
+                                  'bg-red-100 text-red-600': zone.zone_type === 'medical',
+                                  'bg-green-100 text-green-600': zone.zone_type === 'service',
+                                  'bg-gray-200 text-gray-600': zone.zone_type === 'restricted'
+                              }"
+                              x-text="zoneTypeLabels[zone.zone_type]"></span>
+                    </label>
+                </template>
+            </div>
+
+            <!-- Notes -->
+            <input type="text" x-model="batchMoveForm.notes" placeholder="備註 (選填)" class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-4 text-sm">
+
+            <!-- Actions -->
+            <div class="grid grid-cols-2 gap-2">
+                <button @click="showBatchMoveModal = false" class="px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                <button @click="doBatchMove()" class="px-4 py-2 bg-primary-600 text-white rounded-lg font-medium">確認移動</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Bundle Edit Modal (新增/編輯組套) -->
     <div x-show="showBundleEditModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleEditModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
@@ -1186,6 +1393,14 @@
                 triageFilter: '',
                 messageCategory: '',
 
+                // Zone data
+                zones: [],
+                zoneTypeFilter: '',
+                zoneFilter: '',
+                showZoneOverview: false,
+                selectedPeople: [],
+                zoneTypeLabels: { shelter: '收容', medical: '醫療', service: '服務', restricted: '管制' },
+
                 // Modals
                 showLoginModal: false,
                 showTriageModal: false,
@@ -1204,6 +1419,8 @@
                 showBundleDetailModal: false,
                 showBundleManageModal: false,
                 showBundleEditModal: false,
+                showZoneManageModal: false,
+                showBatchMoveModal: false,
                 lastDistributeResult: null,
                 deleteTarget: null,
                 deleteType: null,
@@ -1229,6 +1446,8 @@
                 bundleIntakeForm: { bundle_id: '', multiplier: 1, location: '' },
                 bundleForm: { name: '', description: '', icon: '📦', items: [] },
                 newBundleItem: { name: '', specification: '', category: 'other', quantity: 1, unit: '個' },
+                batchMoveForm: { target_zone_id: '', notes: '' },
+                newZone: { id: '', name: '', zone_type: 'shelter', capacity: 0, description: '' },
 
                 // Toast
                 toast: { show: false, message: '', type: 'success' },
@@ -1266,7 +1485,7 @@
 
                 loadTabData() {
                     switch(this.currentTab) {
-                        case 'people': this.loadPeople(); break;
+                        case 'people': this.loadPeople(); this.loadZones(); break;
                         case 'inventory': this.loadInventory(); this.loadExpiringItems(); this.loadBundles(); break;
                         case 'equipment': this.loadEquipment(); this.loadEquipmentPending(); break;
                         case 'messages': this.loadMessages(); break;
@@ -1292,8 +1511,13 @@
                         if (p.role !== 'public') return false;
                         const matchSearch = !this.peopleSearch || p.display_name.toLowerCase().includes(this.peopleSearch.toLowerCase()) || p.id.includes(this.peopleSearch);
                         const matchTriage = !this.triageFilter || p.triage_status === this.triageFilter;
-                        return matchSearch && matchTriage;
+                        const matchZone = !this.zoneFilter || p.current_location === this.zoneFilter;
+                        return matchSearch && matchTriage && matchZone;
                     });
+                },
+
+                get filteredZones() {
+                    return this.zones.filter(z => !this.zoneTypeFilter || z.zone_type === this.zoneTypeFilter);
                 },
 
                 get filteredMessages() {
@@ -1434,6 +1658,116 @@
                             this.bundles = data.bundles || [];
                         }
                     } catch (e) {}
+                },
+
+                // Zone methods
+                async loadZones() {
+                    try {
+                        const res = await fetch('/api/zone');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.zones = data.zones || [];
+                        }
+                    } catch (e) { console.error('Failed to load zones:', e); }
+                },
+
+                filterByZone(zoneId) {
+                    this.zoneFilter = this.zoneFilter === zoneId ? '' : zoneId;
+                },
+
+                openZoneManageModal() {
+                    this.showZoneManageModal = true;
+                },
+
+                openBatchMoveModal() {
+                    this.batchMoveForm = { target_zone_id: '', notes: '' };
+                    this.showBatchMoveModal = true;
+                },
+
+                async doBatchMove() {
+                    if (!this.batchMoveForm.target_zone_id) {
+                        this.showToast('請選擇目標區域', 'error');
+                        return;
+                    }
+                    if (this.selectedPeople.length === 0) {
+                        this.showToast('請選擇要移動的人員', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await this.apiCall('/api/zone/move', {
+                            method: 'POST',
+                            body: {
+                                person_ids: this.selectedPeople,
+                                target_zone_id: this.batchMoveForm.target_zone_id,
+                                operator_id: this.currentUser.id,
+                                notes: this.batchMoveForm.notes
+                            }
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.showToast(data.message, 'success');
+                            this.showBatchMoveModal = false;
+                            this.selectedPeople = [];
+                            await this.loadPeople();
+                            await this.loadZones();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '移動失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('移動失敗', 'error'); }
+                },
+
+                togglePersonSelect(personId) {
+                    const idx = this.selectedPeople.indexOf(personId);
+                    if (idx > -1) {
+                        this.selectedPeople.splice(idx, 1);
+                    } else {
+                        this.selectedPeople.push(personId);
+                    }
+                },
+
+                selectAllFiltered() {
+                    const filtered = this.filteredPeople.map(p => p.id);
+                    if (filtered.every(id => this.selectedPeople.includes(id))) {
+                        this.selectedPeople = this.selectedPeople.filter(id => !filtered.includes(id));
+                    } else {
+                        this.selectedPeople = [...new Set([...this.selectedPeople, ...filtered])];
+                    }
+                },
+
+                async createZone() {
+                    if (!this.newZone.id || !this.newZone.name) {
+                        this.showToast('請輸入區域代碼和名稱', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await this.apiCall('/api/zone', {
+                            method: 'POST',
+                            body: this.newZone
+                        });
+                        if (res.ok) {
+                            this.showToast('區域新增成功', 'success');
+                            this.newZone = { id: '', name: '', zone_type: 'shelter', capacity: 0, description: '' };
+                            await this.loadZones();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '新增失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('新增失敗', 'error'); }
+                },
+
+                async deleteZone(zoneId) {
+                    if (!confirm('確定要刪除此區域嗎？')) return;
+                    try {
+                        const res = await this.apiCall(`/api/zone/${zoneId}`, { method: 'DELETE' });
+                        if (res.ok) {
+                            this.showToast('區域已刪除', 'success');
+                            await this.loadZones();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '刪除失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('刪除失敗', 'error'); }
                 },
 
                 // Quick check-in with triage

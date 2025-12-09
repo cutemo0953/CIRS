@@ -123,6 +123,49 @@ def apply_migrations(conn):
         conn.execute("ALTER TABLE person ADD COLUMN id_status TEXT DEFAULT 'confirmed'")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_person_id_status ON person(id_status)")
 
+    # Zone table migration
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='zone'")
+    if not cursor.fetchone():
+        print("Migration: Creating zone table and default zones")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS zone (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                zone_type TEXT NOT NULL,
+                capacity INTEGER DEFAULT 0,
+                description TEXT,
+                icon TEXT,
+                sort_order INTEGER DEFAULT 0,
+                is_active INTEGER DEFAULT 1,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_zone_type ON zone(zone_type)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_zone_active ON zone(is_active)")
+        # Insert default zones
+        conn.executemany(
+            "INSERT OR IGNORE INTO zone (id, name, zone_type, capacity, description, icon, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [
+                ('rest_area', '休息區', 'shelter', 100, '一般收容民眾休息區', 'moon', 10),
+                ('dining_area', '用餐區', 'shelter', 80, '用餐及飲水供應區', 'cake', 11),
+                ('family_area', '家庭區', 'shelter', 50, '有幼兒/長者的家庭優先', 'user-group', 12),
+                ('elderly_area', '長者區', 'shelter', 30, '行動不便者及長者專區', 'heart', 13),
+                ('children_area', '兒童區', 'shelter', 40, '兒童遊戲及照護區', 'face-smile', 14),
+                ('triage_area', '檢傷區', 'medical', 20, 'START 檢傷分類處', 'clipboard-document-check', 20),
+                ('green_area', '輕傷區', 'medical', 50, 'GREEN - 可延後處理', 'check-circle', 21),
+                ('yellow_area', '中傷區', 'medical', 30, 'YELLOW - 需優先處理', 'exclamation-triangle', 22),
+                ('red_area', '重傷區', 'medical', 10, 'RED - 立即處理', 'exclamation-circle', 23),
+                ('observation_area', '觀察區', 'medical', 20, '症狀觀察及隔離區', 'eye', 24),
+                ('registration', '報到處', 'service', 0, '人員報到登記', 'clipboard-document-list', 30),
+                ('supply_station', '物資發放區', 'service', 0, '物資領取處', 'cube', 31),
+                ('info_desk', '服務台', 'service', 0, '諮詢及協助', 'information-circle', 32),
+                ('warehouse', '倉庫', 'restricted', 0, '物資儲存區 (管制)', 'building-storefront', 40),
+                ('office', '辦公室', 'restricted', 0, '行政管理區 (管制)', 'building-office', 41),
+                ('equipment_room', '設備間', 'restricted', 0, '發電機/通訊設備 (管制)', 'cog-6-tooth', 42),
+            ]
+        )
+
     conn.commit()
     print("Migrations applied successfully")
 

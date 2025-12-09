@@ -159,7 +159,26 @@ CREATE TABLE IF NOT EXISTS backup_log (
 CREATE INDEX IF NOT EXISTS idx_backup_time ON backup_log(timestamp);
 
 -- ============================================
--- 8. 預設資料
+-- 8. Zone (區域管理)
+-- ============================================
+CREATE TABLE IF NOT EXISTS zone (
+    id TEXT PRIMARY KEY,             -- 區域代碼: 'zone_medical_1'
+    name TEXT NOT NULL,              -- 顯示名稱: '醫療區 A'
+    zone_type TEXT NOT NULL,         -- 'shelter', 'medical', 'service', 'restricted'
+    capacity INTEGER DEFAULT 0,      -- 容量上限 (0=無限制)
+    description TEXT,                -- 說明
+    icon TEXT,                       -- 圖示 emoji
+    sort_order INTEGER DEFAULT 0,    -- 排序順序
+    is_active INTEGER DEFAULT 1,     -- 是否啟用
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_zone_type ON zone(zone_type);
+CREATE INDEX IF NOT EXISTS idx_zone_active ON zone(is_active);
+
+-- ============================================
+-- 9. 預設資料
 -- ============================================
 
 -- 預設設定
@@ -177,3 +196,26 @@ INSERT OR IGNORE INTO person (id, display_name, role, pin_hash) VALUES
     ('admin001', '管理員', 'admin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC'),
     ('staff001', '志工小明', 'staff', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC'),
     ('medic001', '醫護小華', 'medic', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC');
+
+-- 預設區域 (icon 使用 heroicon 名稱)
+INSERT OR IGNORE INTO zone (id, name, zone_type, capacity, description, icon, sort_order) VALUES
+    -- 收容區域
+    ('rest_area', '休息區', 'shelter', 100, '一般收容民眾休息區', 'moon', 10),
+    ('dining_area', '用餐區', 'shelter', 80, '用餐及飲水供應區', 'cake', 11),
+    ('family_area', '家庭區', 'shelter', 50, '有幼兒/長者的家庭優先', 'user-group', 12),
+    ('elderly_area', '長者區', 'shelter', 30, '行動不便者及長者專區', 'heart', 13),
+    ('children_area', '兒童區', 'shelter', 40, '兒童遊戲及照護區', 'face-smile', 14),
+    -- 醫療區域
+    ('triage_area', '檢傷區', 'medical', 20, 'START 檢傷分類處', 'clipboard-document-check', 20),
+    ('green_area', '輕傷區', 'medical', 50, 'GREEN - 可延後處理', 'check-circle', 21),
+    ('yellow_area', '中傷區', 'medical', 30, 'YELLOW - 需優先處理', 'exclamation-triangle', 22),
+    ('red_area', '重傷區', 'medical', 10, 'RED - 立即處理', 'exclamation-circle', 23),
+    ('observation_area', '觀察區', 'medical', 20, '症狀觀察及隔離區', 'eye', 24),
+    -- 服務區域
+    ('registration', '報到處', 'service', 0, '人員報到登記', 'clipboard-document-list', 30),
+    ('supply_station', '物資發放區', 'service', 0, '物資領取處', 'cube', 31),
+    ('info_desk', '服務台', 'service', 0, '諮詢及協助', 'information-circle', 32),
+    -- 管制區域
+    ('warehouse', '倉庫', 'restricted', 0, '物資儲存區 (管制)', 'building-storefront', 40),
+    ('office', '辦公室', 'restricted', 0, '行政管理區 (管制)', 'building-office', 41),
+    ('equipment_room', '設備間', 'restricted', 0, '發電機/通訊設備 (管制)', 'cog-6-tooth', 42);
