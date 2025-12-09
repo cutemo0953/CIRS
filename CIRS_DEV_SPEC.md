@@ -1,6 +1,6 @@
-# CIRS (Community Inventory Resilience System) v1.1 Development Specification
+# CIRS (Community Inventory Resilience System) v1.2 Development Specification
 
-**Version:** 1.1
+**Version:** 1.2
 **Target Environment:** Raspberry Pi (Backend) + Mobile PWA (Frontend)
 **Network Topology:** Raspberry Pi as Appliance (Ethernet to Mesh Router or WiFi Hotspot)
 **Core Philosophy:** Offline-First, Community-Scale, High Resilience
@@ -1828,13 +1828,29 @@ Additional Instructions:
 
 ---
 
-**Version:** 1.1
+**Version:** 1.2
 **Last Updated:** 2024-12
 **Author:** De Novo Orthopedics Inc. / 谷盺生物科技股份有限公司
 
 ---
 
 ## Changelog
+
+### v1.2 (2024-12)
+- **Frontend**: 設備範本功能 - 預設 7 組常用範本
+  - 電力設備組（發電機、UPS、照明）
+  - 通訊設備組（對講機、擴音器、行動電源）
+  - 醫療設備組（血壓計、輪椅、AED）
+  - 收容基本設備（折疊床、睡袋、桌椅）
+  - 炊事設備組（瓦斯爐、鍋具、飲水機）
+  - 衛生設備組（移動廁所、消毒設備）
+  - 救援工具組（油壓剪、繩索、安全帽）
+- **Frontend**: 設備範本可自訂新增、編輯、刪除（管理員）
+- **Frontend**: 套用範本可批次建立設備，含預設檢查週期
+- **Frontend**: 物資發放按鈕改用大地色系 (amber-600)
+- **Frontend**: 人員清單區域/檢傷按鈕改用 primary 色系
+- **Frontend**: 新增單人快速移動區域功能
+- **Frontend**: 新增物資紀錄查詢（管理員）
 
 ### v1.1 (2024-12)
 - **Database**: 新增 `parent_id` 欄位支援留言回覆

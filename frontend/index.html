@@ -550,12 +550,23 @@
                 <p x-show="equipment.length === 0" class="text-center text-gray-400 py-8">無設備資料</p>
             </div>
 
-            <!-- Add Equipment Button -->
-            <button @click="showAddEquipmentModal = true" x-show="currentUser" class="fixed bottom-24 right-4 w-14 h-14 bg-primary-600 text-white rounded-full shadow-lg flex items-center justify-center">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
-                </svg>
-            </button>
+            <!-- Fixed Bottom Buttons for Equipment -->
+            <div x-show="currentUser && currentTab === 'equipment'" class="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-40">
+                <div class="grid grid-cols-2 gap-2 max-w-lg mx-auto">
+                    <button @click="showAddEquipmentModal = true" class="rounded-xl py-3 text-center card-press shadow-sm font-medium bg-primary-600 text-white">
+                        <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                        新增設備
+                    </button>
+                    <button @click="openEquipmentTemplateModal()" class="rounded-xl py-3 text-center card-press shadow-sm font-medium bg-primary-100 text-primary-700">
+                        <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                        範本
+                    </button>
+                </div>
+            </div>
         </div>
 
         <!-- ==================== 留言板 Tab ==================== -->
@@ -1546,6 +1557,186 @@
         </div>
     </div>
 
+    <!-- Equipment Template Select Modal (設備範本選擇) -->
+    <div x-show="showEquipmentTemplateModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showEquipmentTemplateModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">設備範本</h3>
+                <button x-show="currentUser && currentUser.role === 'admin'" @click="showEquipmentTemplateModal = false; openEquipmentTemplateManage()" class="text-xs text-primary-600 hover:underline">管理範本</button>
+            </div>
+            <div class="space-y-2 overflow-y-auto flex-1">
+                <template x-for="template in equipmentTemplates" :key="template.id">
+                    <button @click="applyEquipmentTemplate(template)" class="w-full bg-gray-50 hover:bg-primary-50 rounded-xl p-4 text-left transition-colors border border-gray-100 hover:border-primary-200">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 mr-3 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path :d="getEquipmentTemplateIconPath(template.icon)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                                </svg>
+                            </div>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-800" x-text="template.name"></p>
+                                <p class="text-sm text-gray-500" x-text="template.description"></p>
+                                <p class="text-xs text-gray-400 mt-1">
+                                    包含 <span x-text="template.items?.length || 0"></span> 項設備
+                                </p>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </button>
+                </template>
+                <p x-show="equipmentTemplates.length === 0" class="text-center text-gray-400 py-8">無範本資料<br><span class="text-xs">請先建立範本</span></p>
+            </div>
+            <button @click="showEquipmentTemplateModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+        </div>
+    </div>
+
+    <!-- Equipment Template Manage Modal (設備範本管理 - Admin) -->
+    <div x-show="showEquipmentTemplateManageModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showEquipmentTemplateManageModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">管理設備範本</h3>
+                <button @click="startCreateEquipmentTemplate()" class="bg-primary-600 text-white px-3 py-1 rounded-lg text-sm">新增範本</button>
+            </div>
+            <div class="space-y-2 overflow-y-auto flex-1">
+                <template x-for="template in equipmentTemplates" :key="template.id">
+                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center flex-1 min-w-0">
+                                <div class="w-10 h-10 mr-3 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path :d="getEquipmentTemplateIconPath(template.icon)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                                    </svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="font-medium text-gray-800 truncate" x-text="template.name"></p>
+                                    <p class="text-xs text-gray-400"><span x-text="template.items?.length || 0"></span> 項設備</p>
+                                </div>
+                            </div>
+                            <div class="flex space-x-1 ml-2">
+                                <button @click="startEditEquipmentTemplate(template)" class="text-blue-600 p-1.5 bg-blue-50 rounded-lg" title="編輯">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                </button>
+                                <button @click="confirmDeleteEquipmentTemplate(template)" class="text-red-600 p-1.5 bg-red-50 rounded-lg" title="刪除">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="equipmentTemplates.length === 0" class="text-center text-gray-400 py-8">尚無範本，點擊上方新增</p>
+            </div>
+            <button @click="showEquipmentTemplateManageModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">關閉</button>
+        </div>
+    </div>
+
+    <!-- Equipment Template Edit Modal (新增/編輯設備範本) -->
+    <div x-show="showEquipmentTemplateEditModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showEquipmentTemplateEditModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+            <h3 class="text-lg font-semibold mb-4" x-text="editingEquipmentTemplate ? '編輯設備範本' : '新增設備範本'"></h3>
+
+            <div class="space-y-3 overflow-y-auto flex-1">
+                <!-- Basic Info -->
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">名稱 *</label>
+                    <input type="text" x-model="equipmentTemplateForm.name" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="例：發電機組">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">說明</label>
+                    <input type="text" x-model="equipmentTemplateForm.description" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="例：緊急供電設備">
+                </div>
+
+                <!-- Icon Selector -->
+                <div>
+                    <label class="block text-xs text-gray-600 mb-2">選擇圖示</label>
+                    <div class="grid grid-cols-8 gap-1.5">
+                        <template x-for="icon in equipmentTemplateIconOptions" :key="icon.id">
+                            <button type="button"
+                                    @click="equipmentTemplateForm.icon = icon.id"
+                                    class="p-2 rounded-lg border-2 transition flex items-center justify-center"
+                                    :class="equipmentTemplateForm.icon === icon.id ? 'border-primary-600 bg-primary-100' : 'border-gray-200 hover:border-gray-300'"
+                                    :title="icon.name">
+                                <svg class="w-5 h-5" :class="equipmentTemplateForm.icon === icon.id ? 'text-primary-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path :d="icon.path" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                                </svg>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Items List -->
+                <div class="border-t pt-3">
+                    <p class="text-sm font-medium text-gray-700 mb-2">設備清單 (<span x-text="equipmentTemplateForm.items.length"></span> 項)</p>
+                    <div class="space-y-1 max-h-40 overflow-y-auto mb-3">
+                        <template x-for="(item, idx) in equipmentTemplateForm.items" :key="idx">
+                            <div class="flex items-center bg-gray-50 rounded-lg px-2 py-2 text-sm">
+                                <!-- Move buttons -->
+                                <div class="flex flex-col mr-2">
+                                    <button @click="moveEquipmentTemplateItem(idx, -1)" :disabled="idx === 0"
+                                            class="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed p-0.5">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                                        </svg>
+                                    </button>
+                                    <button @click="moveEquipmentTemplateItem(idx, 1)" :disabled="idx === equipmentTemplateForm.items.length - 1"
+                                            class="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed p-0.5">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
+                                <span class="flex-1 truncate">
+                                    <span x-text="item.name"></span>
+                                    <span x-show="item.specification" class="text-gray-400">(<span x-text="item.specification"></span>)</span>
+                                </span>
+                                <!-- Quantity editor -->
+                                <div class="flex items-center mx-2">
+                                    <button @click="item.quantity = Math.max(1, item.quantity - 1)"
+                                            class="w-5 h-5 bg-gray-200 rounded text-xs flex items-center justify-center hover:bg-gray-300">-</button>
+                                    <input type="number" x-model.number="item.quantity" min="1"
+                                           class="w-10 text-center text-sm border-0 bg-transparent mx-1">
+                                    <button @click="item.quantity++"
+                                            class="w-5 h-5 bg-gray-200 rounded text-xs flex items-center justify-center hover:bg-gray-300">+</button>
+                                </div>
+                                <button @click="removeEquipmentTemplateItem(idx)" class="text-red-500 p-1">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </template>
+                        <p x-show="equipmentTemplateForm.items.length === 0" class="text-xs text-gray-400 text-center py-2">尚無設備</p>
+                    </div>
+
+                    <!-- Add Item Form -->
+                    <div class="bg-primary-100 rounded-xl p-3">
+                        <p class="text-xs font-medium text-primary-700 mb-2">新增設備</p>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <input type="text" x-model="newEquipmentTemplateItem.name" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="名稱 *">
+                            <input type="text" x-model="newEquipmentTemplateItem.specification" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="規格">
+                        </div>
+                        <div class="grid grid-cols-3 gap-2 mb-2">
+                            <input type="number" x-model.number="newEquipmentTemplateItem.quantity" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white" min="1" placeholder="數量">
+                            <input type="text" x-model="newEquipmentTemplateItem.unit" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="單位">
+                            <input type="number" x-model.number="newEquipmentTemplateItem.check_interval_days" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white" min="1" placeholder="檢查週期">
+                        </div>
+                        <button @click="addEquipmentTemplateItem()" class="w-full bg-primary-600 text-white rounded-lg py-1.5 text-sm font-medium">+ 加入設備</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex space-x-3 mt-4 pt-3 border-t">
+                <button @click="showEquipmentTemplateEditModal = false; showEquipmentTemplateManageModal = true" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                <button @click="saveEquipmentTemplate()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium">儲存</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div x-show="toast.show" x-cloak
          x-transition:enter="transition ease-out duration-200"
@@ -1578,6 +1769,7 @@
                 similarItems: [],
                 bundles: [],
                 inventoryHistory: [],
+                equipmentTemplates: [],
 
                 // Filters
                 historyFilter: '',
@@ -1617,6 +1809,10 @@
                 showBatchMoveModal: false,
                 showPersonMoveModal: false,
                 showInventoryHistoryModal: false,
+                showEquipmentTemplateModal: false,
+                showEquipmentTemplateManageModal: false,
+                showEquipmentTemplateEditModal: false,
+                editingEquipmentTemplate: null,
                 personToMove: null,
                 lastDistributeResult: null,
                 deleteTarget: null,
@@ -1643,6 +1839,8 @@
                 bundleIntakeForm: { bundle_id: '', multiplier: 1, location: '' },
                 bundleForm: { name: '', description: '', icon: 'backpack', items: [] },
                 newBundleItem: { name: '', specification: '', category: 'other', quantity: 1, unit: '個' },
+                equipmentTemplateForm: { name: '', description: '', icon: 'cog', items: [] },
+                newEquipmentTemplateItem: { name: '', specification: '', quantity: 1, unit: '台', check_interval_days: 7 },
                 batchMoveForm: { target_zone_id: '', notes: '' },
                 newZone: { id: '', name: '', zone_type: 'shelter', capacity: 0, description: '' },
 
@@ -1668,6 +1866,26 @@
                     { id: 'bolt', name: '電力', path: 'M13 10V3L4 14h7v7l9-11h-7z' },
                     { id: 'gift', name: '禮物', path: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' },
                     { id: 'cube', name: '物資', path: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' }
+                ],
+
+                // Equipment template icon options (heroicons)
+                equipmentTemplateIconOptions: [
+                    { id: 'cog', name: '齒輪', path: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z' },
+                    { id: 'bolt', name: '電力', path: 'M13 10V3L4 14h7v7l9-11h-7z' },
+                    { id: 'signal', name: '通訊', path: 'M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0' },
+                    { id: 'truck', name: '車輛', path: 'M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0' },
+                    { id: 'beaker', name: '檢測', path: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z' },
+                    { id: 'wrench', name: '工具', path: 'M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z' },
+                    { id: 'fire', name: '消防', path: 'M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z' },
+                    { id: 'light', name: '照明', path: 'M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z' },
+                    { id: 'speaker', name: '音響', path: 'M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z' },
+                    { id: 'computer', name: '電腦', path: 'M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
+                    { id: 'camera', name: '攝影', path: 'M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z M15 13a3 3 0 11-6 0 3 3 0 016 0z' },
+                    { id: 'medical', name: '醫療', path: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z' },
+                    { id: 'shield', name: '防護', path: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+                    { id: 'water', name: '水源', path: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z' },
+                    { id: 'home', name: '設施', path: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+                    { id: 'cube', name: '其他', path: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' }
                 ],
 
                 // Toast
@@ -1708,7 +1926,7 @@
                     switch(this.currentTab) {
                         case 'people': this.loadPeople(); this.loadZones(); break;
                         case 'inventory': this.loadInventory(); this.loadExpiringItems(); this.loadBundles(); break;
-                        case 'equipment': this.loadEquipment(); this.loadEquipmentPending(); break;
+                        case 'equipment': this.loadEquipment(); this.loadEquipmentPending(); this.loadEquipmentTemplates(); break;
                         case 'messages': this.loadMessages(); break;
                     }
                 },
@@ -1854,6 +2072,273 @@
                             this.equipmentPending = data.items || [];
                         }
                     } catch (e) {}
+                },
+
+                // Equipment Template methods
+                getDefaultEquipmentTemplates() {
+                    return [
+                        {
+                            id: 'power_station',
+                            name: '電力設備組',
+                            description: '發電機、延長線、照明等供電設備',
+                            icon: 'bolt',
+                            items: [
+                                { name: '汽油發電機', specification: '3500W', quantity: 2, unit: '台', check_interval_days: 30 },
+                                { name: 'UPS不斷電系統', specification: '1000VA', quantity: 2, unit: '台', check_interval_days: 90 },
+                                { name: 'LED工作燈', specification: '50W', quantity: 6, unit: '組', check_interval_days: 30 },
+                                { name: '工業延長線', specification: '10米', quantity: 4, unit: '條', check_interval_days: 30 },
+                                { name: '手電筒', specification: 'LED充電式', quantity: 10, unit: '支', check_interval_days: 30 }
+                            ]
+                        },
+                        {
+                            id: 'comm_station',
+                            name: '通訊設備組',
+                            description: '無線電、擴音器等通訊設備',
+                            icon: 'signal',
+                            items: [
+                                { name: '對講機', specification: 'VHF/UHF 雙頻', quantity: 6, unit: '台', check_interval_days: 30 },
+                                { name: '手持擴音器', specification: '25W', quantity: 2, unit: '台', check_interval_days: 30 },
+                                { name: '行動電源', specification: '20000mAh', quantity: 10, unit: '個', check_interval_days: 90 },
+                                { name: 'USB充電站', specification: '10孔', quantity: 2, unit: '台', check_interval_days: 90 }
+                            ]
+                        },
+                        {
+                            id: 'medical_station',
+                            name: '醫療設備組',
+                            description: '血壓計、輪椅等基本醫療設備',
+                            icon: 'heart',
+                            items: [
+                                { name: '電子血壓計', specification: '臂式', quantity: 3, unit: '台', check_interval_days: 30 },
+                                { name: '額溫槍', specification: '非接觸式', quantity: 5, unit: '支', check_interval_days: 30 },
+                                { name: '血氧機', specification: '指夾式', quantity: 3, unit: '台', check_interval_days: 30 },
+                                { name: '輪椅', specification: '標準型', quantity: 4, unit: '台', check_interval_days: 90 },
+                                { name: '擔架', specification: '折疊式', quantity: 2, unit: '組', check_interval_days: 90 },
+                                { name: 'AED', specification: '自動體外心臟電擊器', quantity: 1, unit: '台', check_interval_days: 30 }
+                            ]
+                        },
+                        {
+                            id: 'shelter_basic',
+                            name: '收容基本設備',
+                            description: '帳篷、睡袋、桌椅等收容必需品',
+                            icon: 'home',
+                            items: [
+                                { name: '折疊床', specification: '標準單人', quantity: 50, unit: '張', check_interval_days: 180 },
+                                { name: '睡袋', specification: '成人款', quantity: 50, unit: '個', check_interval_days: 180 },
+                                { name: '毛毯', specification: '150x200cm', quantity: 100, unit: '條', check_interval_days: 180 },
+                                { name: '折疊桌', specification: '180cm長桌', quantity: 10, unit: '張', check_interval_days: 180 },
+                                { name: '折疊椅', specification: '塑膠款', quantity: 50, unit: '張', check_interval_days: 180 }
+                            ]
+                        },
+                        {
+                            id: 'kitchen_set',
+                            name: '炊事設備組',
+                            description: '瓦斯爐、鍋具等炊事設備',
+                            icon: 'fire',
+                            items: [
+                                { name: '卡式瓦斯爐', specification: '單口', quantity: 4, unit: '台', check_interval_days: 30 },
+                                { name: '大型湯鍋', specification: '50L', quantity: 2, unit: '個', check_interval_days: 90 },
+                                { name: '保溫桶', specification: '20L', quantity: 4, unit: '個', check_interval_days: 90 },
+                                { name: '飲水機', specification: '桶裝水用', quantity: 2, unit: '台', check_interval_days: 30 }
+                            ]
+                        },
+                        {
+                            id: 'sanitation_set',
+                            name: '衛生設備組',
+                            description: '簡易廁所、消毒設備等',
+                            icon: 'beaker',
+                            items: [
+                                { name: '移動式廁所', specification: '單人座', quantity: 4, unit: '座', check_interval_days: 7 },
+                                { name: '消毒噴霧器', specification: '手壓式8L', quantity: 4, unit: '台', check_interval_days: 30 },
+                                { name: '垃圾桶', specification: '120L有蓋', quantity: 10, unit: '個', check_interval_days: 90 }
+                            ]
+                        },
+                        {
+                            id: 'rescue_tools',
+                            name: '救援工具組',
+                            description: '破壞器材、繩索等救援工具',
+                            icon: 'wrench',
+                            items: [
+                                { name: '油壓剪', specification: '手動式', quantity: 1, unit: '台', check_interval_days: 90 },
+                                { name: '鐵撬', specification: '90cm', quantity: 2, unit: '支', check_interval_days: 90 },
+                                { name: '救援繩', specification: '50米', quantity: 2, unit: '捲', check_interval_days: 90 },
+                                { name: '安全帽', specification: '工程用', quantity: 10, unit: '頂', check_interval_days: 180 },
+                                { name: '工作手套', specification: '防滑', quantity: 20, unit: '雙', check_interval_days: 90 }
+                            ]
+                        }
+                    ];
+                },
+
+                loadEquipmentTemplates() {
+                    const saved = localStorage.getItem('cirs_equipment_templates');
+                    if (saved) {
+                        try {
+                            this.equipmentTemplates = JSON.parse(saved);
+                            // 如果是空陣列，載入預設範本
+                            if (this.equipmentTemplates.length === 0) {
+                                this.equipmentTemplates = this.getDefaultEquipmentTemplates();
+                                this.saveEquipmentTemplatesToStorage();
+                            }
+                        } catch (e) {
+                            this.equipmentTemplates = this.getDefaultEquipmentTemplates();
+                            this.saveEquipmentTemplatesToStorage();
+                        }
+                    } else {
+                        // 首次載入，使用預設範本
+                        this.equipmentTemplates = this.getDefaultEquipmentTemplates();
+                        this.saveEquipmentTemplatesToStorage();
+                    }
+                },
+
+                saveEquipmentTemplatesToStorage() {
+                    localStorage.setItem('cirs_equipment_templates', JSON.stringify(this.equipmentTemplates));
+                },
+
+                openEquipmentTemplateModal() {
+                    this.loadEquipmentTemplates();
+                    this.showEquipmentTemplateModal = true;
+                },
+
+                openEquipmentTemplateManage() {
+                    this.loadEquipmentTemplates();
+                    this.showEquipmentTemplateManageModal = true;
+                },
+
+                startCreateEquipmentTemplate() {
+                    this.editingEquipmentTemplate = null;
+                    this.equipmentTemplateForm = { name: '', description: '', icon: 'cog', items: [] };
+                    this.newEquipmentTemplateItem = { name: '', specification: '', quantity: 1, unit: '台', check_interval_days: 7 };
+                    this.showEquipmentTemplateManageModal = false;
+                    this.showEquipmentTemplateEditModal = true;
+                },
+
+                startEditEquipmentTemplate(template) {
+                    this.editingEquipmentTemplate = template;
+                    this.equipmentTemplateForm = {
+                        name: template.name,
+                        description: template.description || '',
+                        icon: template.icon || 'cog',
+                        items: JSON.parse(JSON.stringify(template.items || []))
+                    };
+                    this.newEquipmentTemplateItem = { name: '', specification: '', quantity: 1, unit: '台', check_interval_days: 7 };
+                    this.showEquipmentTemplateManageModal = false;
+                    this.showEquipmentTemplateEditModal = true;
+                },
+
+                addEquipmentTemplateItem() {
+                    if (!this.newEquipmentTemplateItem.name.trim()) {
+                        this.showToast('請輸入設備名稱', 'error');
+                        return;
+                    }
+                    this.equipmentTemplateForm.items.push({
+                        name: this.newEquipmentTemplateItem.name.trim(),
+                        specification: this.newEquipmentTemplateItem.specification.trim(),
+                        quantity: this.newEquipmentTemplateItem.quantity || 1,
+                        unit: this.newEquipmentTemplateItem.unit || '台',
+                        check_interval_days: this.newEquipmentTemplateItem.check_interval_days || 7
+                    });
+                    this.newEquipmentTemplateItem = { name: '', specification: '', quantity: 1, unit: '台', check_interval_days: 7 };
+                },
+
+                removeEquipmentTemplateItem(index) {
+                    this.equipmentTemplateForm.items.splice(index, 1);
+                },
+
+                moveEquipmentTemplateItem(index, direction) {
+                    const newIndex = index + direction;
+                    if (newIndex < 0 || newIndex >= this.equipmentTemplateForm.items.length) return;
+                    const items = [...this.equipmentTemplateForm.items];
+                    const [item] = items.splice(index, 1);
+                    items.splice(newIndex, 0, item);
+                    this.equipmentTemplateForm.items = items;
+                },
+
+                saveEquipmentTemplate() {
+                    if (!this.equipmentTemplateForm.name.trim()) {
+                        this.showToast('請輸入範本名稱', 'error');
+                        return;
+                    }
+                    if (this.equipmentTemplateForm.items.length === 0) {
+                        this.showToast('請至少加入一項設備', 'error');
+                        return;
+                    }
+
+                    if (this.editingEquipmentTemplate) {
+                        // Update existing
+                        const index = this.equipmentTemplates.findIndex(t => t.id === this.editingEquipmentTemplate.id);
+                        if (index !== -1) {
+                            this.equipmentTemplates[index] = {
+                                ...this.editingEquipmentTemplate,
+                                name: this.equipmentTemplateForm.name.trim(),
+                                description: this.equipmentTemplateForm.description.trim(),
+                                icon: this.equipmentTemplateForm.icon,
+                                items: this.equipmentTemplateForm.items
+                            };
+                        }
+                    } else {
+                        // Create new
+                        this.equipmentTemplates.push({
+                            id: 'eq_tpl_' + Date.now(),
+                            name: this.equipmentTemplateForm.name.trim(),
+                            description: this.equipmentTemplateForm.description.trim(),
+                            icon: this.equipmentTemplateForm.icon,
+                            items: this.equipmentTemplateForm.items
+                        });
+                    }
+
+                    this.saveEquipmentTemplatesToStorage();
+                    this.showEquipmentTemplateEditModal = false;
+                    this.showEquipmentTemplateManageModal = true;
+                    this.showToast(this.editingEquipmentTemplate ? '範本已更新' : '範本已建立', 'success');
+                },
+
+                confirmDeleteEquipmentTemplate(template) {
+                    if (!confirm(`確定要刪除「${template.name}」範本嗎？`)) return;
+                    this.equipmentTemplates = this.equipmentTemplates.filter(t => t.id !== template.id);
+                    this.saveEquipmentTemplatesToStorage();
+                    this.showToast('範本已刪除', 'success');
+                },
+
+                async applyEquipmentTemplate(template) {
+                    if (!template.items || template.items.length === 0) {
+                        this.showToast('此範本無設備', 'error');
+                        return;
+                    }
+
+                    this.showEquipmentTemplateModal = false;
+                    let successCount = 0;
+                    let failCount = 0;
+
+                    for (const item of template.items) {
+                        try {
+                            const res = await this.apiCall('/api/inventory', {
+                                method: 'POST',
+                                body: {
+                                    name: item.name,
+                                    specification: item.specification || '',
+                                    category: 'equipment',
+                                    quantity: item.quantity || 1,
+                                    unit: item.unit || '台',
+                                    check_interval_days: item.check_interval_days || 7
+                                }
+                            });
+                            if (res.ok) successCount++;
+                            else failCount++;
+                        } catch (e) { failCount++; }
+                    }
+
+                    await this.loadEquipment();
+                    await this.loadEquipmentPending();
+
+                    if (failCount === 0) {
+                        this.showToast(`已新增 ${successCount} 項設備`, 'success');
+                    } else {
+                        this.showToast(`新增 ${successCount} 項，${failCount} 項失敗`, 'error');
+                    }
+                },
+
+                getEquipmentTemplateIconPath(iconId) {
+                    const icon = this.equipmentTemplateIconOptions.find(i => i.id === iconId);
+                    return icon ? icon.path : this.equipmentTemplateIconOptions[0].path;
                 },
 
                 async loadPeople() {
