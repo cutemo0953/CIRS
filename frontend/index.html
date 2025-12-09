@@ -298,19 +298,21 @@
                             </p>
                         </div>
                         <div class="flex items-center space-x-1">
-                            <!-- MIRS Link for RED/YELLOW patients -->
-                            <a x-show="person.triage_status === 'RED' || person.triage_status === 'YELLOW'"
-                               :href="'/mirs/#patient/' + person.id"
-                               class="text-blue-600 p-2 bg-blue-50 rounded-lg"
-                               title="查看 MIRS 處置記錄">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            <!-- Zone/Location Button (移動區域) -->
+                            <button @click="openPersonMoveModal(person)" x-show="currentUser"
+                                    class="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
+                                    title="移動區域">
+                                <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
                                 </svg>
-                            </a>
-                            <!-- Triage Button -->
-                            <button @click="startTriage(person)" x-show="currentUser && (currentUser.role === 'admin' || currentUser.role === 'medic')" class="text-primary-600 p-2">
-                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </button>
+                            <!-- Triage Button (檢傷分類) -->
+                            <button @click="startTriage(person)" x-show="currentUser && (currentUser.role === 'admin' || currentUser.role === 'medic')"
+                                    class="p-2 bg-red-50 hover:bg-red-100 rounded-lg transition"
+                                    title="檢傷分類">
+                                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
                                 </svg>
                             </button>
                         </div>
@@ -805,7 +807,7 @@
                 </div>
                 <div class="flex space-x-3">
                     <button @click="showDistributeModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doDistribute()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">確認發放</button>
+                    <button @click="doDistribute()" class="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg">確認發放</button>
                 </div>
             </div>
         </div>
@@ -1243,6 +1245,63 @@
         </div>
     </div>
 
+    <!-- Single Person Move Modal (單人區域移動) -->
+    <div x-show="showPersonMoveModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showPersonMoveModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <div class="flex items-center mb-4">
+                <div class="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold mr-3"
+                     :class="{
+                         'bg-green-500': personToMove?.triage_status === 'GREEN',
+                         'bg-yellow-500': personToMove?.triage_status === 'YELLOW',
+                         'bg-red-500': personToMove?.triage_status === 'RED',
+                         'bg-gray-800': personToMove?.triage_status === 'BLACK',
+                         'bg-gray-300': !personToMove?.triage_status
+                     }">
+                    <span x-text="personToMove?.display_name?.charAt(0) || '?'"></span>
+                </div>
+                <div>
+                    <h3 class="font-semibold" x-text="personToMove?.display_name"></h3>
+                    <p class="text-xs text-gray-500">
+                        目前位置：<span x-text="zones.find(z => z.id === personToMove?.current_location)?.name || '未指定'"></span>
+                    </p>
+                </div>
+            </div>
+
+            <p class="text-sm text-gray-600 mb-3">選擇目標區域：</p>
+
+            <!-- Target Zone Selection -->
+            <div class="space-y-2 max-h-52 overflow-y-auto mb-4">
+                <template x-for="zone in zones" :key="zone.id">
+                    <label class="flex items-center p-3 bg-gray-50 rounded-lg cursor-pointer hover:bg-gray-100 transition"
+                           :class="batchMoveForm.target_zone_id === zone.id ? 'ring-2 ring-primary-500 bg-primary-50' : ''">
+                        <input type="radio" name="person_target_zone" :value="zone.id" x-model="batchMoveForm.target_zone_id" class="mr-3">
+                        <div class="flex-1">
+                            <p class="font-medium text-sm" x-text="zone.name"></p>
+                            <p class="text-xs text-gray-400">
+                                <span x-text="zone.current_count || 0"></span>
+                                <span x-show="zone.capacity > 0">/<span x-text="zone.capacity"></span></span>
+                            </p>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded"
+                              :class="{
+                                  'bg-blue-100 text-blue-600': zone.zone_type === 'shelter',
+                                  'bg-red-100 text-red-600': zone.zone_type === 'medical',
+                                  'bg-green-100 text-green-600': zone.zone_type === 'service',
+                                  'bg-gray-200 text-gray-600': zone.zone_type === 'restricted'
+                              }"
+                              x-text="zoneTypeLabels[zone.zone_type]"></span>
+                    </label>
+                </template>
+            </div>
+
+            <!-- Actions -->
+            <div class="grid grid-cols-2 gap-2">
+                <button @click="showPersonMoveModal = false" class="px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                <button @click="doPersonMove()" class="px-4 py-2 bg-primary-600 text-white rounded-lg font-medium">確認移動</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Bundle Edit Modal (新增/編輯組套) -->
     <div x-show="showBundleEditModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleEditModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
@@ -1500,6 +1559,8 @@
                 showBundleEditModal: false,
                 showZoneManageModal: false,
                 showBatchMoveModal: false,
+                showPersonMoveModal: false,
+                personToMove: null,
                 lastDistributeResult: null,
                 deleteTarget: null,
                 deleteType: null,
@@ -1967,6 +2028,41 @@
                 startTriage(person) {
                     this.triageTarget = person;
                     this.showTriageModal = true;
+                },
+
+                // Single person move (區域移動)
+                openPersonMoveModal(person) {
+                    this.personToMove = person;
+                    this.batchMoveForm.target_zone_id = person.current_location || '';
+                    this.batchMoveForm.notes = '';
+                    this.showPersonMoveModal = true;
+                },
+
+                async doPersonMove() {
+                    if (!this.batchMoveForm.target_zone_id) {
+                        this.showToast('請選擇目標區域', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await this.apiCall('/api/zone/move', {
+                            method: 'POST',
+                            body: {
+                                person_ids: [this.personToMove.id],
+                                target_zone_id: this.batchMoveForm.target_zone_id,
+                                operator_id: this.currentUser.id,
+                                notes: this.batchMoveForm.notes
+                            }
+                        });
+                        if (res.ok) {
+                            this.showPersonMoveModal = false;
+                            this.showToast('移動成功', 'success');
+                            await this.loadPeople();
+                            await this.loadZones();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '移動失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('移動失敗', 'error'); }
                 },
 
                 async doTriage(status) {
