@@ -47,10 +47,10 @@ CIRS 是社區級災難韌性管理系統，整合物資管理、人員報到、
 
 ## 快速開始
 
-### 開發環境 (macOS/Linux)
+### 本地端開發環境 (macOS/Linux)
 
 ```bash
-# 1. Clone
+# 1. Clone 專案
 git clone https://github.com/cutemo0953/CIRS.git
 cd CIRS
 
@@ -59,7 +59,51 @@ python3 -m venv venv
 source venv/bin/activate  # Linux/macOS
 # Windows: venv\Scripts\activate
 
-# 3. 安裝 Python 依賴 (需先升級 pip)
+# 3. 安裝 Python 依賴
+cd backend
+pip install --upgrade pip
+pip install -r requirements.txt
+
+# 4. 初始化資料庫
+python init_db.py
+
+# 5. 啟動後端 (開發模式，支援熱重載)
+uvicorn main:app --host 0.0.0.0 --port 8090 --reload
+
+# 6. 開啟瀏覽器測試
+# API 文件: http://localhost:8090/docs
+# 前端介面: http://localhost:8090/frontend
+# Portal 入口: http://localhost:8090/portal
+```
+
+### 本地端測試流程
+
+```bash
+# 確認服務運行中
+curl http://localhost:8090/api/health
+# 預期回應: {"status":"healthy"}
+
+# 查看系統統計
+curl http://localhost:8090/api/stats
+
+# 測試登入 (預設帳號 admin001, PIN: 1234)
+curl -X POST http://localhost:8090/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"person_id":"admin001","pin":"1234"}'
+```
+
+### Windows 開發環境
+
+```powershell
+# 1. Clone 專案
+git clone https://github.com/cutemo0953/CIRS.git
+cd CIRS
+
+# 2. 建立虛擬環境
+python -m venv venv
+venv\Scripts\activate
+
+# 3. 安裝依賴
 cd backend
 pip install --upgrade pip
 pip install -r requirements.txt
@@ -70,8 +114,7 @@ python init_db.py
 # 5. 啟動後端
 uvicorn main:app --host 0.0.0.0 --port 8090 --reload
 
-# 6. 開啟瀏覽器
-open http://localhost:8090
+# 6. 開啟瀏覽器: http://localhost:8090/frontend
 ```
 
 ### Raspberry Pi 部署
@@ -227,6 +270,56 @@ CIRS 發放物資時會產生 QR Code，使用者可用 HIRS 掃描同步到個�
 | 檢傷分類 | - | - | ✓ | ✓ |
 | 刪除設備/留言 | - | - | - | ✓ |
 | 編輯站點設定 | - | - | - | ✓ |
+
+## API 端點說明
+
+### 備份系統 API (`/api/backup`)
+
+```bash
+# 查看備份狀態
+curl http://localhost:8090/api/backup/status
+
+# 建立本地加密備份
+curl -X POST http://localhost:8090/api/backup/create \
+  -H "Content-Type: application/json" \
+  -d '{"operator_id":"admin001","target":"local","encrypt":true,"password":"your_password"}'
+
+# 建立 USB 備份 (需插入 USB)
+curl -X POST http://localhost:8090/api/backup/create \
+  -H "Content-Type: application/json" \
+  -d '{"operator_id":"admin001","target":"usb","encrypt":true,"password":"your_password"}'
+
+# 驗證備份完整性
+curl http://localhost:8090/api/backup/verify/1
+
+# 查看備份審計記錄
+curl http://localhost:8090/api/backup/audit-log
+```
+
+### 人員管理 API (`/api/person`)
+
+```bash
+# 報到登記 (含照片)
+curl -X POST http://localhost:8090/api/person \
+  -H "Content-Type: application/json" \
+  -d '{
+    "display_name":"測試病患",
+    "triage_status":"YELLOW",
+    "photo_data":"data:image/jpeg;base64,...",
+    "physical_desc":"男性，約40歲，藍色上衣"
+  }'
+
+# 查詢待辨識人員
+curl http://localhost:8090/api/person/unidentified/list
+
+# 確認身分 (管理員)
+curl -X POST http://localhost:8090/api/person/P0001/confirm-identity \
+  -H "Content-Type: application/json" \
+  -d '{"national_id":"A123456789","operator_id":"admin001"}'
+
+# 查詢人員修改記錄
+curl http://localhost:8090/api/person/P0001/audit-log
+```
 
 ## 開發規格
 
