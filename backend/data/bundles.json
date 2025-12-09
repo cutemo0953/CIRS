@@ -1,0 +1,103 @@
+{
+  "bundles": [
+    {
+      "id": "emergency_kit",
+      "name": "防災包",
+      "description": "標準緊急避難包",
+      "icon": "🎒",
+      "items": [
+        { "name": "礦泉水", "specification": "600ml", "category": "water", "quantity": 6, "unit": "瓶" },
+        { "name": "餅乾", "specification": "壓縮口糧", "category": "food", "quantity": 3, "unit": "包" },
+        { "name": "手電筒", "category": "power", "quantity": 1, "unit": "支" },
+        { "name": "電池", "specification": "AA", "category": "power", "quantity": 4, "unit": "顆" },
+        { "name": "急救包", "category": "medical", "quantity": 1, "unit": "個" },
+        { "name": "哨子", "category": "other", "quantity": 1, "unit": "個" },
+        { "name": "收音機", "category": "power", "quantity": 1, "unit": "台" }
+      ]
+    },
+    {
+      "id": "food_supply",
+      "name": "糧食補給",
+      "description": "一週食物供給",
+      "icon": "🍚",
+      "items": [
+        { "name": "礦泉水", "specification": "2L", "category": "water", "quantity": 6, "unit": "瓶" },
+        { "name": "泡麵", "category": "food", "quantity": 10, "unit": "包" },
+        { "name": "罐頭", "specification": "肉類", "category": "food", "quantity": 6, "unit": "罐" },
+        { "name": "罐頭", "specification": "蔬菜", "category": "food", "quantity": 6, "unit": "罐" },
+        { "name": "餅乾", "category": "food", "quantity": 5, "unit": "包" },
+        { "name": "米", "specification": "2公斤裝", "category": "food", "quantity": 2, "unit": "包" }
+      ]
+    },
+    {
+      "id": "medical_kit",
+      "name": "醫療補給",
+      "description": "醫療用品補充",
+      "icon": "🏥",
+      "items": [
+        { "name": "OK繃", "category": "medical", "quantity": 50, "unit": "片" },
+        { "name": "紗布", "category": "medical", "quantity": 10, "unit": "卷" },
+        { "name": "消毒酒精", "specification": "75%", "category": "medical", "quantity": 2, "unit": "瓶" },
+        { "name": "優碘", "category": "medical", "quantity": 2, "unit": "瓶" },
+        { "name": "生理食鹽水", "category": "medical", "quantity": 5, "unit": "瓶" },
+        { "name": "口罩", "category": "medical", "quantity": 50, "unit": "片" },
+        { "name": "手套", "specification": "乳膠", "category": "medical", "quantity": 50, "unit": "雙" }
+      ]
+    },
+    {
+      "id": "power_supply",
+      "name": "電力補給",
+      "description": "電力與照明設備",
+      "icon": "🔋",
+      "items": [
+        { "name": "電池", "specification": "AA", "category": "power", "quantity": 20, "unit": "顆" },
+        { "name": "電池", "specification": "AAA", "category": "power", "quantity": 20, "unit": "顆" },
+        { "name": "手電筒", "category": "power", "quantity": 5, "unit": "支" },
+        { "name": "蠟燭", "category": "power", "quantity": 20, "unit": "支" },
+        { "name": "打火機", "category": "power", "quantity": 5, "unit": "個" },
+        { "name": "行動電源", "specification": "10000mAh", "category": "power", "quantity": 3, "unit": "個" }
+      ]
+    },
+    {
+      "id": "baby_supply",
+      "name": "嬰兒用品",
+      "description": "嬰幼兒所需物資",
+      "icon": "👶",
+      "items": [
+        { "name": "尿布", "specification": "M號", "category": "daily", "quantity": 50, "unit": "片" },
+        { "name": "奶粉", "specification": "400g", "category": "food", "quantity": 2, "unit": "罐" },
+        { "name": "奶瓶", "category": "daily", "quantity": 2, "unit": "個" },
+        { "name": "濕紙巾", "category": "daily", "quantity": 3, "unit": "包" },
+        { "name": "嬰兒食品", "category": "food", "quantity": 10, "unit": "罐" }
+      ]
+    },
+    {
+      "id": "daily_supply",
+      "name": "日用品",
+      "description": "日常生活必需品",
+      "icon": "🧴",
+      "items": [
+        { "name": "衛生紙", "category": "daily", "quantity": 6, "unit": "卷" },
+        { "name": "毛巾", "category": "daily", "quantity": 10, "unit": "條" },
+        { "name": "牙刷", "category": "daily", "quantity": 10, "unit": "支" },
+        { "name": "牙膏", "category": "daily", "quantity": 3, "unit": "條" },
+        { "name": "肥皂", "category": "daily", "quantity": 5, "unit": "塊" },
+        { "name": "洗髮精", "category": "daily", "quantity": 2, "unit": "瓶" },
+        { "name": "毛毯", "category": "daily", "quantity": 10, "unit": "條" }
+      ]
+    },
+    {
+      "id": "shelter_equipment",
+      "name": "收容所設備",
+      "description": "避難所基本設備",
+      "icon": "🏕️",
+      "items": [
+        { "name": "睡袋", "category": "daily", "quantity": 20, "unit": "個" },
+        { "name": "睡墊", "category": "daily", "quantity": 20, "unit": "個" },
+        { "name": "帳篷", "specification": "4人帳", "category": "equipment", "quantity": 5, "unit": "頂" },
+        { "name": "摺疊桌", "category": "equipment", "quantity": 10, "unit": "張" },
+        { "name": "摺疊椅", "category": "equipment", "quantity": 30, "unit": "張" }
+      ]
+    }
+  ]
+}

@@ -717,17 +717,28 @@
 
     <!-- Intake Modal -->
     <div x-show="showIntakeModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showIntakeModal = false">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col">
             <h3 class="text-lg font-semibold mb-4">入庫</h3>
-            <div class="space-y-4">
+            <div class="space-y-4 overflow-y-auto flex-1">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">選擇物資</label>
-                    <select x-model="intakeForm.item_id" class="w-full border border-gray-200 rounded-lg px-3 py-2">
-                        <option value="">-- 選擇 --</option>
-                        <template x-for="item in inventory.filter(i => i.category !== 'equipment')" :key="item.id">
-                            <option :value="item.id" x-text="item.name + (item.specification ? ' (' + item.specification + ')' : '')"></option>
+                    <label class="block text-sm text-gray-600 mb-1">搜尋並選擇物資</label>
+                    <input type="text" x-model="intakeSearch" placeholder="輸入名稱搜尋..."
+                           class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-2 text-sm">
+                    <div class="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
+                        <template x-for="item in inventory.filter(i => i.category !== 'equipment' && (!intakeSearch || i.name.toLowerCase().includes(intakeSearch.toLowerCase())))" :key="item.id">
+                            <button @click="intakeForm.item_id = item.id; intakeSearch = ''"
+                                    class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                                    :class="intakeForm.item_id === item.id ? 'bg-primary-50 text-primary-700' : ''">
+                                <span x-text="item.name + (item.specification ? ' (' + item.specification + ')' : '')"></span>
+                                <span class="text-gray-400 ml-1">庫存: <span x-text="item.quantity"></span></span>
+                            </button>
                         </template>
-                    </select>
+                        <p x-show="inventory.filter(i => i.category !== 'equipment' && (!intakeSearch || i.name.toLowerCase().includes(intakeSearch.toLowerCase()))).length === 0"
+                           class="text-center text-gray-400 py-2 text-xs">沒有符合的物資</p>
+                    </div>
+                    <p x-show="intakeForm.item_id" class="text-xs text-primary-600 mt-1">
+                        已選: <span x-text="inventory.find(i => i.id === intakeForm.item_id)?.name || ''"></span>
+                    </p>
                 </div>
                 <div>
                     <label class="block text-sm text-gray-600 mb-1">入庫數量</label>
@@ -751,17 +762,23 @@
 
     <!-- Distribute Select Modal -->
     <div x-show="showDistributeSelectModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDistributeSelectModal = false">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-4">選擇發放物資</h3>
-            <div class="space-y-2 max-h-80 overflow-y-auto">
-                <template x-for="item in inventory.filter(i => i.category !== 'equipment' && i.quantity > 0)" :key="item.id">
-                    <button @click="startDistribute(item); showDistributeSelectModal = false" class="w-full bg-gray-50 hover:bg-gray-100 rounded-lg p-3 text-left">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] flex flex-col">
+            <h3 class="text-lg font-semibold mb-3">選擇發放物資</h3>
+            <!-- 搜尋欄 -->
+            <input type="text" x-model="distributeSearch" placeholder="搜尋物資名稱..."
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"
+                   @input="$event.target.focus()">
+            <div class="space-y-2 overflow-y-auto flex-1">
+                <template x-for="item in inventory.filter(i => i.category !== 'equipment' && i.quantity > 0 && (!distributeSearch || i.name.toLowerCase().includes(distributeSearch.toLowerCase())))" :key="item.id">
+                    <button @click="startDistribute(item); showDistributeSelectModal = false; distributeSearch = ''" class="w-full bg-gray-50 hover:bg-gray-100 rounded-lg p-3 text-left">
                         <p class="font-medium" x-text="item.name + (item.specification ? ' (' + item.specification + ')' : '')"></p>
                         <p class="text-sm text-gray-500">庫存: <span x-text="item.quantity"></span> <span x-text="item.unit || '個'"></span></p>
                     </button>
                 </template>
+                <p x-show="inventory.filter(i => i.category !== 'equipment' && i.quantity > 0 && (!distributeSearch || i.name.toLowerCase().includes(distributeSearch.toLowerCase()))).length === 0"
+                   class="text-center text-gray-400 py-4 text-sm">沒有符合的物資</p>
             </div>
-            <button @click="showDistributeSelectModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+            <button @click="showDistributeSelectModal = false; distributeSearch = ''" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
         </div>
     </div>
 
@@ -1046,7 +1063,11 @@
                 <template x-for="bundle in bundles" :key="bundle.id">
                     <button @click="selectBundle(bundle)" class="w-full bg-gray-50 hover:bg-teal-50 rounded-xl p-4 text-left transition-colors border border-gray-100 hover:border-teal-200">
                         <div class="flex items-center">
-                            <span class="text-2xl mr-3" x-text="bundle.icon || '📦'"></span>
+                            <div class="w-10 h-10 mr-3 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <svg class="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path :d="getBundleIconPath(bundle.icon)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                                </svg>
+                            </div>
                             <div class="flex-1">
                                 <p class="font-medium text-gray-800" x-text="bundle.name"></p>
                                 <p class="text-sm text-gray-500" x-text="bundle.description"></p>
@@ -1078,7 +1099,11 @@
                     <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center flex-1 min-w-0">
-                                <span class="text-2xl mr-3" x-text="bundle.icon || '📦'"></span>
+                                <div class="w-10 h-10 mr-3 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path :d="getBundleIconPath(bundle.icon)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                                    </svg>
+                                </div>
                                 <div class="min-w-0">
                                     <p class="font-medium text-gray-800 truncate" x-text="bundle.name"></p>
                                     <p class="text-xs text-gray-400"><span x-text="bundle.items?.length || 0"></span> 項物資</p>
@@ -1225,27 +1250,54 @@
 
             <div class="space-y-3 overflow-y-auto flex-1">
                 <!-- Basic Info -->
-                <div class="grid grid-cols-4 gap-2">
-                    <div class="col-span-1">
-                        <label class="block text-xs text-gray-600 mb-1">圖示</label>
-                        <input type="text" x-model="bundleForm.icon" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-center text-xl" placeholder="📦">
-                    </div>
-                    <div class="col-span-3">
-                        <label class="block text-xs text-gray-600 mb-1">名稱 *</label>
-                        <input type="text" x-model="bundleForm.name" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 防災包">
-                    </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">名稱 *</label>
+                    <input type="text" x-model="bundleForm.name" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 防災包">
                 </div>
                 <div>
                     <label class="block text-xs text-gray-600 mb-1">說明</label>
                     <input type="text" x-model="bundleForm.description" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 標準緊急避難包">
                 </div>
 
-                <!-- Items List -->
+                <!-- Icon Selector (heroicon grid) -->
+                <div>
+                    <label class="block text-xs text-gray-600 mb-2">選擇圖示</label>
+                    <div class="grid grid-cols-8 gap-1.5">
+                        <template x-for="icon in bundleIconOptions" :key="icon.id">
+                            <button type="button"
+                                    @click="bundleForm.icon = icon.id"
+                                    class="p-2 rounded-lg border-2 transition flex items-center justify-center"
+                                    :class="bundleForm.icon === icon.id ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'"
+                                    :title="icon.name">
+                                <svg class="w-5 h-5" :class="bundleForm.icon === icon.id ? 'text-teal-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path :d="icon.path" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                                </svg>
+                            </button>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- Items List with move buttons -->
                 <div class="border-t pt-3">
                     <p class="text-sm font-medium text-gray-700 mb-2">物資清單 (<span x-text="bundleForm.items.length"></span> 項)</p>
-                    <div class="space-y-1 max-h-32 overflow-y-auto mb-3">
+                    <div class="space-y-1 max-h-40 overflow-y-auto mb-3">
                         <template x-for="(item, idx) in bundleForm.items" :key="idx">
-                            <div class="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                            <div class="flex items-center bg-gray-50 rounded-lg px-2 py-2 text-sm">
+                                <!-- Move buttons -->
+                                <div class="flex flex-col mr-2">
+                                    <button @click="moveBundleItem(idx, -1)" :disabled="idx === 0"
+                                            class="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed p-0.5">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/>
+                                        </svg>
+                                    </button>
+                                    <button @click="moveBundleItem(idx, 1)" :disabled="idx === bundleForm.items.length - 1"
+                                            class="text-gray-400 hover:text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed p-0.5">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                                        </svg>
+                                    </button>
+                                </div>
                                 <span class="flex-1 truncate">
                                     <span x-text="item.name"></span>
                                     <span x-show="item.specification" class="text-gray-400">(<span x-text="item.specification"></span>)</span>
@@ -1297,7 +1349,11 @@
     <div x-show="showBundleDetailModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleDetailModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] overflow-hidden flex flex-col">
             <div class="flex items-center mb-4">
-                <span class="text-3xl mr-3" x-text="selectedBundle?.icon || '📦'"></span>
+                <div class="w-12 h-12 mr-3 bg-teal-100 rounded-xl flex items-center justify-center">
+                    <svg class="w-7 h-7 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path :d="getBundleIconPath(selectedBundle?.icon)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+                    </svg>
+                </div>
                 <div>
                     <h3 class="text-lg font-semibold" x-text="selectedBundle?.name"></h3>
                     <p class="text-sm text-gray-500" x-text="selectedBundle?.description"></p>
@@ -1459,10 +1515,34 @@
                 newMessage: { category: 'general', content: '', author_name: '' },
                 replyForm: { content: '', author_name: '' },
                 bundleIntakeForm: { bundle_id: '', multiplier: 1, location: '' },
-                bundleForm: { name: '', description: '', icon: '📦', items: [] },
+                bundleForm: { name: '', description: '', icon: 'backpack', items: [] },
                 newBundleItem: { name: '', specification: '', category: 'other', quantity: 1, unit: '個' },
                 batchMoveForm: { target_zone_id: '', notes: '' },
                 newZone: { id: '', name: '', zone_type: 'shelter', capacity: 0, description: '' },
+
+                // Search filters
+                intakeSearch: '',
+                distributeSearch: '',
+
+                // Bundle icon options (heroicons)
+                bundleIconOptions: [
+                    { id: 'backpack', name: '背包', path: 'M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4' },
+                    { id: 'home', name: '居家', path: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+                    { id: 'heart', name: '醫療', path: 'M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z' },
+                    { id: 'truck', name: '車用', path: 'M8 7h12m0 0l-4-4m4 4l-4 4m-8 6H4m0 0l4 4m-4-4l4-4' },
+                    { id: 'baby', name: '嬰兒', path: 'M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z' },
+                    { id: 'elderly', name: '長者', path: 'M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z' },
+                    { id: 'office', name: '辦公', path: 'M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z' },
+                    { id: 'camping', name: '露營', path: 'M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z' },
+                    { id: 'shield', name: '防護', path: 'M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z' },
+                    { id: 'fire', name: '消防', path: 'M17.657 18.657A8 8 0 016.343 7.343S7 9 9 10c0-2 .5-5 2.986-7C14 5 16.09 5.777 17.656 7.343A7.975 7.975 0 0120 13a7.975 7.975 0 01-2.343 5.657z' },
+                    { id: 'water', name: '水資源', path: 'M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z' },
+                    { id: 'food', name: '糧食', path: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+                    { id: 'sun', name: '戶外', path: 'M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z' },
+                    { id: 'bolt', name: '電力', path: 'M13 10V3L4 14h7v7l9-11h-7z' },
+                    { id: 'gift', name: '禮物', path: 'M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7' },
+                    { id: 'cube', name: '物資', path: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' }
+                ],
 
                 // Toast
                 toast: { show: false, message: '', type: 'success' },
@@ -2077,17 +2157,22 @@
 
                 startCreateBundle() {
                     this.editingBundle = null;
-                    this.bundleForm = { name: '', description: '', icon: '📦', items: [] };
+                    this.bundleForm = { name: '', description: '', icon: 'backpack', items: [] };
                     this.showBundleManageModal = false;
                     this.showBundleEditModal = true;
                 },
 
                 startEditBundle(bundle) {
                     this.editingBundle = bundle;
+                    // Convert emoji icon to heroicon id if needed
+                    let iconId = bundle.icon || 'backpack';
+                    if (iconId.length > 10 || /[\u{1F300}-\u{1F9FF}]/u.test(iconId)) {
+                        iconId = 'backpack'; // Default if old emoji format
+                    }
                     this.bundleForm = {
                         name: bundle.name,
                         description: bundle.description || '',
-                        icon: bundle.icon || '📦',
+                        icon: iconId,
                         items: JSON.parse(JSON.stringify(bundle.items || []))
                     };
                     this.showBundleManageModal = false;
@@ -2105,6 +2190,21 @@
 
                 removeBundleItem(index) {
                     this.bundleForm.items.splice(index, 1);
+                },
+
+                moveBundleItem(index, direction) {
+                    const newIndex = index + direction;
+                    if (newIndex < 0 || newIndex >= this.bundleForm.items.length) return;
+                    const items = [...this.bundleForm.items];
+                    const [item] = items.splice(index, 1);
+                    items.splice(newIndex, 0, item);
+                    this.bundleForm.items = items;
+                },
+
+                // Get bundle icon SVG path by id
+                getBundleIconPath(iconId) {
+                    const icon = this.bundleIconOptions.find(i => i.id === iconId);
+                    return icon ? icon.path : this.bundleIconOptions[0].path;
                 },
 
                 async saveBundle() {
