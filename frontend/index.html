@@ -1439,8 +1439,8 @@
 
     <!-- Bundle Detail Modal (組套詳情與入庫) -->
     <div x-show="showBundleDetailModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleDetailModal = false">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] overflow-hidden flex flex-col">
-            <div class="flex items-center mb-4">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] flex flex-col">
+            <div class="flex items-center mb-4 flex-shrink-0">
                 <div class="w-12 h-12 mr-3 bg-primary-100 rounded-xl flex items-center justify-center">
                     <svg class="w-7 h-7 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path :d="getBundleIconPath(selectedBundle?.icon)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
@@ -1452,26 +1452,36 @@
                 </div>
             </div>
 
-            <!-- Bundle Items List -->
-            <div class="bg-gray-50 rounded-xl p-3 mb-4 max-h-48 overflow-y-auto">
-                <p class="text-xs text-gray-500 mb-2 font-medium">包含物資：</p>
+            <!-- Bundle Items List with Checkboxes -->
+            <div class="bg-gray-50 rounded-xl p-3 mb-4 overflow-y-auto min-h-0 flex-1">
+                <div class="flex justify-between items-center mb-2">
+                    <p class="text-xs text-gray-500 font-medium">勾選要入庫的物資：</p>
+                    <button @click="toggleAllBundleItems()" class="text-xs text-primary-600 hover:underline">
+                        <span x-text="selectedBundleItems.length === (selectedBundle?.items?.length || 0) ? '取消全選' : '全選'"></span>
+                    </button>
+                </div>
                 <div class="space-y-1">
                     <template x-for="(item, idx) in selectedBundle?.items || []" :key="idx">
-                        <div class="flex justify-between text-sm">
-                            <span class="text-gray-700">
+                        <label class="flex items-center p-2 rounded-lg cursor-pointer hover:bg-gray-100 transition-colors"
+                               :class="selectedBundleItems.includes(idx) ? 'bg-primary-50' : ''">
+                            <input type="checkbox"
+                                   :checked="selectedBundleItems.includes(idx)"
+                                   @change="toggleBundleItem(idx)"
+                                   class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mr-3">
+                            <span class="flex-1 text-sm text-gray-700">
                                 <span x-text="item.name"></span>
                                 <span x-show="item.specification" class="text-gray-400">(<span x-text="item.specification"></span>)</span>
                             </span>
-                            <span class="text-gray-500">
+                            <span class="text-sm text-gray-500">
                                 <span x-text="item.quantity"></span> <span x-text="item.unit || '個'"></span>
                             </span>
-                        </div>
+                        </label>
                     </template>
                 </div>
             </div>
 
             <!-- Multiplier & Location -->
-            <div class="space-y-3 mb-4">
+            <div class="space-y-3 mb-4 flex-shrink-0">
                 <div>
                     <label class="block text-sm text-gray-600 mb-1">入庫套數</label>
                     <div class="flex items-center space-x-3">
@@ -1487,17 +1497,21 @@
             </div>
 
             <!-- Summary -->
-            <div class="bg-primary-100 rounded-lg p-3 mb-4 text-sm">
+            <div class="bg-primary-100 rounded-lg p-3 mb-4 text-sm flex-shrink-0">
                 <p class="text-primary-800">
-                    將入庫 <span class="font-bold" x-text="bundleIntakeForm.multiplier"></span> 套
-                    「<span x-text="selectedBundle?.name"></span>」，
-                    共 <span class="font-bold" x-text="(selectedBundle?.items?.length || 0) * bundleIntakeForm.multiplier"></span> 項物資
+                    將入庫 <span class="font-bold" x-text="bundleIntakeForm.multiplier"></span> 套，
+                    共 <span class="font-bold" x-text="selectedBundleItems.length * bundleIntakeForm.multiplier"></span> 項物資
+                    <span x-show="selectedBundleItems.length < (selectedBundle?.items?.length || 0)" class="text-primary-600">
+                        (已選 <span x-text="selectedBundleItems.length"></span>/<span x-text="selectedBundle?.items?.length || 0"></span>)
+                    </span>
                 </p>
             </div>
 
-            <div class="flex space-x-3">
+            <div class="flex space-x-3 flex-shrink-0">
                 <button @click="showBundleDetailModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">返回</button>
-                <button @click="doBundleIntake()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium">確認入庫</button>
+                <button @click="doBundleIntake()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium"
+                        :disabled="selectedBundleItems.length === 0"
+                        :class="selectedBundleItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''">確認入庫</button>
             </div>
         </div>
     </div>
@@ -1880,6 +1894,7 @@
                 editingEquipmentTemplate: null,
                 selectedEquipmentTemplate: null,
                 selectedTemplateItems: [],
+                selectedBundleItems: [],
                 personToMove: null,
                 lastDistributeResult: null,
                 deleteTarget: null,
@@ -2992,7 +3007,28 @@
                 selectBundle(bundle) {
                     this.selectedBundle = bundle;
                     this.bundleIntakeForm.bundle_id = bundle.id;
+                    // 預設全選所有項目
+                    this.selectedBundleItems = bundle.items ? bundle.items.map((_, idx) => idx) : [];
                     this.showBundleDetailModal = true;
+                },
+
+                toggleBundleItem(idx) {
+                    const index = this.selectedBundleItems.indexOf(idx);
+                    if (index > -1) {
+                        this.selectedBundleItems.splice(index, 1);
+                    } else {
+                        this.selectedBundleItems.push(idx);
+                    }
+                },
+
+                toggleAllBundleItems() {
+                    if (!this.selectedBundle?.items) return;
+                    const allCount = this.selectedBundle.items.length;
+                    if (this.selectedBundleItems.length === allCount) {
+                        this.selectedBundleItems = [];
+                    } else {
+                        this.selectedBundleItems = this.selectedBundle.items.map((_, idx) => idx);
+                    }
                 },
 
                 async doBundleIntake() {
@@ -3000,10 +3036,18 @@
                         this.showToast('請選擇組套', 'error');
                         return;
                     }
+                    if (this.selectedBundleItems.length === 0) {
+                        this.showToast('請至少勾選一項物資', 'error');
+                        return;
+                    }
                     try {
+                        const requestBody = {
+                            ...this.bundleIntakeForm,
+                            selected_indices: this.selectedBundleItems
+                        };
                         const res = await this.apiCall('/api/inventory/bundles/intake', {
                             method: 'POST',
-                            body: this.bundleIntakeForm
+                            body: requestBody
                         });
                         if (res.ok) {
                             const data = await res.json();

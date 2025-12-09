@@ -127,6 +127,7 @@ class BundleIntakeRequest(BaseModel):
     multiplier: int = 1  # How many sets of the bundle to add
     location: Optional[str] = None
     notes: Optional[str] = None
+    selected_indices: Optional[List[int]] = None  # 勾選的項目索引，None 表示全選
 
 
 @router.get("/bundles")
@@ -185,8 +186,15 @@ async def intake_bundle(request: BundleIntakeRequest):
     created_items = []
     updated_items = []
 
+    # 過濾要入庫的項目（如果有指定 selected_indices）
+    all_items = bundle["items"]
+    if request.selected_indices is not None:
+        items_to_intake = [all_items[i] for i in request.selected_indices if i < len(all_items)]
+    else:
+        items_to_intake = all_items
+
     with write_db() as conn:
-        for item in bundle["items"]:
+        for item in items_to_intake:
             quantity = item["quantity"] * request.multiplier
 
             # Check if similar item exists (same name and specification)
