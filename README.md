@@ -92,6 +92,55 @@ curl -X POST http://localhost:8090/api/auth/login \
   -d '{"person_id":"admin001","pin":"1234"}'
 ```
 
+### 本地端更新流程
+
+當 GitHub 有新版本時，依以下步驟更新：
+
+```bash
+# 1. 拉取最新程式碼
+cd ~/Downloads/CIRS
+git pull origin main
+
+# 2. 後端 Python 檔案變更
+#    - 若使用 --reload 參數，uvicorn 會自動重載，無需重啟
+#    - 若未使用 --reload，需 Ctrl+C 後重新啟動
+
+# 3. 前端 HTML/JS 檔案變更
+#    - 瀏覽器強制重新整理：
+#      macOS: Cmd + Shift + R
+#      Windows/Linux: Ctrl + Shift + R
+#    - 或清除瀏覽器快取
+
+# 4. 資料庫 Schema 變更（若有）
+cd backend
+python init_db.py  # 會自動執行 migration
+```
+
+**開發模式 vs 正式環境：**
+
+| 項目 | 開發模式 | 正式環境 |
+|------|----------|----------|
+| 啟動指令 | `uvicorn main:app --reload` | `uvicorn main:app` |
+| Python 變更 | 自動重載 | 需手動重啟 |
+| 前端變更 | 強制重整瀏覽器 | 強制重整瀏覽器 |
+| 效能 | 較慢（監控檔案） | 較快 |
+
+**常見問題：**
+
+```bash
+# Q: 更新後前端沒有變化？
+# A: 清除瀏覽器快取或使用無痕模式
+
+# Q: 更新後 API 報錯？
+# A: 可能需要更新資料庫
+cd backend && python init_db.py
+
+# Q: Port 8090 已被佔用？
+# A: 找出並關閉佔用程序
+lsof -i :8090
+kill -9 <PID>
+```
+
 ### Windows 開發環境
 
 ```powershell
