@@ -105,6 +105,24 @@ def apply_migrations(conn):
         print("Migration: Adding 'parent_id' column to message for replies")
         conn.execute("ALTER TABLE message ADD COLUMN parent_id INTEGER")
 
+    # Person migrations
+    cursor = conn.execute("PRAGMA table_info(person)")
+    person_columns = [row['name'] for row in cursor.fetchall()]
+
+    # Migration: Add national_id_hash column
+    if person_columns and 'national_id_hash' not in person_columns:
+        print("Migration: Adding 'national_id_hash' column to person")
+        conn.execute("ALTER TABLE person ADD COLUMN national_id_hash TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_person_national_id ON person(national_id_hash)")
+
+    # Migration: Add photo and identification columns
+    if person_columns and 'photo_data' not in person_columns:
+        print("Migration: Adding photo and identification columns to person")
+        conn.execute("ALTER TABLE person ADD COLUMN photo_data TEXT")
+        conn.execute("ALTER TABLE person ADD COLUMN physical_desc TEXT")
+        conn.execute("ALTER TABLE person ADD COLUMN id_status TEXT DEFAULT 'confirmed'")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_person_id_status ON person(id_status)")
+
     conn.commit()
     print("Migrations applied successfully")
 

@@ -7,11 +7,28 @@ from typing import Optional, List
 from datetime import datetime
 import os
 import sys
+import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import get_db, write_db, dict_from_row, rows_to_list
 
 router = APIRouter()
+
+# Load bundles configuration
+BUNDLES_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "bundles.json")
+
+def load_bundles():
+    """Load bundles from JSON file"""
+    if os.path.exists(BUNDLES_PATH):
+        with open(BUNDLES_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {"bundles": []}
+
+def save_bundles(data):
+    """Save bundles to JSON file"""
+    os.makedirs(os.path.dirname(BUNDLES_PATH), exist_ok=True)
+    with open(BUNDLES_PATH, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
 
 
 class InventoryCreate(BaseModel):
@@ -375,3 +392,221 @@ async def find_similar_items(name: str = Query(..., min_length=1)):
         items = rows_to_list(cursor.fetchall())
 
     return {"items": items, "count": len(items)}
+
+
+# ============================================
+# Bundles (組套) API
+# ============================================
+
+@router.get("/bundles")
+async def list_bundles():
+    """List all available bundles (組套)"""
+    bundles_data = load_bundles()
+    return {"bundles": bundles_data.get("bundles", [])}
+
+
+@router.get("/bundles/{bundle_id}")
+async def get_bundle(bundle_id: str):
+    """Get a specific bundle by ID"""
+    bundles_data = load_bundles()
+    for bundle in bundles_data.get("bundles", []):
+        if bundle["id"] == bundle_id:
+            return bundle
+    raise HTTPException(status_code=404, detail="Bundle not found")
+
+
+class BundleIntakeRequest(BaseModel):
+    bundle_id: str
+    multiplier: int = 1  # How many sets of the bundle to add
+    location: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.post("/bundles/intake")
+async def intake_bundle(request: BundleIntakeRequest):
+    """Add all items from a bundle to inventory (組套入庫)"""
+    bundles_data = load_bundles()
+
+    # Find the bundle
+    bundle = None
+    for b in bundles_data.get("bundles", []):
+        if b["id"] == request.bundle_id:
+            bundle = b
+            break
+
+    if bundle is None:
+        raise HTTPException(status_code=404, detail="Bundle not found")
+
+    created_items = []
+    updated_items = []
+
+    with write_db() as conn:
+        for item in bundle["items"]:
+            quantity = item["quantity"] * request.multiplier
+
+            # Check if similar item exists (same name and specification)
+            cursor = conn.execute(
+                """
+                SELECT id, name, quantity FROM inventory
+                WHERE name = ? AND (specification = ? OR (specification IS NULL AND ? IS NULL))
+                """,
+                (item["name"], item.get("specification"), item.get("specification"))
+            )
+            existing = cursor.fetchone()
+
+            if existing:
+                # Update existing item quantity
+                new_quantity = existing['quantity'] + quantity
+                conn.execute(
+                    "UPDATE inventory SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                    (new_quantity, existing['id'])
+                )
+                # Log event
+                conn.execute(
+                    """
+                    INSERT INTO event_log (event_type, item_id, quantity_change, notes)
+                    VALUES ('RESOURCE_IN', ?, ?, ?)
+                    """,
+                    (existing['id'], quantity, f"組套入庫: {bundle['name']}")
+                )
+                updated_items.append({
+                    "id": existing['id'],
+                    "name": item["name"],
+                    "added": quantity,
+                    "new_quantity": new_quantity
+                })
+            else:
+                # Create new item
+                cursor = conn.execute(
+                    """
+                    INSERT INTO inventory (name, specification, category, quantity, unit, location)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (item["name"], item.get("specification"), item["category"],
+                     quantity, item.get("unit"), request.location)
+                )
+                new_id = cursor.lastrowid
+                # Log event
+                conn.execute(
+                    """
+                    INSERT INTO event_log (event_type, item_id, quantity_change, notes)
+                    VALUES ('RESOURCE_IN', ?, ?, ?)
+                    """,
+                    (new_id, quantity, f"組套入庫: {bundle['name']} - 新增 {item['name']}")
+                )
+                created_items.append({
+                    "id": new_id,
+                    "name": item["name"],
+                    "quantity": quantity
+                })
+
+    return {
+        "message": f"Bundle '{bundle['name']}' added successfully",
+        "bundle": bundle["name"],
+        "multiplier": request.multiplier,
+        "created": created_items,
+        "updated": updated_items,
+        "total_items": len(created_items) + len(updated_items)
+    }
+
+
+# Bundle Item model
+class BundleItem(BaseModel):
+    name: str
+    specification: Optional[str] = None
+    category: str
+    quantity: float
+    unit: Optional[str] = None
+
+
+class BundleCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    icon: Optional[str] = "📦"
+    items: List[BundleItem]
+
+
+class BundleUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    icon: Optional[str] = None
+    items: Optional[List[BundleItem]] = None
+
+
+@router.post("/bundles")
+async def create_bundle(bundle: BundleCreate):
+    """Create a new bundle (Admin only)"""
+    bundles_data = load_bundles()
+
+    # Generate unique ID from name
+    import re
+    base_id = re.sub(r'[^a-z0-9]', '_', bundle.name.lower())
+    bundle_id = base_id
+
+    # Ensure unique ID
+    existing_ids = {b["id"] for b in bundles_data.get("bundles", [])}
+    counter = 1
+    while bundle_id in existing_ids:
+        bundle_id = f"{base_id}_{counter}"
+        counter += 1
+
+    new_bundle = {
+        "id": bundle_id,
+        "name": bundle.name,
+        "description": bundle.description or "",
+        "icon": bundle.icon or "📦",
+        "items": [item.model_dump() for item in bundle.items]
+    }
+
+    bundles_data["bundles"].append(new_bundle)
+    save_bundles(bundles_data)
+
+    return {"id": bundle_id, "message": "Bundle created successfully", "bundle": new_bundle}
+
+
+@router.put("/bundles/{bundle_id}")
+async def update_bundle(bundle_id: str, bundle: BundleUpdate):
+    """Update an existing bundle (Admin only)"""
+    bundles_data = load_bundles()
+
+    # Find bundle
+    bundle_index = None
+    for i, b in enumerate(bundles_data.get("bundles", [])):
+        if b["id"] == bundle_id:
+            bundle_index = i
+            break
+
+    if bundle_index is None:
+        raise HTTPException(status_code=404, detail="Bundle not found")
+
+    # Update fields
+    existing = bundles_data["bundles"][bundle_index]
+    if bundle.name is not None:
+        existing["name"] = bundle.name
+    if bundle.description is not None:
+        existing["description"] = bundle.description
+    if bundle.icon is not None:
+        existing["icon"] = bundle.icon
+    if bundle.items is not None:
+        existing["items"] = [item.model_dump() for item in bundle.items]
+
+    save_bundles(bundles_data)
+
+    return {"message": "Bundle updated successfully", "bundle": existing}
+
+
+@router.delete("/bundles/{bundle_id}")
+async def delete_bundle(bundle_id: str):
+    """Delete a bundle (Admin only)"""
+    bundles_data = load_bundles()
+
+    # Find and remove bundle
+    original_len = len(bundles_data.get("bundles", []))
+    bundles_data["bundles"] = [b for b in bundles_data.get("bundles", []) if b["id"] != bundle_id]
+
+    if len(bundles_data["bundles"]) == original_len:
+        raise HTTPException(status_code=404, detail="Bundle not found")
+
+    save_bundles(bundles_data)
+
+    return {"message": "Bundle deleted successfully"}

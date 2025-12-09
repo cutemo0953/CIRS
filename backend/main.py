@@ -18,7 +18,7 @@ PORTAL_DIR = os.path.join(BASE_DIR, 'portal')
 FILES_DIR = os.path.join(BASE_DIR, 'files')
 
 # Import routes
-from routes import auth, inventory, person, events, messages, system
+from routes import auth, inventory, person, events, messages, system, backup
 
 
 @asynccontextmanager
@@ -56,6 +56,7 @@ app.include_router(person.router, prefix="/api/person", tags=["Person"])
 app.include_router(events.router, prefix="/api/events", tags=["Events"])
 app.include_router(messages.router, prefix="/api/messages", tags=["Messages"])
 app.include_router(system.router, prefix="/api/system", tags=["System"])
+app.include_router(backup.router, prefix="/api/backup", tags=["Backup"])
 
 
 @app.get("/")

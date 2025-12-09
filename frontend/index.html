@@ -98,9 +98,29 @@
                     快速報到
                 </h3>
                 <div class="space-y-3">
-                    <input type="text" x-model="newPerson.display_name" placeholder="姓名" class="w-full border border-gray-200 rounded-lg px-3 py-2">
-                    <div class="flex space-x-2">
-                        <input type="text" x-model="newPerson.current_location" placeholder="位置 (選填)" class="flex-1 border border-gray-200 rounded-lg px-3 py-2">
+                    <input type="text" x-model="newPerson.display_name" placeholder="姓名 *" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                    <div class="grid grid-cols-2 gap-2">
+                        <input type="text" x-model="newPerson.national_id" placeholder="身分證 (選填)" class="border border-gray-200 rounded-lg px-3 py-2 uppercase" maxlength="10">
+                        <input type="tel" x-model="newPerson.phone" placeholder="電話 (選填)" class="border border-gray-200 rounded-lg px-3 py-2">
+                    </div>
+                    <input type="text" x-model="newPerson.current_location" placeholder="位置 (選填)" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                    <!-- Photo capture for unidentified persons -->
+                    <div x-show="!newPerson.national_id" class="border border-dashed border-gray-300 rounded-lg p-3">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-sm text-gray-600">無法辨識身分時拍照</span>
+                            <button type="button" @click="capturePhoto()" class="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg">
+                                <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                </svg>
+                                拍照
+                            </button>
+                        </div>
+                        <div x-show="newPerson.photo_data" class="mb-2">
+                            <img :src="newPerson.photo_data" class="w-24 h-24 object-cover rounded-lg mx-auto">
+                            <button @click="newPerson.photo_data = ''" class="text-xs text-red-500 block mx-auto mt-1">移除照片</button>
+                        </div>
+                        <input type="text" x-model="newPerson.physical_desc" placeholder="外觀特徵描述 (選填)" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
                     </div>
                     <!-- Triage Selection (light bg + dark text, like filter tags) -->
                     <div class="grid grid-cols-4 gap-2">
@@ -110,6 +130,7 @@
                         <button @click="newPerson.triage_status = 'BLACK'" :class="newPerson.triage_status === 'BLACK' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'" class="rounded-lg py-2 text-sm font-medium">死亡</button>
                     </div>
                     <button @click="doQuickCheckIn()" class="w-full bg-primary-600 text-white rounded-lg py-2 font-medium">報到登記</button>
+                    <p class="text-xs text-gray-400 text-center">無身分證時系統自動產生序號</p>
                 </div>
             </div>
 
@@ -294,12 +315,18 @@
 
             <!-- Fixed Bottom Buttons for Inventory -->
             <div x-show="currentUser && currentTab === 'inventory'" class="fixed bottom-16 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 z-40">
-                <div class="grid grid-cols-2 gap-3 max-w-lg mx-auto">
+                <div class="grid grid-cols-3 gap-2 max-w-lg mx-auto">
                     <button @click="showIntakeModal = true" class="rounded-xl py-3 text-center card-press shadow-sm font-medium" style="background-color: #4c826b; color: white;">
                         <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
                         入庫
+                    </button>
+                    <button @click="openBundleModal()" class="rounded-xl py-3 text-center card-press shadow-sm font-medium" style="background-color: #e0f2f1; color: #00695c;">
+                        <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
+                        </svg>
+                        組套
                     </button>
                     <button @click="showDistributeSelectModal = true" class="rounded-xl py-3 text-center card-press shadow-sm font-medium" style="background-color: #fee39a; color: #333;">
                         <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -899,6 +926,212 @@
         </div>
     </div>
 
+    <!-- Bundle Select Modal (組套選擇) -->
+    <div x-show="showBundleModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">選擇組套入庫</h3>
+                <button x-show="currentUser && currentUser.role === 'admin'" @click="showBundleModal = false; openBundleManage()" class="text-xs text-teal-600 hover:underline">管理組套</button>
+            </div>
+            <div class="space-y-2 overflow-y-auto flex-1">
+                <template x-for="bundle in bundles" :key="bundle.id">
+                    <button @click="selectBundle(bundle)" class="w-full bg-gray-50 hover:bg-teal-50 rounded-xl p-4 text-left transition-colors border border-gray-100 hover:border-teal-200">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3" x-text="bundle.icon || '📦'"></span>
+                            <div class="flex-1">
+                                <p class="font-medium text-gray-800" x-text="bundle.name"></p>
+                                <p class="text-sm text-gray-500" x-text="bundle.description"></p>
+                                <p class="text-xs text-gray-400 mt-1">
+                                    包含 <span x-text="bundle.items?.length || 0"></span> 項物資
+                                </p>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </div>
+                    </button>
+                </template>
+                <p x-show="bundles.length === 0" class="text-center text-gray-400 py-8">無組套資料</p>
+            </div>
+            <button @click="showBundleModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+        </div>
+    </div>
+
+    <!-- Bundle Manage Modal (組套管理 - Admin) -->
+    <div x-show="showBundleManageModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleManageModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold">管理組套</h3>
+                <button @click="startCreateBundle()" class="bg-teal-600 text-white px-3 py-1 rounded-lg text-sm">新增組套</button>
+            </div>
+            <div class="space-y-2 overflow-y-auto flex-1">
+                <template x-for="bundle in bundles" :key="bundle.id">
+                    <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center flex-1 min-w-0">
+                                <span class="text-2xl mr-3" x-text="bundle.icon || '📦'"></span>
+                                <div class="min-w-0">
+                                    <p class="font-medium text-gray-800 truncate" x-text="bundle.name"></p>
+                                    <p class="text-xs text-gray-400"><span x-text="bundle.items?.length || 0"></span> 項物資</p>
+                                </div>
+                            </div>
+                            <div class="flex space-x-1 ml-2">
+                                <button @click="startEditBundle(bundle)" class="text-blue-600 p-1.5 bg-blue-50 rounded-lg" title="編輯">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                                    </svg>
+                                </button>
+                                <button @click="confirmDeleteBundle(bundle)" class="text-red-600 p-1.5 bg-red-50 rounded-lg" title="刪除">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </template>
+                <p x-show="bundles.length === 0" class="text-center text-gray-400 py-8">尚無組套，點擊上方新增</p>
+            </div>
+            <button @click="showBundleManageModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">關閉</button>
+        </div>
+    </div>
+
+    <!-- Bundle Edit Modal (新增/編輯組套) -->
+    <div x-show="showBundleEditModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleEditModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+            <h3 class="text-lg font-semibold mb-4" x-text="editingBundle ? '編輯組套' : '新增組套'"></h3>
+
+            <div class="space-y-3 overflow-y-auto flex-1">
+                <!-- Basic Info -->
+                <div class="grid grid-cols-4 gap-2">
+                    <div class="col-span-1">
+                        <label class="block text-xs text-gray-600 mb-1">圖示</label>
+                        <input type="text" x-model="bundleForm.icon" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-center text-xl" placeholder="📦">
+                    </div>
+                    <div class="col-span-3">
+                        <label class="block text-xs text-gray-600 mb-1">名稱 *</label>
+                        <input type="text" x-model="bundleForm.name" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 防災包">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-600 mb-1">說明</label>
+                    <input type="text" x-model="bundleForm.description" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 標準緊急避難包">
+                </div>
+
+                <!-- Items List -->
+                <div class="border-t pt-3">
+                    <p class="text-sm font-medium text-gray-700 mb-2">物資清單 (<span x-text="bundleForm.items.length"></span> 項)</p>
+                    <div class="space-y-1 max-h-32 overflow-y-auto mb-3">
+                        <template x-for="(item, idx) in bundleForm.items" :key="idx">
+                            <div class="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2 text-sm">
+                                <span class="flex-1 truncate">
+                                    <span x-text="item.name"></span>
+                                    <span x-show="item.specification" class="text-gray-400">(<span x-text="item.specification"></span>)</span>
+                                    <span class="text-gray-500 ml-1">x<span x-text="item.quantity"></span></span>
+                                </span>
+                                <button @click="removeBundleItem(idx)" class="text-red-500 p-1 ml-2">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </template>
+                        <p x-show="bundleForm.items.length === 0" class="text-xs text-gray-400 text-center py-2">尚無物資</p>
+                    </div>
+
+                    <!-- Add Item Form -->
+                    <div class="bg-teal-50 rounded-xl p-3">
+                        <p class="text-xs font-medium text-teal-700 mb-2">新增物資</p>
+                        <div class="grid grid-cols-2 gap-2 mb-2">
+                            <input type="text" x-model="newBundleItem.name" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm" placeholder="名稱 *">
+                            <input type="text" x-model="newBundleItem.specification" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm" placeholder="規格">
+                        </div>
+                        <div class="grid grid-cols-4 gap-2 mb-2">
+                            <select x-model="newBundleItem.category" class="col-span-2 border border-gray-200 rounded-lg px-2 py-1.5 text-sm">
+                                <option value="water">水</option>
+                                <option value="food">食物</option>
+                                <option value="medical">醫療</option>
+                                <option value="power">電力</option>
+                                <option value="daily">日用品</option>
+                                <option value="equipment">設備</option>
+                                <option value="other">其他</option>
+                            </select>
+                            <input type="number" x-model.number="newBundleItem.quantity" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center" min="1" placeholder="數量">
+                            <input type="text" x-model="newBundleItem.unit" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm" placeholder="單位">
+                        </div>
+                        <button @click="addBundleItem()" class="w-full bg-teal-600 text-white rounded-lg py-1.5 text-sm font-medium">+ 加入物資</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex space-x-3 mt-4 pt-3 border-t">
+                <button @click="showBundleEditModal = false; showBundleManageModal = true" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                <button @click="saveBundle()" class="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg font-medium">儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bundle Detail Modal (組套詳情與入庫) -->
+    <div x-show="showBundleDetailModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleDetailModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="flex items-center mb-4">
+                <span class="text-3xl mr-3" x-text="selectedBundle?.icon || '📦'"></span>
+                <div>
+                    <h3 class="text-lg font-semibold" x-text="selectedBundle?.name"></h3>
+                    <p class="text-sm text-gray-500" x-text="selectedBundle?.description"></p>
+                </div>
+            </div>
+
+            <!-- Bundle Items List -->
+            <div class="bg-gray-50 rounded-xl p-3 mb-4 max-h-48 overflow-y-auto">
+                <p class="text-xs text-gray-500 mb-2 font-medium">包含物資：</p>
+                <div class="space-y-1">
+                    <template x-for="(item, idx) in selectedBundle?.items || []" :key="idx">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-700">
+                                <span x-text="item.name"></span>
+                                <span x-show="item.specification" class="text-gray-400">(<span x-text="item.specification"></span>)</span>
+                            </span>
+                            <span class="text-gray-500">
+                                <span x-text="item.quantity"></span> <span x-text="item.unit || '個'"></span>
+                            </span>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Multiplier & Location -->
+            <div class="space-y-3 mb-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">入庫套數</label>
+                    <div class="flex items-center space-x-3">
+                        <button @click="bundleIntakeForm.multiplier = Math.max(1, bundleIntakeForm.multiplier - 1)" class="w-10 h-10 bg-gray-100 rounded-lg text-lg font-medium">-</button>
+                        <input type="number" x-model.number="bundleIntakeForm.multiplier" class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-center text-lg font-medium" min="1">
+                        <button @click="bundleIntakeForm.multiplier++" class="w-10 h-10 bg-gray-100 rounded-lg text-lg font-medium">+</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">存放位置</label>
+                    <input type="text" x-model="bundleIntakeForm.location" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="倉庫A (選填)">
+                </div>
+            </div>
+
+            <!-- Summary -->
+            <div class="bg-teal-50 rounded-lg p-3 mb-4 text-sm">
+                <p class="text-teal-800">
+                    將入庫 <span class="font-bold" x-text="bundleIntakeForm.multiplier"></span> 套
+                    「<span x-text="selectedBundle?.name"></span>」，
+                    共 <span class="font-bold" x-text="(selectedBundle?.items?.length || 0) * bundleIntakeForm.multiplier"></span> 項物資
+                </p>
+            </div>
+
+            <div class="flex space-x-3">
+                <button @click="showBundleDetailModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">返回</button>
+                <button @click="doBundleIntake()" class="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg font-medium">確認入庫</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Distribute QR Code Modal -->
     <div x-show="showDistributeQRModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDistributeQRModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
@@ -944,6 +1177,7 @@
                 people: [],
                 messages: [],
                 similarItems: [],
+                bundles: [],
 
                 // Filters
                 inventorySearch: '',
@@ -966,16 +1200,22 @@
                 showAddMessage: false,
                 showReplyModal: false,
                 showDistributeQRModal: false,
+                showBundleModal: false,
+                showBundleDetailModal: false,
+                showBundleManageModal: false,
+                showBundleEditModal: false,
                 lastDistributeResult: null,
                 deleteTarget: null,
                 deleteType: null,
                 replyTarget: null,
+                selectedBundle: null,
+                editingBundle: null,
 
                 // Forms
                 loginForm: { person_id: '', pin: '' },
                 loginError: '',
                 triageTarget: null,
-                newPerson: { display_name: '', current_location: '', triage_status: 'GREEN' },
+                newPerson: { display_name: '', national_id: '', phone: '', current_location: '', triage_status: 'GREEN', photo_data: '', physical_desc: '' },
                 intakeForm: { item_id: '', quantity: 1, notes: '' },
                 distributeItem: null,
                 distributeForm: { person_id: '', quantity: 1, notes: '' },
@@ -986,6 +1226,9 @@
                 editEquipment: { id: '', name: '', specification: '', quantity: 1, unit: '', location: '', check_interval_days: 1 },
                 newMessage: { category: 'general', content: '', author_name: '' },
                 replyForm: { content: '', author_name: '' },
+                bundleIntakeForm: { bundle_id: '', multiplier: 1, location: '' },
+                bundleForm: { name: '', description: '', icon: '📦', items: [] },
+                newBundleItem: { name: '', specification: '', category: 'other', quantity: 1, unit: '個' },
 
                 // Toast
                 toast: { show: false, message: '', type: 'success' },
@@ -1024,7 +1267,7 @@
                 loadTabData() {
                     switch(this.currentTab) {
                         case 'people': this.loadPeople(); break;
-                        case 'inventory': this.loadInventory(); this.loadExpiringItems(); break;
+                        case 'inventory': this.loadInventory(); this.loadExpiringItems(); this.loadBundles(); break;
                         case 'equipment': this.loadEquipment(); this.loadEquipmentPending(); break;
                         case 'messages': this.loadMessages(); break;
                     }
@@ -1183,6 +1426,16 @@
                     } catch (e) {}
                 },
 
+                async loadBundles() {
+                    try {
+                        const res = await fetch('/api/inventory/bundles');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.bundles = data.bundles || [];
+                        }
+                    } catch (e) {}
+                },
+
                 // Quick check-in with triage
                 async doQuickCheckIn() {
                     if (!this.newPerson.display_name) {
@@ -1194,18 +1447,59 @@
                             method: 'POST',
                             body: {
                                 display_name: this.newPerson.display_name,
+                                national_id: this.newPerson.national_id || null,
+                                phone: this.newPerson.phone || null,
                                 current_location: this.newPerson.current_location,
-                                triage_status: this.newPerson.triage_status
+                                triage_status: this.newPerson.triage_status,
+                                photo_data: this.newPerson.photo_data || null,
+                                physical_desc: this.newPerson.physical_desc || null
                             }
                         });
                         if (res.ok) {
                             const data = await res.json();
-                            this.showToast(`報到成功 ID: ${data.id}`, 'success');
-                            this.newPerson = { display_name: '', current_location: '', triage_status: 'GREEN' };
+                            const msg = data.existing
+                                ? `已登記: ${data.id} (${data.message})`
+                                : `報到成功 序號: ${data.id}`;
+                            this.showToast(msg, data.existing ? 'info' : 'success');
+                            this.newPerson = { display_name: '', national_id: '', phone: '', current_location: '', triage_status: 'GREEN', photo_data: '', physical_desc: '' };
                             await this.loadPeople();
                             await this.loadStats();
                         }
                     } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                // Capture photo for unidentified person
+                async capturePhoto() {
+                    try {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = 'image/*';
+                        input.capture = 'environment';
+                        input.onchange = async (e) => {
+                            const file = e.target.files[0];
+                            if (file) {
+                                // Compress and convert to base64
+                                const canvas = document.createElement('canvas');
+                                const ctx = canvas.getContext('2d');
+                                const img = new Image();
+                                img.onload = () => {
+                                    // Max 400px for thumbnail
+                                    const maxSize = 400;
+                                    let w = img.width, h = img.height;
+                                    if (w > h && w > maxSize) { h = h * maxSize / w; w = maxSize; }
+                                    else if (h > maxSize) { w = w * maxSize / h; h = maxSize; }
+                                    canvas.width = w;
+                                    canvas.height = h;
+                                    ctx.drawImage(img, 0, 0, w, h);
+                                    this.newPerson.photo_data = canvas.toDataURL('image/jpeg', 0.7);
+                                };
+                                img.src = URL.createObjectURL(file);
+                            }
+                        };
+                        input.click();
+                    } catch (e) {
+                        this.showToast('無法存取相機', 'error');
+                    }
                 },
 
                 startTriage(person) {
@@ -1367,6 +1661,138 @@
                     } catch (e) { this.showToast('操作失敗', 'error'); }
                 },
 
+                // Bundle operations
+                openBundleModal() {
+                    this.bundleIntakeForm = { bundle_id: '', multiplier: 1, location: '' };
+                    this.showBundleModal = true;
+                },
+
+                selectBundle(bundle) {
+                    this.selectedBundle = bundle;
+                    this.bundleIntakeForm.bundle_id = bundle.id;
+                    this.showBundleDetailModal = true;
+                },
+
+                async doBundleIntake() {
+                    if (!this.bundleIntakeForm.bundle_id) {
+                        this.showToast('請選擇組套', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await this.apiCall('/api/inventory/bundles/intake', {
+                            method: 'POST',
+                            body: this.bundleIntakeForm
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.showBundleDetailModal = false;
+                            this.showBundleModal = false;
+                            this.showToast(`${this.selectedBundle.name} 入庫成功 (${data.total_items} 項物資)`, 'success');
+                            await this.loadInventory();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '入庫失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                // Bundle Management (Admin)
+                openBundleManage() {
+                    this.showBundleManageModal = true;
+                },
+
+                startCreateBundle() {
+                    this.editingBundle = null;
+                    this.bundleForm = { name: '', description: '', icon: '📦', items: [] };
+                    this.showBundleManageModal = false;
+                    this.showBundleEditModal = true;
+                },
+
+                startEditBundle(bundle) {
+                    this.editingBundle = bundle;
+                    this.bundleForm = {
+                        name: bundle.name,
+                        description: bundle.description || '',
+                        icon: bundle.icon || '📦',
+                        items: JSON.parse(JSON.stringify(bundle.items || []))
+                    };
+                    this.showBundleManageModal = false;
+                    this.showBundleEditModal = true;
+                },
+
+                addBundleItem() {
+                    if (!this.newBundleItem.name) {
+                        this.showToast('請輸入物資名稱', 'error');
+                        return;
+                    }
+                    this.bundleForm.items.push({...this.newBundleItem});
+                    this.newBundleItem = { name: '', specification: '', category: 'other', quantity: 1, unit: '個' };
+                },
+
+                removeBundleItem(index) {
+                    this.bundleForm.items.splice(index, 1);
+                },
+
+                async saveBundle() {
+                    if (!this.bundleForm.name) {
+                        this.showToast('請輸入組套名稱', 'error');
+                        return;
+                    }
+                    if (this.bundleForm.items.length === 0) {
+                        this.showToast('請至少新增一項物資', 'error');
+                        return;
+                    }
+
+                    try {
+                        let res;
+                        if (this.editingBundle) {
+                            // Update existing
+                            res = await this.apiCall(`/api/inventory/bundles/${this.editingBundle.id}`, {
+                                method: 'PUT',
+                                body: this.bundleForm
+                            });
+                        } else {
+                            // Create new
+                            res = await this.apiCall('/api/inventory/bundles', {
+                                method: 'POST',
+                                body: this.bundleForm
+                            });
+                        }
+
+                        if (res.ok) {
+                            this.showBundleEditModal = false;
+                            this.showToast(this.editingBundle ? '組套更新成功' : '組套建立成功', 'success');
+                            await this.loadBundles();
+                            this.showBundleManageModal = true;
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '儲存失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                confirmDeleteBundle(bundle) {
+                    this.deleteTarget = bundle;
+                    this.deleteType = 'bundle';
+                    this.showDeleteConfirmModal = true;
+                },
+
+                async doDeleteBundle() {
+                    try {
+                        const res = await this.apiCall(`/api/inventory/bundles/${this.deleteTarget.id}`, {
+                            method: 'DELETE'
+                        });
+                        if (res.ok) {
+                            this.showDeleteConfirmModal = false;
+                            this.showToast('組套刪除成功', 'success');
+                            await this.loadBundles();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '刪除失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
                 // Equipment operations
                 startEquipmentCheck(eq) {
                     this.checkTarget = eq;
@@ -1463,6 +1889,12 @@
                 },
 
                 async doDelete() {
+                    // Handle bundle deletion separately
+                    if (this.deleteType === 'bundle') {
+                        await this.doDeleteBundle();
+                        return;
+                    }
+
                     try {
                         const endpoint = this.deleteType === 'message'
                             ? `/api/messages/${this.deleteTarget.id}`
