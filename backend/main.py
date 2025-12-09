@@ -97,6 +97,27 @@ async def get_stats():
         """)
         headcount = dict_from_row(cursor.fetchone())
 
+        # Inventory total count (excluding equipment)
+        cursor = conn.execute("""
+            SELECT COUNT(*) as count FROM inventory WHERE category != 'equipment'
+        """)
+        inventory_total = cursor.fetchone()['count']
+
+        # Equipment OK count (check_status = 'OK' or NULL with no check needed)
+        cursor = conn.execute("""
+            SELECT COUNT(*) as count FROM inventory
+            WHERE category = 'equipment'
+            AND (check_status IS NULL OR check_status = 'OK')
+        """)
+        equipment_ok = cursor.fetchone()['count']
+
+        # Messages today count
+        cursor = conn.execute("""
+            SELECT COUNT(*) as count FROM message
+            WHERE DATE(created_at) = DATE('now')
+        """)
+        messages_today = cursor.fetchone()['count']
+
         # Inventory alerts (below min_quantity)
         cursor = conn.execute("""
             SELECT id, name, quantity, min_quantity, unit
@@ -137,6 +158,9 @@ async def get_stats():
 
         return {
             "headcount": headcount,
+            "inventory_total": inventory_total,
+            "equipment_ok": equipment_ok,
+            "messages_today": messages_today,
             "survival_days": {
                 "water": round(water_days, 1),
                 "food": round(food_days, 1)
