@@ -754,7 +754,7 @@
                 </div>
                 <div class="flex space-x-3">
                     <button @click="showIntakeModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doIntake()" class="flex-1 px-4 py-2 bg-emerald-500 text-white rounded-lg">確認入庫</button>
+                    <button @click="doIntake()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">確認入庫</button>
                 </div>
             </div>
         </div>
@@ -805,7 +805,7 @@
                 </div>
                 <div class="flex space-x-3">
                     <button @click="showDistributeModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doDistribute()" class="flex-1 px-4 py-2 bg-orange-500 text-white rounded-lg">確認發放</button>
+                    <button @click="doDistribute()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">確認發放</button>
                 </div>
             </div>
         </div>
@@ -1057,14 +1057,14 @@
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-semibold">選擇組套入庫</h3>
-                <button x-show="currentUser && currentUser.role === 'admin'" @click="showBundleModal = false; openBundleManage()" class="text-xs text-teal-600 hover:underline">管理組套</button>
+                <button x-show="currentUser && currentUser.role === 'admin'" @click="showBundleModal = false; openBundleManage()" class="text-xs text-primary-600 hover:underline">管理組套</button>
             </div>
             <div class="space-y-2 overflow-y-auto flex-1">
                 <template x-for="bundle in bundles" :key="bundle.id">
-                    <button @click="selectBundle(bundle)" class="w-full bg-gray-50 hover:bg-teal-50 rounded-xl p-4 text-left transition-colors border border-gray-100 hover:border-teal-200">
+                    <button @click="selectBundle(bundle)" class="w-full bg-gray-50 hover:bg-primary-50 rounded-xl p-4 text-left transition-colors border border-gray-100 hover:border-primary-200">
                         <div class="flex items-center">
-                            <div class="w-10 h-10 mr-3 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                <svg class="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <div class="w-10 h-10 mr-3 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path :d="getBundleIconPath(bundle.icon)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
                                 </svg>
                             </div>
@@ -1092,15 +1092,15 @@
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col">
             <div class="flex justify-between items-center mb-4">
                 <h3 class="text-lg font-semibold">管理組套</h3>
-                <button @click="startCreateBundle()" class="bg-teal-600 text-white px-3 py-1 rounded-lg text-sm">新增組套</button>
+                <button @click="startCreateBundle()" class="bg-primary-600 text-white px-3 py-1 rounded-lg text-sm">新增組套</button>
             </div>
             <div class="space-y-2 overflow-y-auto flex-1">
                 <template x-for="bundle in bundles" :key="bundle.id">
                     <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center flex-1 min-w-0">
-                                <div class="w-10 h-10 mr-3 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                    <svg class="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <div class="w-10 h-10 mr-3 bg-primary-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                    <svg class="w-6 h-6 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path :d="getBundleIconPath(bundle.icon)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
                                     </svg>
                                 </div>
@@ -1267,9 +1267,9 @@
                             <button type="button"
                                     @click="bundleForm.icon = icon.id"
                                     class="p-2 rounded-lg border-2 transition flex items-center justify-center"
-                                    :class="bundleForm.icon === icon.id ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'"
+                                    :class="bundleForm.icon === icon.id ? 'border-primary-600 bg-primary-100' : 'border-gray-200 hover:border-gray-300'"
                                     :title="icon.name">
-                                <svg class="w-5 h-5" :class="bundleForm.icon === icon.id ? 'text-teal-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-5 h-5" :class="bundleForm.icon === icon.id ? 'text-primary-600' : 'text-gray-500'" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path :d="icon.path" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
                                 </svg>
                             </button>
@@ -1277,7 +1277,7 @@
                     </div>
                 </div>
 
-                <!-- Items List with move buttons -->
+                <!-- Items List with move buttons and quantity edit -->
                 <div class="border-t pt-3">
                     <p class="text-sm font-medium text-gray-700 mb-2">物資清單 (<span x-text="bundleForm.items.length"></span> 項)</p>
                     <div class="space-y-1 max-h-40 overflow-y-auto mb-3">
@@ -1301,9 +1301,17 @@
                                 <span class="flex-1 truncate">
                                     <span x-text="item.name"></span>
                                     <span x-show="item.specification" class="text-gray-400">(<span x-text="item.specification"></span>)</span>
-                                    <span class="text-gray-500 ml-1">x<span x-text="item.quantity"></span></span>
                                 </span>
-                                <button @click="removeBundleItem(idx)" class="text-red-500 p-1 ml-2">
+                                <!-- Quantity editor -->
+                                <div class="flex items-center mx-2">
+                                    <button @click="item.quantity = Math.max(1, item.quantity - 1)"
+                                            class="w-5 h-5 bg-gray-200 rounded text-xs flex items-center justify-center hover:bg-gray-300">-</button>
+                                    <input type="number" x-model.number="item.quantity" min="1"
+                                           class="w-10 text-center text-sm border-0 bg-transparent mx-1">
+                                    <button @click="item.quantity++"
+                                            class="w-5 h-5 bg-gray-200 rounded text-xs flex items-center justify-center hover:bg-gray-300">+</button>
+                                </div>
+                                <button @click="removeBundleItem(idx)" class="text-red-500 p-1">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                                     </svg>
@@ -1314,14 +1322,14 @@
                     </div>
 
                     <!-- Add Item Form -->
-                    <div class="bg-teal-50 rounded-xl p-3">
-                        <p class="text-xs font-medium text-teal-700 mb-2">新增物資</p>
+                    <div class="bg-primary-100 rounded-xl p-3">
+                        <p class="text-xs font-medium text-primary-700 mb-2">新增物資</p>
                         <div class="grid grid-cols-2 gap-2 mb-2">
-                            <input type="text" x-model="newBundleItem.name" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm" placeholder="名稱 *">
-                            <input type="text" x-model="newBundleItem.specification" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm" placeholder="規格">
+                            <input type="text" x-model="newBundleItem.name" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="名稱 *">
+                            <input type="text" x-model="newBundleItem.specification" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="規格">
                         </div>
                         <div class="grid grid-cols-4 gap-2 mb-2">
-                            <select x-model="newBundleItem.category" class="col-span-2 border border-gray-200 rounded-lg px-2 py-1.5 text-sm">
+                            <select x-model="newBundleItem.category" class="col-span-2 border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white">
                                 <option value="water">水</option>
                                 <option value="food">食物</option>
                                 <option value="medical">醫療</option>
@@ -1330,17 +1338,17 @@
                                 <option value="equipment">設備</option>
                                 <option value="other">其他</option>
                             </select>
-                            <input type="number" x-model.number="newBundleItem.quantity" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center" min="1" placeholder="數量">
-                            <input type="text" x-model="newBundleItem.unit" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm" placeholder="單位">
+                            <input type="number" x-model.number="newBundleItem.quantity" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white" min="1" placeholder="數量">
+                            <input type="text" x-model="newBundleItem.unit" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="單位">
                         </div>
-                        <button @click="addBundleItem()" class="w-full bg-teal-600 text-white rounded-lg py-1.5 text-sm font-medium">+ 加入物資</button>
+                        <button @click="addBundleItem()" class="w-full bg-primary-600 text-white rounded-lg py-1.5 text-sm font-medium">+ 加入物資</button>
                     </div>
                 </div>
             </div>
 
             <div class="flex space-x-3 mt-4 pt-3 border-t">
                 <button @click="showBundleEditModal = false; showBundleManageModal = true" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                <button @click="saveBundle()" class="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg font-medium">儲存</button>
+                <button @click="saveBundle()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium">儲存</button>
             </div>
         </div>
     </div>
@@ -1349,8 +1357,8 @@
     <div x-show="showBundleDetailModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleDetailModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] overflow-hidden flex flex-col">
             <div class="flex items-center mb-4">
-                <div class="w-12 h-12 mr-3 bg-teal-100 rounded-xl flex items-center justify-center">
-                    <svg class="w-7 h-7 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div class="w-12 h-12 mr-3 bg-primary-100 rounded-xl flex items-center justify-center">
+                    <svg class="w-7 h-7 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path :d="getBundleIconPath(selectedBundle?.icon)" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
                     </svg>
                 </div>
@@ -1395,8 +1403,8 @@
             </div>
 
             <!-- Summary -->
-            <div class="bg-teal-50 rounded-lg p-3 mb-4 text-sm">
-                <p class="text-teal-800">
+            <div class="bg-primary-100 rounded-lg p-3 mb-4 text-sm">
+                <p class="text-primary-800">
                     將入庫 <span class="font-bold" x-text="bundleIntakeForm.multiplier"></span> 套
                     「<span x-text="selectedBundle?.name"></span>」，
                     共 <span class="font-bold" x-text="(selectedBundle?.items?.length || 0) * bundleIntakeForm.multiplier"></span> 項物資
@@ -1405,7 +1413,7 @@
 
             <div class="flex space-x-3">
                 <button @click="showBundleDetailModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">返回</button>
-                <button @click="doBundleIntake()" class="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg font-medium">確認入庫</button>
+                <button @click="doBundleIntake()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium">確認入庫</button>
             </div>
         </div>
     </div>
