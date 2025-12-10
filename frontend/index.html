@@ -85,7 +85,7 @@
                     <p class="text-xs text-gray-500">待解決</p>
                 </div>
                 <!-- System Button (Admin only) -->
-                <div x-show="isAdmin" class="relative">
+                <div x-show="currentUser && currentUser.role === 'admin'" class="relative">
                     <button @click="showSystemMenu = !showSystemMenu" class="flex flex-col items-center">
                         <span class="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center hover:bg-gray-300 transition">
                             <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -104,6 +104,13 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3zm0 5h16m-8 5v-5"/>
                             </svg>
                             資料備份
+                        </button>
+                        <button @click="showBroadcastModal = true; showSystemMenu = false"
+                                class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                            </svg>
+                            發佈公告
                         </button>
                         <button @click="showSettingsModal = true; showSystemMenu = false"
                                 class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
@@ -1518,6 +1525,52 @@
         </div>
     </div>
 
+    <!-- Broadcast Modal (發佈公告) -->
+    <div x-show="showBroadcastModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBroadcastModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-6 h-6 text-amber-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
+                </svg>
+                發佈公告
+            </h3>
+
+            <!-- Current Broadcast -->
+            <div x-show="broadcast" class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                <p class="text-xs text-amber-600 mb-1">目前公告：</p>
+                <p class="text-sm text-amber-800" x-text="broadcast"></p>
+            </div>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">公告內容</label>
+                    <textarea x-model="broadcastForm.content" rows="3"
+                              class="w-full border border-gray-200 rounded-lg px-3 py-2 resize-none"
+                              placeholder="輸入要發佈到 Portal 的公告訊息..."></textarea>
+                </div>
+                <p class="text-xs text-gray-500">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    公告會顯示在 Portal 公開看板，所有人都能看到
+                </p>
+                <div class="flex space-x-3">
+                    <button @click="showBroadcastModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="publishBroadcast()"
+                            :disabled="!broadcastForm.content.trim()"
+                            :class="broadcastForm.content.trim() ? 'bg-amber-500 hover:bg-amber-600' : 'bg-gray-300 cursor-not-allowed'"
+                            class="flex-1 px-4 py-2 text-white rounded-lg transition-colors">
+                        發佈
+                    </button>
+                </div>
+                <button x-show="broadcast" @click="clearBroadcast()"
+                        class="w-full px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
+                    清除目前公告
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Single Person Move Modal (單人區域移動) -->
     <div x-show="showPersonMoveModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showPersonMoveModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
@@ -2143,6 +2196,7 @@
                 showSystemMenu: false,
                 showBackupModal: false,
                 showSettingsModal: false,
+                showBroadcastModal: false,
                 editingEquipmentTemplate: null,
                 selectedEquipmentTemplate: null,
                 selectedTemplateItems: [],
@@ -2177,6 +2231,7 @@
                 newEquipmentTemplateItem: { name: '', specification: '', quantity: 1, unit: '台', check_interval_days: 7 },
                 batchMoveForm: { target_zone_id: '', notes: '' },
                 batchCheckoutForm: { reason: 'DISCHARGE', destination: '', notes: '' },
+                broadcastForm: { content: '' },
                 newZone: { id: '', name: '', zone_type: 'shelter', capacity: 0, description: '' },
 
                 // System / Backup
@@ -3045,6 +3100,46 @@
                             this.showToast('站點名稱已更新', 'success');
                         } else {
                             this.showToast('更新失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                async publishBroadcast() {
+                    if (!this.broadcastForm.content.trim()) return;
+                    try {
+                        const res = await this.apiCall('/api/messages/broadcast', {
+                            method: 'POST',
+                            body: {
+                                content: this.broadcastForm.content.trim(),
+                                is_pinned: true
+                            }
+                        });
+                        if (res.ok) {
+                            this.broadcast = this.broadcastForm.content.trim();
+                            this.broadcastForm.content = '';
+                            this.showBroadcastModal = false;
+                            this.showToast('公告已發佈', 'success');
+                        } else {
+                            this.showToast('發佈失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                async clearBroadcast() {
+                    // Get current broadcast and unpin it
+                    try {
+                        const res = await fetch('/api/messages/broadcast');
+                        if (res.ok) {
+                            const data = await res.json();
+                            if (data.broadcast?.id) {
+                                await this.apiCall(`/api/messages/${data.broadcast.id}/pin`, {
+                                    method: 'POST',
+                                    body: { is_pinned: false }
+                                });
+                                this.broadcast = null;
+                                this.showBroadcastModal = false;
+                                this.showToast('公告已清除', 'success');
+                            }
                         }
                     } catch (e) { this.showToast('操作失敗', 'error'); }
                 },
