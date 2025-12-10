@@ -1820,11 +1820,14 @@
     <!-- Distribute QR Code Modal -->
     <div x-show="showDistributeQRModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDistributeQRModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
-            <h3 class="text-lg font-semibold mb-2">發放成功</h3>
+            <h3 class="text-lg font-semibold mb-2">發放記錄 QR Code</h3>
             <p class="text-sm text-gray-600 mb-4">
                 <span x-text="lastDistributeResult?.item?.name"></span>
                 <span x-show="lastDistributeResult?.item?.specification" class="text-gray-400">(<span x-text="lastDistributeResult?.item?.specification"></span>)</span>
                 x <span x-text="lastDistributeResult?.quantity"></span>
+                <span x-show="lastDistributeResult?.person_id" class="block text-xs text-gray-400 mt-1">
+                    領取人: <span x-text="lastDistributeResult?.person_id"></span>
+                </span>
             </p>
             <div id="distribute-qrcode" class="flex justify-center mb-4"></div>
             <p class="text-sm text-gray-500 mb-4">讓領取人用 HIRS App 掃描此 QR Code 同步到家庭物資</p>
@@ -1857,9 +1860,20 @@
                     <div class="bg-gray-50 rounded-lg p-3 text-sm">
                         <div class="flex items-center justify-between mb-1">
                             <span class="font-medium" x-text="event.item_name || '未知物資'"></span>
-                            <span class="text-xs px-2 py-0.5 rounded"
-                                  :class="event.event_type === 'RESOURCE_IN' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
-                                  x-text="event.event_type === 'RESOURCE_IN' ? '入庫' : '發放'"></span>
+                            <div class="flex items-center gap-2">
+                                <!-- QR Code button for RESOURCE_OUT events -->
+                                <button x-show="event.event_type === 'RESOURCE_OUT'"
+                                        @click="regenerateDistributeQR(event)"
+                                        class="p-1 text-primary-600 hover:bg-primary-50 rounded"
+                                        title="產生 QR Code">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                                    </svg>
+                                </button>
+                                <span class="text-xs px-2 py-0.5 rounded"
+                                      :class="event.event_type === 'RESOURCE_IN' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
+                                      x-text="event.event_type === 'RESOURCE_IN' ? '入庫' : '發放'"></span>
+                            </div>
                         </div>
                         <div class="flex items-center justify-between text-gray-500">
                             <span>
@@ -3461,6 +3475,32 @@
                     } catch (e) {
                         console.error('QR generation error:', e);
                         this.showToast('發放成功，QR Code 產生失敗', 'info');
+                    }
+                },
+
+                // 從發放紀錄重新產生 QR Code
+                async regenerateDistributeQR(event) {
+                    // 需要從 API 取得完整的物品資訊
+                    try {
+                        const res = await fetch(`/api/inventory/${event.item_id}`);
+                        if (!res.ok) {
+                            this.showToast('無法取得物品資訊', 'error');
+                            return;
+                        }
+                        const item = await res.json();
+
+                        // 設定 lastDistributeResult 並產生 QR Code
+                        this.lastDistributeResult = {
+                            item: item,
+                            quantity: Math.abs(event.quantity_change),
+                            person_id: event.person_id,
+                            timestamp: event.timestamp
+                        };
+
+                        this.generateDistributeQR();
+                    } catch (e) {
+                        console.error('regenerateDistributeQR error:', e);
+                        this.showToast('產生 QR Code 失敗', 'error');
                     }
                 },
 
