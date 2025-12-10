@@ -309,7 +309,7 @@ if os.path.exists(PORTAL_DIR):
     app.mount("/portal", StaticFiles(directory=PORTAL_DIR, html=True), name="portal")
 
 if os.path.exists(FILES_DIR):
-    app.mount("/files", StaticFiles(directory=FILES_DIR), name="files")
+    app.mount("/files", StaticFiles(directory=FILES_DIR, html=True), name="files")
 
 
 if __name__ == "__main__":
