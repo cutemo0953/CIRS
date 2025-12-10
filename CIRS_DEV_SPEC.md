@@ -1,6 +1,6 @@
-# CIRS (Community Inventory Resilience System) v1.2 Development Specification
+# CIRS (Community Inventory Resilience System) v1.3 Development Specification
 
-**Version:** 1.2
+**Version:** 1.3
 **Target Environment:** Raspberry Pi (Backend) + Mobile PWA (Frontend)
 **Network Topology:** Raspberry Pi as Appliance (Ethernet to Mesh Router or WiFi Hotspot)
 **Core Philosophy:** Offline-First, Community-Scale, High Resilience
@@ -1828,13 +1828,28 @@ Additional Instructions:
 
 ---
 
-**Version:** 1.2
+**Version:** 1.3
 **Last Updated:** 2024-12
 **Author:** De Novo Orthopedics Inc. / 谷盺生物科技股份有限公司
 
 ---
 
 ## Changelog
+
+### v1.3 (2024-12)
+- **Messages**: 新增「找物」(seek_item) 篩選按鈕和紫色標籤
+- **Messages**: 即時統計改為顯示「待解決」數量（非今日留言數）
+- **Messages**: 新增置頂留言功能（管理員可置頂重要公告）
+- **Person**: 批次退場流程 - 支援多人同時辦理離站
+  - 退場原因：正常離站 / 轉送醫院 / 其他
+  - 可填寫去向和備註
+  - 一家人可一起離站，類似出院流程
+- **Portal**: 新增備份管理 UI（管理員專用）
+  - 支援本機 / 下載 / USB 三種備份目標
+  - 可選加密備份（需設定密碼）
+  - 顯示備份歷史記錄
+- **API**: POST `/api/messages/:id/pin` 置頂/取消置頂留言
+- **API**: POST `/api/person/batch-checkout` 批次退場
 
 ### v1.2 (2024-12)
 - **Frontend**: 設備範本功能 - 預設 7 組常用範本
