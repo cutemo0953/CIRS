@@ -77,6 +77,123 @@ async def health_check():
     return {"status": "healthy"}
 
 
+@app.get("/api/public/status")
+async def get_public_status():
+    """
+    Public status endpoint for Portal (交通燈系統)
+    Returns simplified status without sensitive data.
+    No authentication required.
+    """
+    from database import get_db, dict_from_row
+
+    with get_db() as conn:
+        # Get headcount (checked_in only)
+        cursor = conn.execute("""
+            SELECT COUNT(*) as checked_in FROM person
+            WHERE role = 'public' AND checked_in_at IS NOT NULL
+        """)
+        headcount = cursor.fetchone()['checked_in'] or 0
+
+        # Get water and food totals
+        cursor = conn.execute("""
+            SELECT category, SUM(quantity) as total
+            FROM inventory
+            WHERE category IN ('water', 'food')
+            GROUP BY category
+        """)
+        resources = {row['category']: row['total'] for row in cursor.fetchall()}
+
+        # Get config for per-person consumption
+        cursor = conn.execute("SELECT key, value FROM config WHERE key IN ('water_per_person_per_day', 'food_per_person_per_day')")
+        config = {row['key']: float(row['value']) for row in cursor.fetchall()}
+
+        # Calculate survival days
+        people_count = headcount if headcount > 0 else 1
+        water_per_day = config.get('water_per_person_per_day', 3)
+        food_per_day = config.get('food_per_person_per_day', 2100)
+
+        water_days = resources.get('water', 0) / (water_per_day * people_count)
+        food_days = resources.get('food', 0) / (food_per_day * people_count)
+
+        # Traffic light logic: >3 days = green, 1-3 days = yellow, <1 day = red
+        def to_traffic_light(days):
+            if days >= 3:
+                return "green"
+            elif days >= 1:
+                return "yellow"
+            else:
+                return "red"
+
+        # Equipment status (check for issues)
+        cursor = conn.execute("""
+            SELECT COUNT(*) as count FROM inventory
+            WHERE category = 'equipment'
+            AND check_status IN ('NEEDS_REPAIR', 'OUT_OF_SERVICE')
+        """)
+        equipment_issues = cursor.fetchone()['count']
+
+        cursor = conn.execute("""
+            SELECT COUNT(*) as count FROM inventory WHERE category = 'equipment'
+        """)
+        equipment_total = cursor.fetchone()['count']
+
+        # Equipment light: all OK = green, some issues = yellow, most issues = red
+        if equipment_total == 0:
+            equipment_light = "green"
+        elif equipment_issues == 0:
+            equipment_light = "green"
+        elif equipment_issues / equipment_total < 0.3:
+            equipment_light = "yellow"
+        else:
+            equipment_light = "red"
+
+        # Get current broadcast
+        cursor = conn.execute("""
+            SELECT content FROM message
+            WHERE message_type = 'broadcast' AND is_pinned = 1
+            ORDER BY created_at DESC LIMIT 1
+        """)
+        broadcast_row = cursor.fetchone()
+        broadcast = broadcast_row['content'] if broadcast_row else None
+
+        # Shelter capacity (using zone data if available)
+        cursor = conn.execute("""
+            SELECT SUM(capacity) as total_capacity FROM zone WHERE is_active = 1
+        """)
+        capacity_row = cursor.fetchone()
+        total_capacity = capacity_row['total_capacity'] if capacity_row and capacity_row['total_capacity'] else 100
+
+        # Shelter light: <50% = green, 50-90% = yellow, >90% = red
+        occupancy_rate = headcount / total_capacity if total_capacity > 0 else 0
+        if occupancy_rate < 0.5:
+            shelter_light = "green"
+        elif occupancy_rate < 0.9:
+            shelter_light = "yellow"
+        else:
+            shelter_light = "red"
+
+    return {
+        "shelter": {
+            "status": shelter_light,
+            "headcount": headcount,
+            "capacity": total_capacity
+        },
+        "water": {
+            "status": to_traffic_light(water_days),
+            "days": round(water_days, 1)
+        },
+        "food": {
+            "status": to_traffic_light(food_days),
+            "days": round(food_days, 1)
+        },
+        "equipment": {
+            "status": equipment_light,
+            "issues": equipment_issues
+        },
+        "broadcast": broadcast
+    }
+
+
 @app.get("/api/stats")
 async def get_stats():
     """Get system statistics"""

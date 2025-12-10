@@ -1,6 +1,6 @@
-# CIRS (Community Inventory Resilience System) v1.3 Development Specification
+# CIRS (Community Inventory Resilience System) v1.4 Development Specification
 
-**Version:** 1.3
+**Version:** 1.4
 **Target Environment:** Raspberry Pi (Backend) + Mobile PWA (Frontend)
 **Network Topology:** Raspberry Pi as Appliance (Ethernet to Mesh Router or WiFi Hotspot)
 **Core Philosophy:** Offline-First, Community-Scale, High Resilience
@@ -1835,6 +1835,29 @@ Additional Instructions:
 ---
 
 ## Changelog
+
+### v1.4 (2024-12) - Dual-Track Architecture
+- **Architecture**: 實施 Dual-Track 策略，明確分離 Portal（公共看板）和 Frontend（操作台）
+  - Portal = 公共資訊看板（唯讀、交通燈系統、無需登入）
+  - Frontend = 操作人員控制台（需認證、資料密集、CRUD 操作）
+- **Portal**: 重構為純公共看板
+  - 移除管理員登入、備份、設定等功能
+  - 新增交通燈狀態系統（綠/黃/紅）
+  - 四大指標：收容人數、飲用水、糧食、設備狀態
+  - 燈號邏輯：>3 天=綠、1-3 天=黃、<1 天=紅
+  - 公告自動從新 API 取得
+  - 新增狀態說明圖例
+  - 保留防災資料庫、互助留言（唯讀連結）
+- **Frontend**: 強化為操作人員專用控制台
+  - 統計列「收容人數」改為「在場人數」(checked_in)
+  - 新增系統按鈕（齒輪圖示，Admin 專用）
+  - 系統下拉選單：資料備份、站點設定、API 文件
+  - 備份管理整合至 Frontend（從 Portal 移除）
+- **API**: 新增 `GET /api/public/status` 輕量公開端點
+  - 回傳交通燈狀態：shelter、water、food、equipment
+  - 包含收容容量和人數
+  - 包含當前公告內容
+  - 無需認證，供 Portal 使用
 
 ### v1.3 (2024-12)
 - **Messages**: 新增「找物」(seek_item) 篩選按鈕和紫色標籤
