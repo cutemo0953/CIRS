@@ -62,13 +62,9 @@ app.include_router(zone.router, prefix="/api/zone", tags=["Zone"])
 
 @app.get("/")
 async def root():
-    """Root endpoint - redirect to API docs"""
-    return {
-        "name": "CIRS API",
-        "version": "1.0.0",
-        "docs": "/docs",
-        "status": "running"
-    }
+    """Root endpoint - redirect to Portal"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/portal")
 
 
 @app.get("/api/health")
