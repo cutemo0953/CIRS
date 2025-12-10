@@ -36,6 +36,10 @@ class ResolveRequest(BaseModel):
     is_resolved: bool = True
 
 
+class PinRequest(BaseModel):
+    is_pinned: bool = True
+
+
 @router.get("")
 async def list_messages(
     category: Optional[str] = Query(None, description="Filter by category"),
@@ -171,6 +175,22 @@ async def resolve_message(message_id: int, request: ResolveRequest):
         )
 
     return {"message": "Message resolved status updated"}
+
+
+@router.post("/{message_id}/pin")
+async def pin_message(message_id: int, request: PinRequest):
+    """Pin or unpin a message (Admin only)"""
+    with write_db() as conn:
+        cursor = conn.execute("SELECT * FROM message WHERE id = ?", (message_id,))
+        if cursor.fetchone() is None:
+            raise HTTPException(status_code=404, detail="Message not found")
+
+        conn.execute(
+            "UPDATE message SET is_pinned = ? WHERE id = ?",
+            (1 if request.is_pinned else 0, message_id)
+        )
+
+    return {"message": "Message pin status updated"}
 
 
 @router.post("/{message_id}/reply")

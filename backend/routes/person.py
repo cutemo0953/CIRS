@@ -68,6 +68,13 @@ class RoleChangeRequest(BaseModel):
     role: str  # 'admin', 'staff', 'medic', 'public'
 
 
+class BatchCheckoutRequest(BaseModel):
+    person_ids: list[str]
+    reason: Optional[str] = None  # 'DISCHARGE' 正常離站, 'TRANSFER' 轉送, 'OTHER' 其他
+    destination: Optional[str] = None  # 離開後去向
+    notes: Optional[str] = None  # 備註
+
+
 @router.get("")
 async def list_persons(
     role: Optional[str] = Query(None, description="Filter by role"),
@@ -297,6 +304,77 @@ async def check_out(person_id: str):
         )
 
     return {"message": "Check-out successful"}
+
+
+@router.post("/batch-checkout")
+async def batch_checkout(request: BatchCheckoutRequest):
+    """Batch checkout multiple persons (批次退場)"""
+    if not request.person_ids:
+        raise HTTPException(status_code=400, detail="No person IDs provided")
+
+    results = {"success": [], "failed": [], "not_found": []}
+
+    with write_db() as conn:
+        for person_id in request.person_ids:
+            # Check if person exists and is checked in
+            cursor = conn.execute(
+                "SELECT id, display_name, checked_in_at FROM person WHERE id = ?",
+                (person_id,)
+            )
+            person = cursor.fetchone()
+
+            if person is None:
+                results["not_found"].append(person_id)
+                continue
+
+            if person['checked_in_at'] is None:
+                results["failed"].append({
+                    "id": person_id,
+                    "name": person['display_name'],
+                    "reason": "未在站內"
+                })
+                continue
+
+            # Perform checkout
+            conn.execute(
+                """
+                UPDATE person SET checked_in_at = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+                """,
+                (person_id,)
+            )
+
+            # Log event with details
+            notes = []
+            if request.reason:
+                reason_names = {
+                    'DISCHARGE': '正常離站',
+                    'TRANSFER': '轉送醫院',
+                    'OTHER': '其他原因'
+                }
+                notes.append(reason_names.get(request.reason, request.reason))
+            if request.destination:
+                notes.append(f"去向: {request.destination}")
+            if request.notes:
+                notes.append(request.notes)
+
+            conn.execute(
+                """
+                INSERT INTO event_log (event_type, person_id, notes)
+                VALUES ('CHECK_OUT', ?, ?)
+                """,
+                (person_id, " | ".join(notes) if notes else None)
+            )
+
+            results["success"].append({
+                "id": person_id,
+                "name": person['display_name']
+            })
+
+    return {
+        "message": f"批次退場完成: {len(results['success'])} 人成功",
+        "results": results
+    }
 
 
 @router.post("/{person_id}/triage")

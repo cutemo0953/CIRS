@@ -81,8 +81,8 @@
                     <p class="text-xs text-gray-500">設備正常</p>
                 </div>
                 <div>
-                    <p class="text-2xl font-bold text-gray-700" x-text="stats.messages_today || 0"></p>
-                    <p class="text-xs text-gray-500">今日留言</p>
+                    <p class="text-2xl font-bold text-gray-700" x-text="stats.messages_pending || 0"></p>
+                    <p class="text-xs text-gray-500">待解決</p>
                 </div>
             </div>
         </div>
@@ -267,6 +267,7 @@
                 <span x-show="selectedPeople.length > 0" class="text-xs text-gray-500">
                     已選 <span class="font-semibold text-primary-600" x-text="selectedPeople.length"></span> 人
                     <button @click="openBatchMoveModal()" class="ml-2 text-primary-600 underline">移動</button>
+                    <button @click="openBatchCheckoutModal()" class="ml-2 text-red-600 underline">退場</button>
                 </span>
             </div>
 
@@ -596,6 +597,7 @@
             <div class="flex space-x-2 overflow-x-auto pb-2 mb-4">
                 <button @click="messageCategory = ''" :class="messageCategory === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">全部</button>
                 <button @click="messageCategory = 'seek_person'" :class="messageCategory === 'seek_person' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">尋人</button>
+                <button @click="messageCategory = 'seek_item'" :class="messageCategory === 'seek_item' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">找物</button>
                 <button @click="messageCategory = 'offer_help'" :class="messageCategory === 'offer_help' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">互助</button>
                 <button @click="messageCategory = 'report'" :class="messageCategory === 'report' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">回報</button>
             </div>
@@ -603,21 +605,36 @@
             <!-- Messages List -->
             <div class="space-y-3 mb-20">
                 <template x-for="msg in filteredMessages" :key="msg.id">
-                    <div class="bg-white rounded-xl p-4 shadow-sm" :class="msg.is_resolved ? 'opacity-60' : ''">
+                    <div class="bg-white rounded-xl p-4 shadow-sm" :class="{'opacity-60': msg.is_resolved, 'ring-2 ring-amber-400 bg-amber-50': msg.is_pinned}">
                         <div class="flex items-start justify-between mb-2">
-                            <span class="text-xs px-2 py-0.5 rounded-full"
-                                  :class="{
-                                      'bg-blue-100 text-blue-700': msg.category === 'seek_person',
-                                      'bg-green-100 text-green-700': msg.category === 'offer_help',
-                                      'bg-amber-100 text-amber-700': msg.category === 'report',
-                                      'bg-gray-100 text-gray-700': !msg.category || msg.category === 'general'
-                                  }"
-                                  x-text="getCategoryName(msg.category)"></span>
+                            <div class="flex items-center space-x-2">
+                                <!-- 置頂標示 -->
+                                <span x-show="msg.is_pinned" class="text-amber-500" title="置頂">
+                                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                                        <path d="M16 4h2a2 2 0 012 2v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2m4-2a2 2 0 110 4 2 2 0 010-4z"/>
+                                    </svg>
+                                </span>
+                                <span class="text-xs px-2 py-0.5 rounded-full"
+                                      :class="{
+                                          'bg-blue-100 text-blue-700': msg.category === 'seek_person',
+                                          'bg-purple-100 text-purple-700': msg.category === 'seek_item',
+                                          'bg-green-100 text-green-700': msg.category === 'offer_help',
+                                          'bg-amber-100 text-amber-700': msg.category === 'report',
+                                          'bg-gray-100 text-gray-700': !msg.category || msg.category === 'general'
+                                      }"
+                                      x-text="getCategoryName(msg.category)"></span>
+                            </div>
                             <div class="flex items-center space-x-2">
                                 <span x-show="msg.is_resolved" class="text-xs text-green-600">已解決</span>
                                 <!-- Admin Controls -->
                                 <template x-if="currentUser && currentUser.role === 'admin'">
                                     <div class="flex space-x-1">
+                                        <!-- 置頂/取消置頂按鈕 -->
+                                        <button @click="toggleMessagePinned(msg)" class="text-xs px-2 py-1 rounded" :class="msg.is_pinned ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-600'" :title="msg.is_pinned ? '取消置頂' : '置頂'">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                                            </svg>
+                                        </button>
                                         <button @click="toggleMessageResolved(msg)" class="text-xs px-2 py-1 rounded" :class="msg.is_resolved ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-600'">
                                             <span x-text="msg.is_resolved ? '取消解決' : '標為已解決'"></span>
                                         </button>
@@ -1270,6 +1287,71 @@
         </div>
     </div>
 
+    <!-- Batch Checkout Modal (批次退場) -->
+    <div x-show="showBatchCheckoutModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBatchCheckoutModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-semibold mb-2 flex items-center text-red-600">
+                <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                </svg>
+                批次退場
+            </h3>
+            <p class="text-gray-600 mb-4">
+                將 <span class="font-semibold text-red-600" x-text="selectedPeople.length"></span> 人辦理離站手續
+            </p>
+
+            <!-- Selected People Preview -->
+            <div class="bg-gray-50 rounded-lg p-3 mb-4 max-h-32 overflow-y-auto">
+                <p class="text-xs text-gray-500 mb-2">即將退場人員：</p>
+                <div class="flex flex-wrap gap-1">
+                    <template x-for="pid in selectedPeople.slice(0, 10)" :key="pid">
+                        <span class="text-xs bg-white px-2 py-1 rounded border" x-text="people.find(p => p.id === pid)?.display_name || pid"></span>
+                    </template>
+                    <span x-show="selectedPeople.length > 10" class="text-xs text-gray-400">...等 <span x-text="selectedPeople.length"></span> 人</span>
+                </div>
+            </div>
+
+            <!-- Checkout Reason -->
+            <div class="mb-4">
+                <label class="block text-sm text-gray-600 mb-2">退場原因</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button @click="batchCheckoutForm.reason = 'DISCHARGE'"
+                            :class="batchCheckoutForm.reason === 'DISCHARGE' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'"
+                            class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                        正常離站
+                    </button>
+                    <button @click="batchCheckoutForm.reason = 'TRANSFER'"
+                            :class="batchCheckoutForm.reason === 'TRANSFER' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700'"
+                            class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                        轉送醫院
+                    </button>
+                    <button @click="batchCheckoutForm.reason = 'OTHER'"
+                            :class="batchCheckoutForm.reason === 'OTHER' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700'"
+                            class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                        其他
+                    </button>
+                </div>
+            </div>
+
+            <!-- Destination -->
+            <div class="mb-4">
+                <label class="block text-sm text-gray-600 mb-1">去向（選填）</label>
+                <input type="text" x-model="batchCheckoutForm.destination" placeholder="例：返家、XX醫院"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+            </div>
+
+            <!-- Notes -->
+            <input type="text" x-model="batchCheckoutForm.notes" placeholder="備註（選填）"
+                   class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-4 text-sm">
+
+            <!-- Actions -->
+            <div class="grid grid-cols-2 gap-2">
+                <button @click="showBatchCheckoutModal = false" class="px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                <button @click="doBatchCheckout()" class="px-4 py-2 bg-red-600 text-white rounded-lg font-medium">確認退場</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Single Person Move Modal (單人區域移動) -->
     <div x-show="showPersonMoveModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showPersonMoveModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
@@ -1886,6 +1968,7 @@
                 showBundleEditModal: false,
                 showZoneManageModal: false,
                 showBatchMoveModal: false,
+                showBatchCheckoutModal: false,
                 showPersonMoveModal: false,
                 showInventoryHistoryModal: false,
                 showEquipmentTemplateModal: false,
@@ -1924,6 +2007,7 @@
                 equipmentTemplateForm: { name: '', description: '', icon: 'cog', items: [] },
                 newEquipmentTemplateItem: { name: '', specification: '', quantity: 1, unit: '台', check_interval_days: 7 },
                 batchMoveForm: { target_zone_id: '', notes: '' },
+                batchCheckoutForm: { reason: 'DISCHARGE', destination: '', notes: '' },
                 newZone: { id: '', name: '', zone_type: 'shelter', capacity: 0, description: '' },
 
                 // Search filters
@@ -2047,7 +2131,13 @@
                 },
 
                 get filteredMessages() {
-                    return this.messages.filter(m => !this.messageCategory || m.category === this.messageCategory);
+                    const filtered = this.messages.filter(m => !this.messageCategory || m.category === this.messageCategory);
+                    // 置頂留言排在最前面
+                    return filtered.sort((a, b) => {
+                        if (a.is_pinned && !b.is_pinned) return -1;
+                        if (!a.is_pinned && b.is_pinned) return 1;
+                        return 0; // 保持原本的時間排序
+                    });
                 },
 
                 async apiCall(url, options = {}) {
@@ -2654,6 +2744,45 @@
                             this.showToast(err.detail || '移動失敗', 'error');
                         }
                     } catch (e) { this.showToast('移動失敗', 'error'); }
+                },
+
+                openBatchCheckoutModal() {
+                    if (this.selectedPeople.length === 0) {
+                        this.showToast('請選擇要退場的人員', 'error');
+                        return;
+                    }
+                    this.batchCheckoutForm = { reason: 'DISCHARGE', destination: '', notes: '' };
+                    this.showBatchCheckoutModal = true;
+                },
+
+                async doBatchCheckout() {
+                    if (this.selectedPeople.length === 0) {
+                        this.showToast('請選擇要退場的人員', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await this.apiCall('/api/person/batch-checkout', {
+                            method: 'POST',
+                            body: {
+                                person_ids: this.selectedPeople,
+                                reason: this.batchCheckoutForm.reason,
+                                destination: this.batchCheckoutForm.destination,
+                                notes: this.batchCheckoutForm.notes
+                            }
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.showToast(data.message, 'success');
+                            this.showBatchCheckoutModal = false;
+                            this.selectedPeople = [];
+                            await this.loadPeople();
+                            await this.loadZones();
+                            await this.loadStats();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '退場失敗', 'error');
+                        }
+                    } catch (e) { this.showToast('退場失敗', 'error'); }
                 },
 
                 togglePersonSelect(personId) {
@@ -3368,6 +3497,19 @@
                         });
                         if (res.ok) {
                             this.showToast(msg.is_resolved ? '已取消解決' : '已標為解決', 'success');
+                            await this.loadMessages();
+                        }
+                    } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                async toggleMessagePinned(msg) {
+                    try {
+                        const res = await this.apiCall(`/api/messages/${msg.id}/pin`, {
+                            method: 'POST',
+                            body: { is_pinned: !msg.is_pinned }
+                        });
+                        if (res.ok) {
+                            this.showToast(msg.is_pinned ? '已取消置頂' : '已置頂', 'success');
                             await this.loadMessages();
                         }
                     } catch (e) { this.showToast('操作失敗', 'error'); }

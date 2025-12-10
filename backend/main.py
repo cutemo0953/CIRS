@@ -111,12 +111,13 @@ async def get_stats():
         """)
         equipment_ok = cursor.fetchone()['count']
 
-        # Messages today count
+        # Messages pending (unresolved, excluding replies and broadcasts)
         cursor = conn.execute("""
             SELECT COUNT(*) as count FROM message
-            WHERE DATE(created_at) = DATE('now')
+            WHERE (is_resolved IS NULL OR is_resolved = 0)
+            AND message_type = 'post'
         """)
-        messages_today = cursor.fetchone()['count']
+        messages_pending = cursor.fetchone()['count']
 
         # Inventory alerts (below min_quantity)
         cursor = conn.execute("""
@@ -160,7 +161,7 @@ async def get_stats():
             "headcount": headcount,
             "inventory_total": inventory_total,
             "equipment_ok": equipment_ok,
-            "messages_today": messages_today,
+            "messages_pending": messages_pending,
             "survival_days": {
                 "water": round(water_days, 1),
                 "food": round(food_days, 1)

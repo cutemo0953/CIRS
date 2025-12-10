@@ -213,6 +213,22 @@
                 </svg>
                 <span class="text-sm text-gray-700">防災資料庫</span>
             </a>
+            <button x-show="isAdmin" @click="showBackupModal = true" class="bg-white rounded-xl p-3 shadow-sm border border-primary-400/20 flex items-center text-left">
+                <svg class="w-5 h-5 text-primary-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3zm0 5h16m-8 5v-5"/>
+                </svg>
+                <span class="text-sm text-gray-700">資料備份</span>
+            </button>
+            <a x-show="!isAdmin" href="/docs" class="bg-white rounded-xl p-3 shadow-sm border border-primary-400/20 flex items-center">
+                <svg class="w-5 h-5 text-primary-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
+                </svg>
+                <span class="text-sm text-gray-700">API 文件</span>
+            </a>
+        </div>
+
+        <!-- Admin: Additional Quick Links -->
+        <div x-show="isAdmin" x-cloak class="grid grid-cols-2 gap-3 mb-6">
             <a href="/docs" class="bg-white rounded-xl p-3 shadow-sm border border-primary-400/20 flex items-center">
                 <svg class="w-5 h-5 text-primary-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/>
@@ -298,6 +314,109 @@
         </div>
     </div>
 
+    <!-- Backup Modal -->
+    <div x-show="showBackupModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBackupModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto">
+            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-6 h-6 text-primary-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3zm0 5h16m-8 5v-5"/>
+                </svg>
+                資料備份管理
+            </h3>
+
+            <!-- Last Backup Info -->
+            <div class="bg-gray-50 rounded-lg p-4 mb-4">
+                <p class="text-sm text-gray-600 mb-1">最近備份</p>
+                <template x-if="backupStatus.last_backup">
+                    <div>
+                        <p class="font-medium" x-text="formatBackupTime(backupStatus.last_backup.timestamp)"></p>
+                        <p class="text-xs text-gray-500" x-text="backupStatus.last_backup.backup_type + ' · ' + (backupStatus.last_backup.encrypted ? '已加密' : '未加密')"></p>
+                    </div>
+                </template>
+                <template x-if="!backupStatus.last_backup">
+                    <p class="text-gray-400">尚無備份記錄</p>
+                </template>
+            </div>
+
+            <!-- Create Backup Section -->
+            <div class="border border-gray-200 rounded-lg p-4 mb-4">
+                <h4 class="font-medium mb-3">建立新備份</h4>
+
+                <!-- Backup Target -->
+                <div class="mb-3">
+                    <label class="block text-sm text-gray-600 mb-2">備份目標</label>
+                    <div class="grid grid-cols-3 gap-2">
+                        <button @click="backupForm.target = 'local'"
+                                :class="backupForm.target === 'local' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'"
+                                class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                            本機
+                        </button>
+                        <button @click="backupForm.target = 'download'"
+                                :class="backupForm.target === 'download' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'"
+                                class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                            下載
+                        </button>
+                        <button @click="backupForm.target = 'usb'"
+                                :class="backupForm.target === 'usb' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'"
+                                class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                            USB
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Encryption -->
+                <div class="mb-3">
+                    <label class="flex items-center">
+                        <input type="checkbox" x-model="backupForm.encrypt" class="rounded border-gray-300 text-primary-600 mr-2">
+                        <span class="text-sm text-gray-700">加密備份</span>
+                    </label>
+                </div>
+
+                <!-- Password (if encrypted) -->
+                <div x-show="backupForm.encrypt" class="mb-3">
+                    <label class="block text-sm text-gray-600 mb-1">加密密碼</label>
+                    <input type="password" x-model="backupForm.password" placeholder="請輸入密碼"
+                           class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                </div>
+
+                <!-- Notes -->
+                <input type="text" x-model="backupForm.notes" placeholder="備註（選填）"
+                       class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm">
+
+                <button @click="createBackup()" :disabled="backupLoading"
+                        class="w-full bg-primary-600 text-white rounded-lg py-2 font-medium disabled:opacity-50">
+                    <span x-show="!backupLoading">建立備份</span>
+                    <span x-show="backupLoading">備份中...</span>
+                </button>
+            </div>
+
+            <!-- Backup History -->
+            <div class="border border-gray-200 rounded-lg p-4">
+                <h4 class="font-medium mb-3">備份記錄</h4>
+                <div class="space-y-2 max-h-40 overflow-y-auto">
+                    <template x-for="backup in backupStatus.local_backups?.slice(0, 5)" :key="backup.filename">
+                        <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 text-sm">
+                            <div>
+                                <p class="font-medium truncate max-w-[200px]" x-text="backup.filename"></p>
+                                <p class="text-xs text-gray-500">
+                                    <span x-text="backup.size_mb + ' MB'"></span>
+                                    <span x-show="backup.encrypted" class="ml-1 text-primary-600">🔒</span>
+                                </p>
+                            </div>
+                            <span class="text-xs text-gray-400" x-text="formatBackupTime(backup.modified)"></span>
+                        </div>
+                    </template>
+                    <p x-show="!backupStatus.local_backups?.length" class="text-gray-400 text-sm text-center py-2">暫無本機備份</p>
+                </div>
+            </div>
+
+            <!-- Close Button -->
+            <button @click="showBackupModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">
+                關閉
+            </button>
+        </div>
+    </div>
+
     <!-- Toast -->
     <div x-show="toast.show" x-cloak
          x-transition:enter="transition ease-out duration-200"
@@ -321,6 +440,12 @@
                 showLoginModal: false,
                 showSettingsModal: false,
                 showBroadcastModal: false,
+                showBackupModal: false,
+
+                // Backup
+                backupStatus: {},
+                backupLoading: false,
+                backupForm: { target: 'local', encrypt: true, password: '', notes: '' },
 
                 // Forms
                 loginForm: { person_id: '', pin: '' },
@@ -347,6 +472,11 @@
                     await this.loadStats();
                     await this.loadBroadcast();
                     await this.checkNetwork();
+
+                    // Load backup status if admin
+                    if (this.isAdmin) {
+                        await this.loadBackupStatus();
+                    }
 
                     setInterval(() => {
                         this.loadStats();
@@ -487,6 +617,83 @@
                     if (this.networkStatus.lan && !this.networkStatus.internet) return '內網正常 · 外網中斷';
                     if (!this.networkStatus.lan && this.networkStatus.internet) return '內網中斷 · 外網正常';
                     return '連線中...';
+                },
+
+                async loadBackupStatus() {
+                    try {
+                        const res = await fetch('/api/backup/status', {
+                            headers: { 'Authorization': `Bearer ${this.token}` }
+                        });
+                        if (res.ok) {
+                            this.backupStatus = await res.json();
+                        }
+                    } catch (e) { console.error('Failed to load backup status:', e); }
+                },
+
+                async createBackup() {
+                    if (this.backupForm.encrypt && !this.backupForm.password) {
+                        this.showToast('加密備份需要設定密碼', 'error');
+                        return;
+                    }
+
+                    this.backupLoading = true;
+                    try {
+                        const res = await fetch('/api/backup/create', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${this.token}`
+                            },
+                            body: JSON.stringify({
+                                operator_id: this.currentUser.id,
+                                target: this.backupForm.target,
+                                encrypt: this.backupForm.encrypt,
+                                password: this.backupForm.password || null,
+                                notes: this.backupForm.notes || null
+                            })
+                        });
+
+                        if (this.backupForm.target === 'download' && res.ok) {
+                            // Handle download
+                            const blob = await res.blob();
+                            const filename = res.headers.get('Content-Disposition')?.split('filename=')[1] || 'cirs_backup.db.gz';
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = filename;
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            this.showToast('備份已下載', 'success');
+                        } else if (res.ok) {
+                            const data = await res.json();
+                            this.showToast(`備份成功: ${data.filename}`, 'success');
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '備份失敗', 'error');
+                        }
+
+                        // Reload backup status
+                        await this.loadBackupStatus();
+                        // Reset form
+                        this.backupForm.password = '';
+                        this.backupForm.notes = '';
+                    } catch (e) {
+                        this.showToast('備份失敗: ' + e.message, 'error');
+                    } finally {
+                        this.backupLoading = false;
+                    }
+                },
+
+                formatBackupTime(isoStr) {
+                    if (!isoStr) return '';
+                    const d = new Date(isoStr);
+                    const now = new Date();
+                    const diff = (now - d) / 1000;
+                    if (diff < 60) return '剛剛';
+                    if (diff < 3600) return `${Math.floor(diff/60)} 分鐘前`;
+                    if (diff < 86400) return `${Math.floor(diff/3600)} 小時前`;
+                    if (diff < 604800) return `${Math.floor(diff/86400)} 天前`;
+                    return d.toLocaleDateString('zh-TW');
                 },
 
                 showToast(message, type = 'success') {
