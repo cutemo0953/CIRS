@@ -34,6 +34,9 @@ def init_database():
         backup_path = f"{DB_PATH}.backup.{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         shutil.copy(DB_PATH, backup_path)
         print(f"Backed up existing database to: {backup_path}")
+        # Remove existing database to create fresh one
+        os.remove(DB_PATH)
+        print(f"Removed old database, creating fresh one...")
 
     # Read schema
     if not os.path.exists(SCHEMA_PATH):
