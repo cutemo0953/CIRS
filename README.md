@@ -128,17 +128,33 @@ python init_db.py  # 會自動執行 migration
 **常見問題：**
 
 ```bash
+# Q: uvicorn: command not found
+# A: 需要在 backend 目錄安裝依賴
+cd ~/CIRS/backend
+pip install -r requirements.txt
+
+# Q: Error loading ASGI app. Could not import module "main"
+# A: 必須在 backend 目錄執行 uvicorn
+cd ~/CIRS/backend   # 關鍵：要在 backend 目錄
+uvicorn main:app --host 0.0.0.0 --port 8090 --reload
+
 # Q: 更新後前端沒有變化？
 # A: 清除瀏覽器快取或使用無痕模式
+#    macOS: Cmd + Shift + R
+#    Windows/Linux: Ctrl + Shift + R
 
 # Q: 更新後 API 報錯？
 # A: 可能需要更新資料庫
 cd backend && python init_db.py
 
-# Q: Port 8090 已被佔用？
+# Q: Port 8090 已被佔用 (Address already in use)
 # A: 找出並關閉佔用程序
-lsof -i :8090
-kill -9 <PID>
+lsof -ti :8090 | xargs kill -9   # macOS/Linux
+# Windows: netstat -ano | findstr :8090 然後 taskkill /PID <PID> /F
+
+# Q: sqlite3.OperationalError: no such column
+# A: 資料庫 schema 已更新，需重新初始化
+cd backend && python init_db.py  # 輸入 y 確認重建
 ```
 
 ### Windows 開發環境
