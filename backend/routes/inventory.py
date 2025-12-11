@@ -322,8 +322,82 @@ async def delete_bundle(bundle_id: str):
 
 
 # ============================================
+# Static Routes (MUST come before /{item_id})
+# ============================================
+
+@router.get("/equipment-pending")
+async def get_equipment_pending_checks():
+    """Get equipment that needs daily check"""
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            SELECT * FROM inventory
+            WHERE category = 'equipment'
+            AND check_interval_days IS NOT NULL
+            AND (
+                last_check_date IS NULL
+                OR DATE(last_check_date, '+' || check_interval_days || ' days') <= DATE('now')
+            )
+            ORDER BY last_check_date ASC NULLS FIRST
+            """
+        )
+        items = rows_to_list(cursor.fetchall())
+
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/expiring")
+async def get_expiring_items(days: int = Query(7, description="Days until expiry")):
+    """Get items expiring within N days"""
+    with get_db() as conn:
+        cursor = conn.execute(
+            """
+            SELECT * FROM inventory
+            WHERE expiry_date IS NOT NULL
+            AND DATE(expiry_date) <= DATE('now', '+' || ? || ' days')
+            AND DATE(expiry_date) >= DATE('now')
+            ORDER BY expiry_date ASC
+            """,
+            (days,)
+        )
+        items = rows_to_list(cursor.fetchall())
+
+    return {"items": items, "count": len(items)}
+
+
+@router.get("/similar")
+async def find_similar_items(name: str = Query(..., min_length=1)):
+    """Find items with similar names for smart merge suggestion"""
+    with get_db() as conn:
+        # Simple LIKE search for similar names
+        cursor = conn.execute(
+            """
+            SELECT id, name, specification, category, quantity, unit
+            FROM inventory
+            WHERE name LIKE ?
+            ORDER BY name
+            LIMIT 10
+            """,
+            (f"%{name}%",)
+        )
+        items = rows_to_list(cursor.fetchall())
+
+    return {"items": items, "count": len(items)}
+
+
+# ============================================
 # Inventory Item Routes (/{item_id} pattern)
 # ============================================
+
+class IntakeRequest(BaseModel):
+    quantity: float
+    notes: Optional[str] = None
+
+
+class EquipmentCheckRequest(BaseModel):
+    status: str  # 'OK', 'NEEDS_REPAIR', 'OUT_OF_SERVICE'
+    notes: Optional[str] = None
+
 
 @router.get("/{item_id}")
 async def get_inventory_item(item_id: int):
@@ -336,16 +410,6 @@ async def get_inventory_item(item_id: int):
         raise HTTPException(status_code=404, detail="Item not found")
 
     return item
-
-
-class IntakeRequest(BaseModel):
-    quantity: float
-    notes: Optional[str] = None
-
-
-class EquipmentCheckRequest(BaseModel):
-    status: str  # 'OK', 'NEEDS_REPAIR', 'OUT_OF_SERVICE'
-    notes: Optional[str] = None
 
 
 @router.post("")
@@ -525,27 +589,6 @@ async def intake_inventory(item_id: int, request: IntakeRequest):
     }
 
 
-@router.get("/equipment-pending")
-async def get_equipment_pending_checks():
-    """Get equipment that needs daily check"""
-    with get_db() as conn:
-        cursor = conn.execute(
-            """
-            SELECT * FROM inventory
-            WHERE category = 'equipment'
-            AND check_interval_days IS NOT NULL
-            AND (
-                last_check_date IS NULL
-                OR DATE(last_check_date, '+' || check_interval_days || ' days') <= DATE('now')
-            )
-            ORDER BY last_check_date ASC NULLS FIRST
-            """
-        )
-        items = rows_to_list(cursor.fetchall())
-
-    return {"items": items, "count": len(items)}
-
-
 @router.post("/{item_id}/check")
 async def equipment_check(item_id: int, request: EquipmentCheckRequest):
     """Record equipment daily check"""
@@ -583,42 +626,3 @@ async def equipment_check(item_id: int, request: EquipmentCheckRequest):
         "event_id": event_id,
         "status": request.status
     }
-
-
-@router.get("/expiring")
-async def get_expiring_items(days: int = Query(7, description="Days until expiry")):
-    """Get items expiring within N days"""
-    with get_db() as conn:
-        cursor = conn.execute(
-            """
-            SELECT * FROM inventory
-            WHERE expiry_date IS NOT NULL
-            AND DATE(expiry_date) <= DATE('now', '+' || ? || ' days')
-            AND DATE(expiry_date) >= DATE('now')
-            ORDER BY expiry_date ASC
-            """,
-            (days,)
-        )
-        items = rows_to_list(cursor.fetchall())
-
-    return {"items": items, "count": len(items)}
-
-
-@router.get("/similar")
-async def find_similar_items(name: str = Query(..., min_length=1)):
-    """Find items with similar names for smart merge suggestion"""
-    with get_db() as conn:
-        # Simple LIKE search for similar names
-        cursor = conn.execute(
-            """
-            SELECT id, name, specification, category, quantity, unit
-            FROM inventory
-            WHERE name LIKE ?
-            ORDER BY name
-            LIMIT 10
-            """,
-            (f"%{name}%",)
-        )
-        items = rows_to_list(cursor.fetchall())
-
-    return {"items": items, "count": len(items)}
