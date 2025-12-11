@@ -1,0 +1,18 @@
+[Unit]
+Description=HIRS - Home Inventory Resource System (Static File Server)
+Documentation=https://github.com/cutemo0953/HIRS
+After=network.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/HIRS
+ExecStart=/usr/bin/python3 -m http.server 8082 --bind 0.0.0.0
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
