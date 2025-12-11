@@ -3469,8 +3469,12 @@
                         // 等待 DOM 更新完成
                         await this.$nextTick();
 
+                        // 將 UTF-8 字串轉換為 Byte 陣列，確保中文正確編碼
+                        const utf8Bytes = new TextEncoder().encode(jsonStr);
+                        const byteString = Array.from(utf8Bytes).map(b => String.fromCharCode(b)).join('');
+
                         const qr = qrcode(0, 'L');
-                        qr.addData(jsonStr);
+                        qr.addData(byteString, 'Byte');
                         qr.make();
 
                         const container = document.getElementById('distribute-qrcode');
