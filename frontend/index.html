@@ -3470,7 +3470,7 @@
                         await this.$nextTick();
 
                         const qr = qrcode(0, 'L');
-                        qr.addData(jsonStr, 'Byte');
+                        qr.addData(jsonStr);
                         qr.make();
 
                         const container = document.getElementById('distribute-qrcode');
