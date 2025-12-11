@@ -3440,7 +3440,7 @@
                     } catch (e) { this.showToast('操作失敗', 'error'); }
                 },
 
-                generateDistributeQR() {
+                async generateDistributeQR() {
                     if (!this.lastDistributeResult) return;
 
                     const r = this.lastDistributeResult;
@@ -3463,6 +3463,12 @@
                     const jsonStr = JSON.stringify(data);
 
                     try {
+                        // 先顯示 modal，確保 DOM 元素可見
+                        this.showDistributeQRModal = true;
+
+                        // 等待 DOM 更新完成
+                        await this.$nextTick();
+
                         const qr = qrcode(0, 'L');
                         qr.addData(jsonStr, 'Byte');
                         qr.make();
@@ -3470,10 +3476,13 @@
                         const container = document.getElementById('distribute-qrcode');
                         if (container) {
                             container.innerHTML = qr.createImgTag(5);
+                        } else {
+                            console.error('distribute-qrcode container not found');
+                            throw new Error('Container not found');
                         }
-                        this.showDistributeQRModal = true;
                     } catch (e) {
                         console.error('QR generation error:', e);
+                        this.showDistributeQRModal = false;
                         this.showToast('發放成功，QR Code 產生失敗', 'info');
                     }
                 },
