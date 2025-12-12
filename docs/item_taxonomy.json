@@ -1,0 +1,397 @@
+{
+  "$schema": "https://irs.local/schemas/taxonomy/v1.json",
+  "version": "1.0",
+  "last_updated": "2025-12-12",
+
+  "categories": {
+    "water": {
+      "name_zh": "飲用水",
+      "name_en": "Water",
+      "icon": "droplet",
+      "color": "#3b82f6",
+      "systems": ["HIRS", "CIRS"],
+      "days_of_supply_per_person": {
+        "unit": "公升",
+        "daily_need": 3
+      }
+    },
+    "food": {
+      "name_zh": "食物",
+      "name_en": "Food",
+      "icon": "utensils",
+      "color": "#f59e0b",
+      "systems": ["HIRS", "CIRS"],
+      "days_of_supply_per_person": {
+        "unit": "份",
+        "daily_need": 3
+      }
+    },
+    "medical": {
+      "name_zh": "醫療",
+      "name_en": "Medical",
+      "icon": "first-aid",
+      "color": "#ef4444",
+      "systems": ["HIRS", "CIRS", "MIRS"]
+    },
+    "hygiene": {
+      "name_zh": "衛生",
+      "name_en": "Hygiene",
+      "icon": "soap",
+      "color": "#8b5cf6",
+      "systems": ["HIRS", "CIRS"]
+    },
+    "tools": {
+      "name_zh": "工具",
+      "name_en": "Tools",
+      "icon": "wrench",
+      "color": "#6b7280",
+      "systems": ["HIRS", "CIRS"]
+    },
+    "documents": {
+      "name_zh": "證件",
+      "name_en": "Documents",
+      "icon": "id-card",
+      "color": "#0ea5e9",
+      "systems": ["HIRS"]
+    },
+    "clothing": {
+      "name_zh": "衣物",
+      "name_en": "Clothing",
+      "icon": "shirt",
+      "color": "#14b8a6",
+      "systems": ["HIRS", "CIRS"]
+    },
+    "power": {
+      "name_zh": "電力",
+      "name_en": "Power",
+      "icon": "battery",
+      "color": "#eab308",
+      "systems": ["HIRS", "CIRS"],
+      "days_of_supply_per_person": {
+        "unit": "mAh",
+        "daily_need": 5000
+      }
+    },
+    "communication": {
+      "name_zh": "通訊",
+      "name_en": "Communication",
+      "icon": "radio",
+      "color": "#06b6d4",
+      "systems": ["HIRS", "CIRS"]
+    },
+    "shelter": {
+      "name_zh": "避難",
+      "name_en": "Shelter",
+      "icon": "tent",
+      "color": "#84cc16",
+      "systems": ["HIRS", "CIRS"]
+    },
+    "baby": {
+      "name_zh": "嬰幼兒",
+      "name_en": "Baby",
+      "icon": "baby",
+      "color": "#ec4899",
+      "systems": ["HIRS", "CIRS"]
+    },
+    "elderly": {
+      "name_zh": "長者",
+      "name_en": "Elderly",
+      "icon": "wheelchair",
+      "color": "#a855f7",
+      "systems": ["HIRS", "CIRS"]
+    },
+    "pet": {
+      "name_zh": "寵物",
+      "name_en": "Pet",
+      "icon": "paw",
+      "color": "#f97316",
+      "systems": ["HIRS", "CIRS"]
+    },
+    "blood": {
+      "name_zh": "血液",
+      "name_en": "Blood",
+      "icon": "droplet",
+      "color": "#dc2626",
+      "systems": ["MIRS"]
+    },
+    "equipment": {
+      "name_zh": "設備",
+      "name_en": "Equipment",
+      "icon": "monitor",
+      "color": "#475569",
+      "systems": ["MIRS"]
+    },
+    "surgical": {
+      "name_zh": "手術",
+      "name_en": "Surgical",
+      "icon": "scissors",
+      "color": "#0f766e",
+      "systems": ["MIRS"]
+    }
+  },
+
+  "units": {
+    "個": { "name_en": "piece", "plural": "pieces", "is_countable": true },
+    "瓶": { "name_en": "bottle", "plural": "bottles", "is_countable": true },
+    "罐": { "name_en": "can", "plural": "cans", "is_countable": true },
+    "包": { "name_en": "pack", "plural": "packs", "is_countable": true },
+    "盒": { "name_en": "box", "plural": "boxes", "is_countable": true },
+    "箱": { "name_en": "case", "plural": "cases", "is_countable": true },
+    "公斤": { "name_en": "kg", "plural": "kg", "is_countable": false },
+    "公升": { "name_en": "liter", "plural": "liters", "is_countable": false },
+    "組": { "name_en": "set", "plural": "sets", "is_countable": true },
+    "套": { "name_en": "kit", "plural": "kits", "is_countable": true },
+    "打": { "name_en": "dozen", "plural": "dozens", "is_countable": true, "multiplier": 12 },
+    "元": { "name_en": "TWD", "plural": "TWD", "is_countable": false },
+    "袋": { "name_en": "unit", "plural": "units", "is_countable": true, "mirs_only": true },
+    "支": { "name_en": "vial", "plural": "vials", "is_countable": true, "mirs_only": true },
+    "顆": { "name_en": "tablet", "plural": "tablets", "is_countable": true, "mirs_only": true }
+  },
+
+  "common_items": {
+    "WATER-500ML": {
+      "name_zh": "礦泉水 500ml",
+      "name_en": "Bottled Water 500ml",
+      "category": "water",
+      "default_unit": "瓶",
+      "volume_liters": 0.5
+    },
+    "WATER-2L": {
+      "name_zh": "飲用水 2L",
+      "name_en": "Drinking Water 2L",
+      "category": "water",
+      "default_unit": "瓶",
+      "volume_liters": 2
+    },
+    "WATER-5L": {
+      "name_zh": "桶裝水 5L",
+      "name_en": "Water Jug 5L",
+      "category": "water",
+      "default_unit": "桶",
+      "volume_liters": 5
+    },
+    "FOOD-RICE-1KG": {
+      "name_zh": "白米",
+      "name_en": "Rice",
+      "category": "food",
+      "default_unit": "公斤"
+    },
+    "FOOD-INSTANT-NOODLE": {
+      "name_zh": "泡麵",
+      "name_en": "Instant Noodles",
+      "category": "food",
+      "default_unit": "包"
+    },
+    "FOOD-CAN-TUNA": {
+      "name_zh": "鮪魚罐頭",
+      "name_en": "Canned Tuna",
+      "category": "food",
+      "default_unit": "罐"
+    },
+    "FOOD-CAN-CORN": {
+      "name_zh": "玉米罐頭",
+      "name_en": "Canned Corn",
+      "category": "food",
+      "default_unit": "罐"
+    },
+    "FOOD-BISCUIT": {
+      "name_zh": "餅乾",
+      "name_en": "Biscuits",
+      "category": "food",
+      "default_unit": "包"
+    },
+    "FOOD-ENERGY-BAR": {
+      "name_zh": "能量棒",
+      "name_en": "Energy Bar",
+      "category": "food",
+      "default_unit": "條"
+    },
+    "MED-FIRSTAID-KIT": {
+      "name_zh": "急救包",
+      "name_en": "First Aid Kit",
+      "category": "medical",
+      "default_unit": "組"
+    },
+    "MED-BANDAGE": {
+      "name_zh": "繃帶",
+      "name_en": "Bandage",
+      "category": "medical",
+      "default_unit": "捲"
+    },
+    "MED-PAINKILLER": {
+      "name_zh": "止痛藥",
+      "name_en": "Painkiller",
+      "category": "medical",
+      "default_unit": "顆"
+    },
+    "MED-MASK": {
+      "name_zh": "口罩",
+      "name_en": "Face Mask",
+      "category": "medical",
+      "default_unit": "個"
+    },
+    "HYG-TISSUE": {
+      "name_zh": "衛生紙",
+      "name_en": "Tissue Paper",
+      "category": "hygiene",
+      "default_unit": "包"
+    },
+    "HYG-WET-WIPE": {
+      "name_zh": "濕紙巾",
+      "name_en": "Wet Wipes",
+      "category": "hygiene",
+      "default_unit": "包"
+    },
+    "HYG-SANITIZER": {
+      "name_zh": "乾洗手",
+      "name_en": "Hand Sanitizer",
+      "category": "hygiene",
+      "default_unit": "瓶"
+    },
+    "TOOL-FLASHLIGHT": {
+      "name_zh": "手電筒",
+      "name_en": "Flashlight",
+      "category": "tools",
+      "default_unit": "支"
+    },
+    "TOOL-BATTERY-AA": {
+      "name_zh": "3號電池",
+      "name_en": "AA Battery",
+      "category": "tools",
+      "default_unit": "顆"
+    },
+    "TOOL-BATTERY-AAA": {
+      "name_zh": "4號電池",
+      "name_en": "AAA Battery",
+      "category": "tools",
+      "default_unit": "顆"
+    },
+    "TOOL-LIGHTER": {
+      "name_zh": "打火機",
+      "name_en": "Lighter",
+      "category": "tools",
+      "default_unit": "個"
+    },
+    "TOOL-KNIFE": {
+      "name_zh": "瑞士刀",
+      "name_en": "Swiss Knife",
+      "category": "tools",
+      "default_unit": "把"
+    },
+    "TOOL-ROPE": {
+      "name_zh": "繩索",
+      "name_en": "Rope",
+      "category": "tools",
+      "default_unit": "條"
+    },
+    "DOC-CASH": {
+      "name_zh": "現金",
+      "name_en": "Cash",
+      "category": "documents",
+      "default_unit": "元"
+    },
+    "DOC-ID-COPY": {
+      "name_zh": "證件影本",
+      "name_en": "ID Copy",
+      "category": "documents",
+      "default_unit": "份"
+    },
+    "PWR-POWERBANK": {
+      "name_zh": "行動電源",
+      "name_en": "Power Bank",
+      "category": "power",
+      "default_unit": "個"
+    },
+    "PWR-CHARGER": {
+      "name_zh": "充電線",
+      "name_en": "Charging Cable",
+      "category": "power",
+      "default_unit": "條"
+    },
+    "COMM-RADIO": {
+      "name_zh": "收音機",
+      "name_en": "Radio",
+      "category": "communication",
+      "default_unit": "台"
+    },
+    "COMM-WHISTLE": {
+      "name_zh": "哨子",
+      "name_en": "Whistle",
+      "category": "communication",
+      "default_unit": "個"
+    },
+    "SHELTER-BLANKET": {
+      "name_zh": "毛毯",
+      "name_en": "Blanket",
+      "category": "shelter",
+      "default_unit": "條"
+    },
+    "SHELTER-SLEEPING-BAG": {
+      "name_zh": "睡袋",
+      "name_en": "Sleeping Bag",
+      "category": "shelter",
+      "default_unit": "個"
+    },
+    "SHELTER-TARP": {
+      "name_zh": "防水布",
+      "name_en": "Tarp",
+      "category": "shelter",
+      "default_unit": "張"
+    },
+    "CLOTH-RAINCOAT": {
+      "name_zh": "雨衣",
+      "name_en": "Raincoat",
+      "category": "clothing",
+      "default_unit": "件"
+    },
+    "CLOTH-GLOVES": {
+      "name_zh": "工作手套",
+      "name_en": "Work Gloves",
+      "category": "clothing",
+      "default_unit": "雙"
+    },
+    "BABY-DIAPER": {
+      "name_zh": "尿布",
+      "name_en": "Diaper",
+      "category": "baby",
+      "default_unit": "片"
+    },
+    "BABY-FORMULA": {
+      "name_zh": "奶粉",
+      "name_en": "Baby Formula",
+      "category": "baby",
+      "default_unit": "罐"
+    },
+    "BABY-BOTTLE": {
+      "name_zh": "奶瓶",
+      "name_en": "Baby Bottle",
+      "category": "baby",
+      "default_unit": "個"
+    },
+    "PET-FOOD-DOG": {
+      "name_zh": "狗飼料",
+      "name_en": "Dog Food",
+      "category": "pet",
+      "default_unit": "公斤"
+    },
+    "PET-FOOD-CAT": {
+      "name_zh": "貓飼料",
+      "name_en": "Cat Food",
+      "category": "pet",
+      "default_unit": "公斤"
+    }
+  },
+
+  "purchase_url_allowlist": [
+    "shopee.tw",
+    "momoshop.com.tw",
+    "pcone.com.tw",
+    "pchome.com.tw",
+    "amazon.com",
+    "books.com.tw",
+    "costco.com.tw",
+    "carrefour.com.tw",
+    "rt-mart.com.tw",
+    "wellcome.com.tw"
+  ]
+}
