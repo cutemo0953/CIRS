@@ -13,6 +13,7 @@ const IRS_SCHEMA_VERSION = '1.0';
 
 const MESSAGE_TYPES = {
   DISTRIBUTION: 'DISTRIBUTION',
+  DONATION_RECEIPT: 'DONATION_RECEIPT',
   TEMPLATE: 'TEMPLATE',
   INVENTORY_SYNC: 'INVENTORY_SYNC'
 };
@@ -225,6 +226,8 @@ function parseQRContent(rawData) {
       payloadValidation = validateDistributionPayload(envelope.payload);
     } else if (envelope.message_type === MESSAGE_TYPES.TEMPLATE) {
       payloadValidation = validateTemplatePayload(envelope.payload);
+    } else if (envelope.message_type === MESSAGE_TYPES.DONATION_RECEIPT) {
+      payloadValidation = validateDonationReceiptPayload(envelope.payload);
     }
 
     if (!payloadValidation.valid) {
@@ -370,6 +373,76 @@ function createTemplateEnvelope({ issuer, template_name, description, household_
   };
 }
 
+/**
+ * 建立 DONATION_RECEIPT 信封
+ * @param {object} params
+ * @param {object} params.issuer - { system, site_id, site_name }
+ * @param {string} params.donor_name - 捐贈者姓名（選填）
+ * @param {array} params.items - 捐贈品項
+ * @param {string} params.thank_you_note - 感謝詞
+ * @param {string} params.notes - 備註
+ * @returns {object} - 完整信封
+ */
+function createDonationReceiptEnvelope({ issuer, donor_name, items, thank_you_note, notes }) {
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const siteId = issuer.site_id || 'CIRS-DEFAULT';
+
+  return {
+    schema_version: IRS_SCHEMA_VERSION,
+    message_type: MESSAGE_TYPES.DONATION_RECEIPT,
+    issuer: {
+      system: issuer.system || SYSTEMS.CIRS,
+      site_id: siteId,
+      site_name: issuer.site_name || 'CIRS 社區物資站'
+    },
+    timestamp: now.toISOString(),
+    message_id: generateUUID(),
+    payload: {
+      receipt_id: `DON-${siteId}-${dateStr}-${generateUUID().slice(0, 4).toUpperCase()}`,
+      donor_name: donor_name || '',
+      items: items.map(item => ({
+        item_code: item.item_code || `CUSTOM-${generateUUID().slice(0, 8)}`,
+        name: item.name,
+        qty: item.qty,
+        unit: item.unit || '個',
+        category: item.category || 'other'
+      })),
+      thank_you_note: thank_you_note || '感謝您的愛心捐贈！',
+      notes: notes || ''
+    }
+  };
+}
+
+/**
+ * 驗證 DONATION_RECEIPT payload
+ * @param {object} payload
+ * @returns {{ valid: boolean, errors: string[] }}
+ */
+function validateDonationReceiptPayload(payload) {
+  const errors = [];
+
+  if (!payload.receipt_id) {
+    errors.push('Missing receipt_id');
+  }
+
+  if (!payload.items || !Array.isArray(payload.items)) {
+    errors.push('Missing or invalid items array');
+    return { valid: false, errors };
+  }
+
+  if (payload.items.length === 0) {
+    errors.push('Items array cannot be empty');
+  }
+
+  payload.items.forEach((item, index) => {
+    if (!item.name) errors.push(`Item ${index}: missing name`);
+    if (typeof item.qty !== 'number' || item.qty <= 0) errors.push(`Item ${index}: invalid qty`);
+  });
+
+  return { valid: errors.length === 0, errors };
+}
+
 // ============================================================================
 // 工具函式
 // ============================================================================
@@ -449,12 +522,14 @@ if (typeof module !== 'undefined' && module.exports) {
     validateEnvelope,
     validateDistributionPayload,
     validateTemplatePayload,
+    validateDonationReceiptPayload,
     parseQRContent,
     isLegacyCIRSFormat,
     convertLegacyToEnvelope,
     generateUUID,
     createDistributionEnvelope,
     createTemplateEnvelope,
+    createDonationReceiptEnvelope,
     getCategoryInfo,
     isPurchaseUrlAllowed,
     mergeItems
@@ -474,12 +549,14 @@ if (typeof window !== 'undefined') {
     validateEnvelope,
     validateDistributionPayload,
     validateTemplatePayload,
+    validateDonationReceiptPayload,
     parseQRContent,
     isLegacyCIRSFormat,
     convertLegacyToEnvelope,
     generateUUID,
     createDistributionEnvelope,
     createTemplateEnvelope,
+    createDonationReceiptEnvelope,
     getCategoryInfo,
     isPurchaseUrlAllowed,
     mergeItems

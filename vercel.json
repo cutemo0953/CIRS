@@ -15,6 +15,10 @@
     {
       "src": "portal/**",
       "use": "@vercel/static"
+    },
+    {
+      "src": "files/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
@@ -23,6 +27,8 @@
     { "src": "/portal", "dest": "/portal/index.html" },
     { "src": "/frontend/(.*)", "dest": "/frontend/$1" },
     { "src": "/frontend", "dest": "/frontend/index.html" },
+    { "src": "/files/(.*)", "dest": "/files/$1" },
+    { "src": "/files", "dest": "/files/index.html" },
     { "src": "/(.*)", "dest": "/portal/$1" }
   ]
 }

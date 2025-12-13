@@ -808,6 +808,18 @@
                     <input type="password" x-model="loginForm.pin" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="****" inputmode="numeric" maxlength="6">
                 </div>
                 <p x-show="loginError" class="text-red-500 text-sm" x-text="loginError"></p>
+                <!-- Demo Credentials Hint -->
+                <div id="demo-login-hint" style="display:none;" class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs">
+                    <p class="font-medium text-amber-700 mb-2">📋 測試帳號 (PIN 皆為 1234)</p>
+                    <div class="space-y-1 text-amber-600">
+                        <p><code class="bg-amber-100 px-1 rounded">admin001</code> 管理員 - 全功能</p>
+                        <p><code class="bg-amber-100 px-1 rounded">staff001</code> 志工 - 入庫/報到</p>
+                        <p><code class="bg-amber-100 px-1 rounded">medic001</code> 醫護 - 檢傷分類</p>
+                    </div>
+                </div>
+                <script>
+                    fetch('/api/demo-status').then(r=>r.json()).then(d=>{if(d.is_demo)document.getElementById('demo-login-hint').style.display='block';}).catch(()=>{});
+                </script>
                 <div class="flex space-x-3">
                     <button @click="showLoginModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
                     <button @click="doLogin()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">登入</button>

@@ -1836,6 +1836,12 @@ Additional Instructions:
 
 ## Changelog
 
+### v1.4.1 (2024-12)
+- **Fix**: 修復防災資料庫 404 錯誤（新增 /files/ 路由至 vercel.json）
+- **UI**: 登入視窗新增測試帳號提示（僅 Demo 模式顯示）
+  - 顯示三種角色帳號：admin001、staff001、medic001
+  - PIN 皆為 1234
+
 ### v1.4 (2024-12) - Dual-Track Architecture
 - **Architecture**: 實施 Dual-Track 策略，明確分離 Portal（公共看板）和 Frontend（操作台）
   - Portal = 公共資訊看板（唯讀、交通燈系統、無需登入）

@@ -263,6 +263,142 @@ async def intake_bundle(request: BundleIntakeRequest):
     }
 
 
+# ============================================
+# Donation Inbound API (捐贈入庫)
+# ============================================
+
+class DonationItem(BaseModel):
+    item_id: Optional[int] = None  # 現有物品 ID
+    name: str  # 物品名稱（如果是新物品）
+    quantity: float
+    unit: Optional[str] = "個"
+    category: Optional[str] = "other"
+    specification: Optional[str] = None
+
+
+class DonationInboundRequest(BaseModel):
+    items: List[DonationItem]
+    donor_name: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@router.post("/donation/inbound")
+async def donation_inbound(request: DonationInboundRequest):
+    """接收捐贈物資並產生收據 QR Code"""
+    import uuid
+    from datetime import datetime
+
+    # 讀取站點設定
+    config_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "site_config.json")
+    site_config = {"site_id": "CIRS-DEFAULT", "site_name": "CIRS 社區物資站"}
+    if os.path.exists(config_path):
+        with open(config_path, "r", encoding="utf-8") as f:
+            site_config = json.load(f)
+
+    created_items = []
+    updated_items = []
+    receipt_items = []
+
+    with write_db() as conn:
+        for item in request.items:
+            if item.item_id:
+                # 更新現有物品
+                cursor = conn.execute("SELECT * FROM inventory WHERE id = ?", (item.item_id,))
+                existing = dict_from_row(cursor.fetchone())
+
+                if existing:
+                    new_quantity = existing['quantity'] + item.quantity
+                    conn.execute(
+                        "UPDATE inventory SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                        (new_quantity, item.item_id)
+                    )
+                    # Log event with DONATION reason
+                    conn.execute(
+                        """
+                        INSERT INTO event_log (event_type, item_id, quantity_change, notes)
+                        VALUES ('RESOURCE_IN', ?, ?, ?)
+                        """,
+                        (item.item_id, item.quantity, f"捐贈入庫: {request.donor_name or '匿名'}")
+                    )
+                    updated_items.append({
+                        "id": item.item_id,
+                        "name": existing['name'],
+                        "added": item.quantity,
+                        "new_quantity": new_quantity
+                    })
+                    receipt_items.append({
+                        "item_code": f"ITEM-{item.item_id}",
+                        "name": existing['name'],
+                        "qty": item.quantity,
+                        "unit": existing.get('unit') or item.unit or '個',
+                        "category": existing.get('category') or item.category or 'other'
+                    })
+            else:
+                # 建立新物品
+                cursor = conn.execute(
+                    """
+                    INSERT INTO inventory (name, specification, category, quantity, unit)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (item.name, item.specification, item.category, item.quantity, item.unit)
+                )
+                new_id = cursor.lastrowid
+                # Log event
+                conn.execute(
+                    """
+                    INSERT INTO event_log (event_type, item_id, quantity_change, notes)
+                    VALUES ('RESOURCE_IN', ?, ?, ?)
+                    """,
+                    (new_id, item.quantity, f"捐贈入庫(新增): {request.donor_name or '匿名'}")
+                )
+                created_items.append({
+                    "id": new_id,
+                    "name": item.name,
+                    "quantity": item.quantity
+                })
+                receipt_items.append({
+                    "item_code": f"ITEM-{new_id}",
+                    "name": item.name,
+                    "qty": item.quantity,
+                    "unit": item.unit or '個',
+                    "category": item.category or 'other'
+                })
+
+    # 產生 DONATION_RECEIPT 信封
+    now = datetime.now()
+    date_str = now.strftime("%Y%m%d")
+    receipt_id = f"DON-{site_config.get('site_id', 'CIRS')}-{date_str}-{uuid.uuid4().hex[:4].upper()}"
+
+    receipt_envelope = {
+        "schema_version": "1.0",
+        "message_type": "DONATION_RECEIPT",
+        "issuer": {
+            "system": "CIRS",
+            "site_id": site_config.get("site_id", "CIRS-DEFAULT"),
+            "site_name": site_config.get("site_name", "CIRS 社區物資站")
+        },
+        "timestamp": now.isoformat(),
+        "message_id": str(uuid.uuid4()),
+        "payload": {
+            "receipt_id": receipt_id,
+            "donor_name": request.donor_name or "",
+            "items": receipt_items,
+            "thank_you_note": "感謝您的愛心捐贈！",
+            "notes": request.notes or ""
+        }
+    }
+
+    return {
+        "success": True,
+        "message": "捐贈入庫成功",
+        "receipt_id": receipt_id,
+        "created": created_items,
+        "updated": updated_items,
+        "total_items": len(created_items) + len(updated_items),
+        "receipt": receipt_envelope
+    }
+
+
 @router.get("/bundles/{bundle_id}")
 async def get_bundle(bundle_id: str):
     """Get a specific bundle by ID"""
