@@ -38,3 +38,4 @@ node_modules/
 # Uploaded images (keep structure)
 files/uploads/*
 !files/uploads/.gitkeep
+.vercel
