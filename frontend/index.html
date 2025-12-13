@@ -11,6 +11,7 @@
     <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="../shared/irs-schema.js"></script>
     <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script>
         tailwind.config = {
@@ -37,6 +38,39 @@
     </style>
 </head>
 <body class="bg-gray-50" x-data="cirsApp()" x-init="init()">
+    <!-- Demo Mode Banner -->
+    <div id="demo-banner" style="display:none;" class="bg-amber-500 text-white text-center px-4 py-2 text-sm font-bold sticky top-0 z-50">
+        🚧 線上展示版 (Demo Mode) | 資料將在頁面重整後重置 |
+        <a href="https://github.com/cutemo0953/CIRS" target="_blank" class="underline text-white">下載正式版</a>
+        <button onclick="resetDemo()" class="ml-2 px-2 py-0.5 bg-white/20 rounded hover:bg-white/30">重置資料</button>
+    </div>
+    <script>
+        // Demo mode detection
+        fetch('/api/demo-status')
+            .then(r => r.json())
+            .then(data => {
+                if (data.is_demo) {
+                    document.getElementById('demo-banner').style.display = 'block';
+                }
+            })
+            .catch(() => {});
+
+        // Reset demo data
+        function resetDemo() {
+            if (confirm('確定要重置所有展示資料嗎？')) {
+                fetch('/api/demo/reset', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            alert('資料已重置！頁面將重新載入。');
+                            location.reload();
+                        }
+                    })
+                    .catch(e => alert('重置失敗: ' + e));
+            }
+        }
+    </script>
+
     <!-- Top Bar -->
     <header class="bg-primary-600 text-white px-4 py-3 sticky top-0 z-40 shadow-md">
         <div class="flex items-center justify-between max-w-lg mx-auto">
@@ -416,7 +450,12 @@
             <!-- Search & Filter -->
             <div class="flex space-x-2 mb-3">
                 <input type="text" x-model="inventorySearch" placeholder="搜尋物資..." class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
-                <button @click="showAddInventoryModal = true" x-show="currentUser" class="bg-primary-600 text-white px-3 py-2 rounded-lg">
+                <button @click="showDonationModal = true" x-show="currentUser" class="bg-pink-500 text-white px-3 py-2 rounded-lg" title="接收捐贈">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                    </svg>
+                </button>
+                <button @click="showAddInventoryModal = true" x-show="currentUser" class="bg-primary-600 text-white px-3 py-2 rounded-lg" title="新增庫存">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
@@ -1835,6 +1874,120 @@
         </div>
     </div>
 
+    <!-- Donation Inbound Modal (接收捐贈) -->
+    <div x-show="showDonationModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDonationModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold flex items-center gap-2">
+                    <svg class="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
+                    </svg>
+                    接收捐贈
+                </h3>
+                <button @click="showDonationModal = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Donor Info -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">捐贈者姓名 (選填)</label>
+                <input type="text" x-model="donationDonorName" placeholder="例：王先生" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+            </div>
+
+            <!-- Item Selection -->
+            <div class="flex-1 overflow-y-auto mb-4">
+                <div class="flex justify-between items-center mb-2">
+                    <label class="block text-sm font-medium text-gray-700">捐贈物資</label>
+                    <button @click="addDonationItem()" class="text-sm text-primary-600 hover:underline">+ 新增品項</button>
+                </div>
+
+                <div class="space-y-3">
+                    <template x-for="(item, index) in donationItems" :key="index">
+                        <div class="bg-gray-50 rounded-lg p-3">
+                            <div class="flex items-center gap-2 mb-2">
+                                <select x-model="item.item_id" @change="onDonationItemSelect(index)" class="flex-1 border border-gray-200 rounded px-2 py-1 text-sm">
+                                    <option value="">-- 選擇現有物品或新增 --</option>
+                                    <template x-for="inv in inventory" :key="inv.id">
+                                        <option :value="inv.id" x-text="inv.name + (inv.specification ? ' (' + inv.specification + ')' : '')"></option>
+                                    </template>
+                                    <option value="new">+ 新增物品</option>
+                                </select>
+                                <button @click="removeDonationItem(index)" class="text-red-500 hover:text-red-700">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- New Item Fields -->
+                            <div x-show="item.item_id === 'new'" class="space-y-2 mb-2">
+                                <input type="text" x-model="item.name" placeholder="物品名稱" class="w-full border border-gray-200 rounded px-2 py-1 text-sm">
+                                <div class="flex gap-2">
+                                    <select x-model="item.category" class="flex-1 border border-gray-200 rounded px-2 py-1 text-sm">
+                                        <option value="water">水</option>
+                                        <option value="food">食物</option>
+                                        <option value="medical">醫療</option>
+                                        <option value="power">電力</option>
+                                        <option value="daily">日用品</option>
+                                        <option value="other">其他</option>
+                                    </select>
+                                    <input type="text" x-model="item.unit" placeholder="單位" class="w-20 border border-gray-200 rounded px-2 py-1 text-sm">
+                                </div>
+                            </div>
+
+                            <!-- Quantity -->
+                            <div class="flex items-center gap-2">
+                                <label class="text-sm text-gray-600">數量:</label>
+                                <input type="number" x-model.number="item.quantity" min="0.1" step="0.1" class="w-24 border border-gray-200 rounded px-2 py-1 text-sm">
+                                <span class="text-sm text-gray-500" x-text="item.unit || '個'"></span>
+                            </div>
+                        </div>
+                    </template>
+
+                    <div x-show="donationItems.length === 0" class="text-center py-8 text-gray-400">
+                        <p>點擊「新增品項」開始登記捐贈物資</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">備註</label>
+                <input type="text" x-model="donationNotes" placeholder="選填" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-2">
+                <button @click="showDonationModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                <button @click="submitDonation()" :disabled="donationItems.length === 0" class="flex-1 px-4 py-2 bg-pink-500 text-white rounded-lg disabled:opacity-50">
+                    確認入庫
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Donation Receipt QR Modal -->
+    <div x-show="showDonationReceiptModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" @click.self="showDonationReceiptModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
+            <h3 class="text-lg font-semibold mb-2 flex items-center justify-center gap-2">
+                <svg class="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                捐贈收據
+            </h3>
+            <p class="text-sm text-gray-600 mb-4">
+                感謝 <span class="font-semibold" x-text="lastDonationReceipt?.payload?.donor_name || '愛心人士'"></span> 的捐贈！
+            </p>
+            <div id="donation-receipt-qrcode" class="flex justify-center mb-4"></div>
+            <p class="text-sm text-gray-500 mb-2">捐贈者可用 HIRS App 掃描此 QR Code</p>
+            <p class="text-xs text-gray-400 mb-4">收據編號: <span x-text="lastDonationReceipt?.payload?.receipt_id"></span></p>
+            <button @click="showDonationReceiptModal = false" class="w-full py-2 bg-pink-500 text-white rounded-lg font-medium">關閉</button>
+        </div>
+    </div>
+
     <!-- Inventory History Modal (入庫/發放紀錄) -->
     <div x-show="showInventoryHistoryModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showInventoryHistoryModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
@@ -2195,6 +2348,12 @@
                 showAddMessage: false,
                 showReplyModal: false,
                 showDistributeQRModal: false,
+                showDonationModal: false,
+                showDonationReceiptModal: false,
+                donationItems: [],
+                donationDonorName: '',
+                donationNotes: '',
+                lastDonationReceipt: null,
                 showBundleModal: false,
                 showBundleDetailModal: false,
                 showBundleManageModal: false,
@@ -3444,23 +3603,31 @@
                     if (!this.lastDistributeResult) return;
 
                     const r = this.lastDistributeResult;
-                    // 產生 HIRS 相容的封包格式
-                    const data = {
-                        type: 'cirs_distribute',
-                        source: 'CIRS 社區物資站',
-                        timestamp: r.timestamp,
-                        recipient: r.person_id,
-                        inventory: [{
+
+                    // 使用 IRS Interop Spec v1.0 信封格式
+                    const envelope = IRSSchema.createDistributionEnvelope({
+                        issuer: {
+                            system: 'CIRS',
+                            site_id: this.siteConfig?.site_id || 'CIRS-DEFAULT',
+                            site_name: this.siteConfig?.site_name || 'CIRS 社區物資站'
+                        },
+                        recipient: {
+                            display_name: r.person?.display_name || '匿名',
+                            household_size: r.person?.household_size || 1
+                        },
+                        items: [{
+                            item_code: r.item.item_code || `CUSTOM-${r.item.id}`,
                             name: r.item.name,
                             qty: r.quantity,
                             unit: r.item.unit || '個',
-                            category: r.item.category,
-                            expiry: r.item.expiry_date || null,
-                            spec: r.item.specification || null
-                        }]
-                    };
+                            category: r.item.category || 'other',
+                            expiry_date: r.item.expiry_date || null
+                        }],
+                        notes: `發放時間: ${r.timestamp}`
+                    });
 
-                    const jsonStr = JSON.stringify(data);
+                    const jsonStr = JSON.stringify(envelope);
+                    console.log('[IRS] Distribution envelope:', envelope);
 
                     try {
                         // 先顯示 modal，確保 DOM 元素可見
@@ -3507,6 +3674,7 @@
                             item: item,
                             quantity: Math.abs(event.quantity_change),
                             person_id: event.person_id,
+                            person: event.person || { display_name: '匿名', household_size: 1 },
                             timestamp: event.timestamp
                         };
 
@@ -3515,6 +3683,130 @@
                         console.error('regenerateDistributeQR error:', e);
                         this.showToast('產生 QR Code 失敗', 'error');
                     }
+                },
+
+                // ============================================
+                // Donation Functions (捐贈功能)
+                // ============================================
+
+                addDonationItem() {
+                    this.donationItems.push({
+                        item_id: '',
+                        name: '',
+                        quantity: 1,
+                        unit: '個',
+                        category: 'other'
+                    });
+                },
+
+                removeDonationItem(index) {
+                    this.donationItems.splice(index, 1);
+                },
+
+                onDonationItemSelect(index) {
+                    const item = this.donationItems[index];
+                    if (item.item_id && item.item_id !== 'new') {
+                        // 找到選中的庫存物品
+                        const inv = this.inventory.find(i => i.id == item.item_id);
+                        if (inv) {
+                            item.name = inv.name;
+                            item.unit = inv.unit || '個';
+                            item.category = inv.category || 'other';
+                        }
+                    } else if (item.item_id === 'new') {
+                        item.name = '';
+                        item.unit = '個';
+                        item.category = 'other';
+                    }
+                },
+
+                async submitDonation() {
+                    if (this.donationItems.length === 0) {
+                        this.showToast('請新增至少一項物資', 'error');
+                        return;
+                    }
+
+                    // 檢查每項是否有效
+                    for (const item of this.donationItems) {
+                        if (item.item_id === 'new' && !item.name) {
+                            this.showToast('請填寫新增物品的名稱', 'error');
+                            return;
+                        }
+                        if (!item.quantity || item.quantity <= 0) {
+                            this.showToast('請填寫有效的數量', 'error');
+                            return;
+                        }
+                    }
+
+                    try {
+                        const payload = {
+                            items: this.donationItems.map(item => ({
+                                item_id: item.item_id && item.item_id !== 'new' ? parseInt(item.item_id) : null,
+                                name: item.name,
+                                quantity: item.quantity,
+                                unit: item.unit,
+                                category: item.category
+                            })),
+                            donor_name: this.donationDonorName || null,
+                            notes: this.donationNotes || null
+                        };
+
+                        const res = await this.apiCall('/api/inventory/donation/inbound', {
+                            method: 'POST',
+                            body: payload
+                        });
+
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.showToast(`捐贈入庫成功！共 ${data.total_items} 項`, 'success');
+
+                            // 關閉捐贈模態框
+                            this.showDonationModal = false;
+
+                            // 保存收據並顯示 QR Code
+                            this.lastDonationReceipt = data.receipt;
+                            await this.loadInventory();
+
+                            // 產生收據 QR Code
+                            this.generateDonationReceiptQR();
+                        }
+                    } catch (e) {
+                        console.error('submitDonation error:', e);
+                        this.showToast('捐贈入庫失敗', 'error');
+                    }
+                },
+
+                async generateDonationReceiptQR() {
+                    if (!this.lastDonationReceipt) return;
+
+                    const jsonStr = JSON.stringify(this.lastDonationReceipt);
+                    console.log('[IRS] Donation receipt envelope:', this.lastDonationReceipt);
+
+                    try {
+                        this.showDonationReceiptModal = true;
+                        await this.$nextTick();
+
+                        // UTF-8 編碼
+                        const utf8Bytes = new TextEncoder().encode(jsonStr);
+                        const byteString = Array.from(utf8Bytes).map(b => String.fromCharCode(b)).join('');
+
+                        const qr = qrcode(0, 'L');
+                        qr.addData(byteString, 'Byte');
+                        qr.make();
+
+                        const container = document.getElementById('donation-receipt-qrcode');
+                        if (container) {
+                            container.innerHTML = qr.createImgTag(5);
+                        }
+                    } catch (e) {
+                        console.error('QR generation error:', e);
+                        this.showToast('收據 QR Code 產生失敗', 'error');
+                    }
+
+                    // 重置表單
+                    this.donationItems = [];
+                    this.donationDonorName = '';
+                    this.donationNotes = '';
                 },
 
                 async checkSimilarItems() {

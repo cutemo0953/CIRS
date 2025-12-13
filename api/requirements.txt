@@ -1,0 +1,12 @@
+# CIRS Backend Dependencies for Vercel
+# Note: Vercel installs from api/requirements.txt
+
+fastapi>=0.104.0
+uvicorn>=0.24.0
+python-multipart>=0.0.6
+python-jose[cryptography]>=3.3.0
+python-dateutil>=2.8.2
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+qrcode>=7.4.2
+Pillow>=10.1.0

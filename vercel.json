@@ -1,0 +1,28 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.py",
+      "use": "@vercel/python",
+      "config": {
+        "maxLambdaSize": "50mb"
+      }
+    },
+    {
+      "src": "frontend/**",
+      "use": "@vercel/static"
+    },
+    {
+      "src": "portal/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/index.py" },
+    { "src": "/portal/(.*)", "dest": "/portal/$1" },
+    { "src": "/portal", "dest": "/portal/index.html" },
+    { "src": "/frontend/(.*)", "dest": "/frontend/$1" },
+    { "src": "/frontend", "dest": "/frontend/index.html" },
+    { "src": "/(.*)", "dest": "/portal/$1" }
+  ]
+}

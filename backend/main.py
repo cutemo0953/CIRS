@@ -2,20 +2,22 @@
 CIRS - Community Inventory Resilience System
 FastAPI Backend Entry Point
 """
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import os
+from pathlib import Path
 
-from database import init_db
+from database import init_db, get_db, dict_from_row, IS_VERCEL, reset_memory_db
 
-# Paths
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FRONTEND_DIR = os.path.join(BASE_DIR, 'frontend')
-PORTAL_DIR = os.path.join(BASE_DIR, 'portal')
-FILES_DIR = os.path.join(BASE_DIR, 'files')
+# Use pathlib for cross-platform path safety
+BACKEND_DIR = Path(__file__).parent
+BASE_DIR = BACKEND_DIR.parent
+FRONTEND_DIR = BASE_DIR / 'frontend'
+PORTAL_DIR = BASE_DIR / 'portal'
+FILES_DIR = BASE_DIR / 'files'
 
 # Import routes
 from routes import auth, inventory, person, events, messages, system, backup, zone
@@ -27,6 +29,15 @@ async def lifespan(app: FastAPI):
     # Startup: Initialize database
     print("Starting CIRS Backend...")
     init_db()
+
+    # Seed demo data if running on Vercel
+    if IS_VERCEL:
+        from seeder import seed_cirs_demo
+        from database import get_db
+        with get_db() as conn:
+            seed_cirs_demo(conn)
+        print("[CIRS] Demo mode initialized with sample data")
+
     yield
     # Shutdown
     print("Shutting down CIRS Backend...")
@@ -36,11 +47,11 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="CIRS API",
     description="Community Inventory Resilience System API",
-    version="1.0.0",
+    version="1.0.0-demo" if IS_VERCEL else "1.0.0",
     lifespan=lifespan
 )
 
-# CORS middleware (allow all for development)
+# CORS middleware (allow all for development/demo)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -70,8 +81,56 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy"}
+    return {"status": "healthy", "demo_mode": IS_VERCEL}
 
+
+# ============================================================================
+# Demo Mode Endpoints
+# ============================================================================
+
+@app.get("/api/demo-status")
+async def get_demo_status():
+    """Get demo mode status"""
+    return {
+        "is_demo": IS_VERCEL,
+        "version": "1.0.0-demo" if IS_VERCEL else "1.0.0",
+        "message": "此為線上展示版，資料將在頁面重整後重置" if IS_VERCEL else None,
+        "github_url": "https://github.com/cutemo0953/CIRS"
+    }
+
+
+@app.post("/api/demo/reset")
+async def reset_demo():
+    """Reset demo database (only available in Vercel mode)"""
+    if not IS_VERCEL:
+        raise HTTPException(
+            status_code=403,
+            detail="Reset is only available in demo mode"
+        )
+
+    try:
+        # Reset the in-memory database
+        reset_memory_db()
+
+        # Re-seed with demo data
+        from seeder import seed_cirs_demo
+        with get_db() as conn:
+            seed_cirs_demo(conn)
+
+        return {
+            "success": True,
+            "message": "Demo data has been reset successfully"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to reset demo: {str(e)}"
+        )
+
+
+# ============================================================================
+# Public Status API
+# ============================================================================
 
 @app.get("/api/public/status")
 async def get_public_status():
@@ -80,8 +139,6 @@ async def get_public_status():
     Returns simplified status without sensitive data.
     No authentication required.
     """
-    from database import get_db, dict_from_row
-
     with get_db() as conn:
         # Get headcount (checked_in only)
         cursor = conn.execute("""
@@ -186,15 +243,14 @@ async def get_public_status():
             "status": equipment_light,
             "issues": equipment_issues
         },
-        "broadcast": broadcast
+        "broadcast": broadcast,
+        "is_demo": IS_VERCEL
     }
 
 
 @app.get("/api/stats")
 async def get_stats():
     """Get system statistics"""
-    from database import get_db, dict_from_row
-
     with get_db() as conn:
         # Headcount by triage status
         cursor = conn.execute("""
@@ -280,36 +336,46 @@ async def get_stats():
                 "food": round(food_days, 1)
             },
             "inventory_alerts": alerts,
-            "equipment_pending": equipment_pending
+            "equipment_pending": equipment_pending,
+            "is_demo": IS_VERCEL
         }
 
 
-# Mount static files for frontend and portal
-# Note: Mount these AFTER all API routes to avoid conflicts
+# ============================================================================
+# Static File Serving
+# ============================================================================
 
 # Portal entry page
 @app.get("/portal")
 @app.get("/portal/")
 async def serve_portal():
     """Serve portal index.html"""
-    return FileResponse(os.path.join(PORTAL_DIR, 'index.html'))
+    portal_index = PORTAL_DIR / 'index.html'
+    if portal_index.exists():
+        return FileResponse(str(portal_index))
+    return {"error": "Portal not found"}
 
 # Frontend PWA
 @app.get("/frontend")
 @app.get("/frontend/")
 async def serve_frontend():
     """Serve frontend index.html"""
-    return FileResponse(os.path.join(FRONTEND_DIR, 'index.html'))
+    frontend_index = FRONTEND_DIR / 'index.html'
+    if frontend_index.exists():
+        return FileResponse(str(frontend_index))
+    return {"error": "Frontend not found"}
 
-# Mount static directories
-if os.path.exists(FRONTEND_DIR):
-    app.mount("/frontend", StaticFiles(directory=FRONTEND_DIR, html=True), name="frontend")
+# Mount static directories (only if they exist and not on Vercel)
+# On Vercel, static files are served by the static build
+if not IS_VERCEL:
+    if FRONTEND_DIR.exists():
+        app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 
-if os.path.exists(PORTAL_DIR):
-    app.mount("/portal", StaticFiles(directory=PORTAL_DIR, html=True), name="portal")
+    if PORTAL_DIR.exists():
+        app.mount("/portal", StaticFiles(directory=str(PORTAL_DIR), html=True), name="portal")
 
-if os.path.exists(FILES_DIR):
-    app.mount("/files", StaticFiles(directory=FILES_DIR, html=True), name="files")
+    if FILES_DIR.exists():
+        app.mount("/files", StaticFiles(directory=str(FILES_DIR), html=True), name="files")
 
 
 if __name__ == "__main__":

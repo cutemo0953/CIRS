@@ -1,40 +1,76 @@
 """
 CIRS Database Connection Module
 SQLite with WAL mode for concurrent access
+Supports both file-based (production) and in-memory (Vercel demo) modes
 """
 import sqlite3
 from contextlib import contextmanager
 import threading
 import os
+from pathlib import Path
 
-# Database path
-DB_PATH = os.path.join(os.path.dirname(__file__), "data", "cirs.db")
+# ============================================================================
+# Environment Detection
+# ============================================================================
+IS_VERCEL = os.environ.get("VERCEL") == "1"
+
+# Use pathlib for cross-platform path safety
+BACKEND_DIR = Path(__file__).parent
+PROJECT_ROOT = BACKEND_DIR.parent
+
+if IS_VERCEL:
+    # In-memory database for Vercel serverless
+    DB_PATH = ":memory:"
+    print("[CIRS DB] Running in Vercel demo mode (in-memory)")
+else:
+    # File-based database for local/production
+    DB_PATH = str(BACKEND_DIR / "data" / "cirs.db")
+    print(f"[CIRS DB] Running in production mode: {DB_PATH}")
 
 # Global lock for write operations
 db_lock = threading.Lock()
 
+# Singleton connection for in-memory mode (persists across requests)
+_memory_connection = None
+
 
 def get_connection():
     """Create a new database connection with optimized settings"""
-    # Ensure data directory exists
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    global _memory_connection
 
-    conn = sqlite3.connect(
-        DB_PATH,
-        check_same_thread=False,
-        timeout=30.0  # Wait up to 30 seconds for lock
-    )
-    conn.row_factory = sqlite3.Row
+    if IS_VERCEL:
+        # For in-memory mode, reuse the same connection
+        if _memory_connection is None:
+            _memory_connection = sqlite3.connect(
+                DB_PATH,
+                check_same_thread=False,
+                timeout=30.0
+            )
+            _memory_connection.row_factory = sqlite3.Row
+            # Basic pragmas for in-memory
+            _memory_connection.execute("PRAGMA foreign_keys=ON;")
+        return _memory_connection
+    else:
+        # For file-based mode, create new connection each time
+        # Ensure data directory exists
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
 
-    # Critical optimizations for Raspberry Pi
-    conn.execute("PRAGMA journal_mode=WAL;")        # Write-Ahead Logging
-    conn.execute("PRAGMA synchronous=NORMAL;")      # Balance performance/safety
-    conn.execute("PRAGMA cache_size=-64000;")       # 64MB cache
-    conn.execute("PRAGMA temp_store=MEMORY;")       # Temp tables in memory
-    conn.execute("PRAGMA mmap_size=268435456;")     # 256MB mmap
-    conn.execute("PRAGMA foreign_keys=ON;")         # Enable foreign keys
+        conn = sqlite3.connect(
+            DB_PATH,
+            check_same_thread=False,
+            timeout=30.0  # Wait up to 30 seconds for lock
+        )
+        conn.row_factory = sqlite3.Row
 
-    return conn
+        # Critical optimizations for Raspberry Pi
+        conn.execute("PRAGMA journal_mode=WAL;")        # Write-Ahead Logging
+        conn.execute("PRAGMA synchronous=NORMAL;")      # Balance performance/safety
+        conn.execute("PRAGMA cache_size=-64000;")       # 64MB cache
+        conn.execute("PRAGMA temp_store=MEMORY;")       # Temp tables in memory
+        conn.execute("PRAGMA mmap_size=268435456;")     # 256MB mmap
+        conn.execute("PRAGMA foreign_keys=ON;")         # Enable foreign keys
+
+        return conn
 
 
 @contextmanager
@@ -48,7 +84,9 @@ def get_db():
         conn.rollback()
         raise
     finally:
-        conn.close()
+        # Only close for file-based mode; keep in-memory connection alive
+        if not IS_VERCEL:
+            conn.close()
 
 
 @contextmanager
@@ -62,20 +100,49 @@ def write_db():
 def init_db():
     """Initialize database with schema and apply migrations"""
     with get_db() as conn:
-        # First, check if inventory table exists and apply migrations BEFORE schema
+        # For Vercel, always initialize fresh
+        if IS_VERCEL:
+            schema_path = BACKEND_DIR / "schema.sql"
+            if schema_path.exists():
+                with open(schema_path, "r") as f:
+                    conn.executescript(f.read())
+                print("[CIRS DB] In-memory database initialized with schema")
+            return
+
+        # For file-based: check if inventory table exists and apply migrations BEFORE schema
         cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='inventory'")
         if cursor.fetchone():
             # Existing database - apply migrations first
             apply_migrations(conn)
 
         # Then execute schema (CREATE IF NOT EXISTS is safe)
-        schema_path = os.path.join(os.path.dirname(__file__), "schema.sql")
-        if os.path.exists(schema_path):
+        schema_path = BACKEND_DIR / "schema.sql"
+        if schema_path.exists():
             with open(schema_path, "r") as f:
                 conn.executescript(f.read())
-            print(f"Database initialized at {DB_PATH}")
+            print(f"[CIRS DB] Database initialized at {DB_PATH}")
         else:
-            print(f"Warning: schema.sql not found at {schema_path}")
+            print(f"[CIRS DB] Warning: schema.sql not found at {schema_path}")
+
+
+def reset_memory_db():
+    """Reset in-memory database (for demo reset feature)"""
+    global _memory_connection
+
+    if not IS_VERCEL or _memory_connection is None:
+        return False
+
+    # Close existing connection
+    try:
+        _memory_connection.close()
+    except:
+        pass
+
+    _memory_connection = None
+
+    # Reinitialize
+    init_db()
+    return True
 
 
 def apply_migrations(conn):
