@@ -2,14 +2,19 @@
 CIRS Authentication Routes
 PIN-based authentication with JWT tokens
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
 import hashlib
 import os
 import sys
+import io
+import socket
+import qrcode
+from qrcode.image.styledpil import StyledPilImage
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -200,3 +205,164 @@ async def get_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
     user.pop('pin_hash', None)
     return user
+
+
+# Satellite pairing token expiry (shorter for security)
+SATELLITE_TOKEN_EXPIRE_HOURS = 72
+
+
+def get_host_ip() -> str:
+    """Get the host machine's IP address"""
+    try:
+        # Create a socket to determine the outbound IP
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def create_satellite_token(hub_name: str = "CIRS Hub") -> str:
+    """Create a JWT token for satellite pairing"""
+    data = {
+        "sub": "satellite",
+        "type": "satellite_pairing",
+        "hub_name": hub_name,
+        "iat": datetime.utcnow().isoformat()
+    }
+    return create_access_token(data, timedelta(hours=SATELLITE_TOKEN_EXPIRE_HOURS))
+
+
+@router.get("/pairing-qr")
+async def get_pairing_qr(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Generate a QR code for Satellite PWA pairing.
+    Returns a PNG image containing QR code with pairing URL.
+    Requires admin authentication.
+    """
+    # Require admin role
+    user = await get_current_user(credentials)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Get hub name from database
+    hub_name = "CIRS Hub"
+    try:
+        with get_db() as conn:
+            cursor = conn.execute("SELECT value FROM system_config WHERE key = 'site_name'")
+            row = cursor.fetchone()
+            if row:
+                hub_name = row['value']
+    except Exception:
+        pass
+
+    # Get host IP
+    host_ip = get_host_ip()
+
+    # Try to get IP from request headers (in case behind proxy)
+    forwarded_host = request.headers.get("X-Forwarded-Host")
+    if forwarded_host:
+        host_ip = forwarded_host.split(":")[0]
+
+    # Create pairing token
+    token = create_satellite_token(hub_name)
+
+    # Build pairing URL
+    # Note: Use the same port as CIRS API (8090)
+    pairing_url = f"http://{host_ip}:8090/mobile/?token={token}"
+
+    # Generate QR code
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_M,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(pairing_url)
+    qr.make(fit=True)
+
+    # Create image
+    img = qr.make_image(fill_color="#0ea5e9", back_color="white")
+
+    # Save to bytes buffer
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    return StreamingResponse(
+        buffer,
+        media_type="image/png",
+        headers={
+            "Content-Disposition": "inline; filename=pairing-qr.png",
+            "Cache-Control": "no-cache, no-store, must-revalidate"
+        }
+    )
+
+
+@router.get("/pairing-info")
+async def get_pairing_info(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Get pairing information as JSON (for manual connection).
+    Requires admin authentication.
+    """
+    # Require admin role
+    user = await get_current_user(credentials)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    # Get hub name
+    hub_name = "CIRS Hub"
+    try:
+        with get_db() as conn:
+            cursor = conn.execute("SELECT value FROM system_config WHERE key = 'site_name'")
+            row = cursor.fetchone()
+            if row:
+                hub_name = row['value']
+    except Exception:
+        pass
+
+    # Get host IP
+    host_ip = get_host_ip()
+    forwarded_host = request.headers.get("X-Forwarded-Host")
+    if forwarded_host:
+        host_ip = forwarded_host.split(":")[0]
+
+    # Create token
+    token = create_satellite_token(hub_name)
+
+    return {
+        "hub_name": hub_name,
+        "hub_url": f"http://{host_ip}:8090",
+        "token": token,
+        "pairing_url": f"http://{host_ip}:8090/mobile/?token={token}",
+        "expires_in": SATELLITE_TOKEN_EXPIRE_HOURS * 3600
+    }
+
+
+@router.post("/satellite/verify")
+async def verify_satellite_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    Verify a satellite pairing token.
+    Returns hub info if valid.
+    """
+    if credentials is None:
+        raise HTTPException(status_code=401, detail="Token required")
+
+    payload = decode_token(credentials.credentials)
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    if payload.get("type") != "satellite_pairing":
+        raise HTTPException(status_code=401, detail="Invalid token type")
+
+    return {
+        "valid": True,
+        "hub_name": payload.get("hub_name", "CIRS Hub"),
+        "issued_at": payload.get("iat")
+    }

@@ -471,8 +471,13 @@
                 html5QrCode: null,
 
                 async init() {
-                    // Load saved state
-                    this.loadState();
+                    // Check for pairing token in URL (from QR code scan)
+                    await this.checkUrlToken();
+
+                    // Load saved state (if not connected via URL token)
+                    if (!this.isConnected) {
+                        this.loadState();
+                    }
 
                     // Register service worker
                     if ('serviceWorker' in navigator) {
@@ -507,14 +512,73 @@
                     this.updatePendingSyncCount();
                 },
 
+                async checkUrlToken() {
+                    // Check for token in URL parameters
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const token = urlParams.get('token');
+
+                    if (!token) return;
+
+                    console.log('[Satellite] Found token in URL, verifying...');
+
+                    // Get hub URL from current location (same origin)
+                    const hubUrl = `${window.location.protocol}//${window.location.host}`;
+
+                    try {
+                        // Verify token with backend
+                        const response = await fetch(`${hubUrl}/api/auth/satellite/verify`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+
+                            // Save token to sessionStorage (more secure, cleared on tab close)
+                            sessionStorage.setItem('cirs-satellite-token', token);
+
+                            // Connect to hub
+                            this.hubUrl = hubUrl;
+                            this.hubToken = token;
+                            this.hubName = data.hub_name || 'CIRS Hub';
+                            this.volunteerId = 'V-' + Date.now();
+                            this.volunteerName = '志工';
+                            this.isConnected = true;
+
+                            // Save to localStorage for persistence
+                            this.saveState();
+
+                            // Clean URL (remove token parameter)
+                            const cleanUrl = window.location.pathname;
+                            window.history.replaceState({}, document.title, cleanUrl);
+
+                            this.showToast(`已連接到 ${this.hubName}`, 'success');
+                            console.log('[Satellite] Connected to hub:', this.hubName);
+                        } else {
+                            console.error('[Satellite] Token verification failed:', response.status);
+                            this.showToast('連接 Token 無效或已過期', 'error');
+                        }
+                    } catch (error) {
+                        console.error('[Satellite] Token verification error:', error);
+                        // Don't show error toast - might be offline, will try loadState instead
+                    }
+                },
+
                 loadState() {
+                    // First check sessionStorage for active token
+                    const sessionToken = sessionStorage.getItem('cirs-satellite-token');
+
                     const state = localStorage.getItem('cirs-satellite-state');
                     if (state) {
                         const parsed = JSON.parse(state);
                         this.isConnected = parsed.isConnected || false;
                         this.hubUrl = parsed.hubUrl || '';
                         this.hubName = parsed.hubName || '';
-                        this.hubToken = parsed.hubToken || '';
+                        // Prefer sessionStorage token if available (more recent)
+                        this.hubToken = sessionToken || parsed.hubToken || '';
                         this.volunteerId = parsed.volunteerId || '';
                         this.volunteerName = parsed.volunteerName || '';
                         this.lastSyncTime = parsed.lastSyncTime || null;
@@ -621,6 +685,8 @@
                     this.hubUrl = '';
                     this.hubName = '';
                     this.hubToken = '';
+                    // Clear session token
+                    sessionStorage.removeItem('cirs-satellite-token');
                     this.saveState();
                     this.showSettings = false;
                     this.showToast('已中斷連接', 'info');
@@ -755,6 +821,7 @@
                 clearAllData() {
                     if (confirm('確定要清除所有資料嗎？')) {
                         localStorage.removeItem('cirs-satellite-state');
+                        sessionStorage.removeItem('cirs-satellite-token');
                         indexedDB.deleteDatabase('cirs-satellite');
                         location.reload();
                     }
