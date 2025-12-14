@@ -1,6 +1,6 @@
 # CIRS - Community Inventory Resilience System
 
-> 社區韌性物資管理系統 v1.4
+> 社區韌性物資管理系統 v1.6
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
@@ -21,17 +21,23 @@ CIRS 是社區級災難韌性管理系統，整合物資管理、人員報到、
 | **安全備份** | 加密備份、USB 備份、備份驗證、審計記錄 |
 | **HIRS 同步** | 發放物資 QR Code 同步到個人 HIRS |
 | **MIRS 連結** | RED/YELLOW 傷患可連結至 MIRS 處置記錄 |
+| **Satellite PWA** | 志工行動 App，支援離線報到/物資領取 |
 
 ### 系統架構
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Raspberry Pi (192.168.x.x)                     │
+│  Raspberry Pi (192.168.x.x) - Hub              │
 ├─────────────────────────────────────────────────┤
 │  Port 80:   Portal (統一入口)                   │
 │  Port 8090: CIRS API (FastAPI)                  │
 │  Port 8000: MIRS (醫療庫存，選配)               │
 └─────────────────────────────────────────────────┘
+              ↑ WiFi / LAN
+    ┌─────────┴─────────┐
+    │  Satellite PWA    │  ← 志工手機
+    │  (離線優先)        │     報到/物資領取
+    └───────────────────┘
 ```
 
 ## 技術棧
@@ -320,7 +326,15 @@ CIRS/
 │   ├── lang/
 │   │   ├── zh-TW.json       # 繁體中文
 │   │   └── ja.json          # 日本語
+│   ├── mobile/              # Satellite PWA (志工手機)
+│   │   ├── index.html
+│   │   ├── manifest.json
+│   │   ├── service-worker.js
+│   │   └── icons/
 │   └── assets/
+│
+├── docs/
+│   └── volunteer-pwa-guide.md  # 志工 PWA 安裝指南
 │
 ├── portal/
 │   └── index.html           # 統一入口頁面
@@ -450,6 +464,24 @@ curl http://localhost:8090/api/person/P0001/audit-log
 - DS3231 RTC 安裝指南
 
 ## 更新日誌
+
+### v1.6 (2024-12) - Satellite PWA
+- **新增**：志工行動 App (Satellite PWA)
+  - 離線優先架構（可在無網路環境下操作）
+  - QR Code 掃描連接 Hub
+  - 人員報到/退場功能
+  - 物資領取確認功能
+  - iOS Safari 相容（無需 Background Sync API）
+  - IndexedDB 同步佇列
+  - 自動/手動同步機制
+- **新增**：[志工 PWA 安裝指南](docs/volunteer-pwa-guide.md)
+  - iOS (Safari) 安裝步驟
+  - Android (Chrome) 安裝步驟
+  - 首次連接設定說明
+  - 常見問題排解
+- **改進**：組套範本與設備範本 i18n
+  - 組套內物品名稱/單位翻譯
+  - 設備範本語言切換時自動重新生成
 
 ### v1.5.1 (2024-12) - 完整 i18n 翻譯
 - **完成**：所有 UI 元件完整翻譯
