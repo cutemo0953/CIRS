@@ -1,6 +1,6 @@
-# CIRS (Community Inventory Resilience System) v1.4 Development Specification
+# CIRS (Community Inventory Resilience System) v1.0 Development Specification
 
-**Version:** 1.4
+**Version:** 1.0
 **Target Environment:** Raspberry Pi (Backend) + Mobile PWA (Frontend)
 **Network Topology:** Raspberry Pi as Appliance (Ethernet to Mesh Router or WiFi Hotspot)
 **Core Philosophy:** Offline-First, Community-Scale, High Resilience
@@ -413,12 +413,9 @@ CREATE TABLE person (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- 預設帳號 (PIN 皆為 1234)
--- bcrypt hash for '1234': $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC
-INSERT INTO person (id, display_name, role, pin_hash) VALUES
-    ('admin001', '管理員', 'admin', '$2b$12$...'),   -- 全部權限 + 站點設定 + 刪除
-    ('staff001', '志工小明', 'staff', '$2b$12$...'), -- 入庫/出庫/報到/設備檢查
-    ('medic001', '醫護小華', 'medic', '$2b$12$...'); -- 檢傷分類 + staff 權限
+-- 預設 Admin 帳號
+INSERT INTO person (id, display_name, role, pin_hash)
+VALUES ('admin001', '管理員', 'admin', '$2b$12$...');  -- PIN: 1234
 ```
 
 ### 4.3 EventLog (事件紀錄表)
@@ -462,12 +459,11 @@ CREATE INDEX idx_event_time ON event_log(timestamp);
 ```sql
 CREATE TABLE message (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    message_type TEXT DEFAULT 'post', -- 'broadcast' (官方公告), 'post' (一般留言), 'reply' (回覆)
-    category TEXT,                    -- 'seek_person', 'seek_item', 'offer_help', 'report', 'general', 'reply'
+    message_type TEXT DEFAULT 'post', -- 'broadcast' (官方公告), 'post' (一般留言)
+    category TEXT,                    -- 'seek_person', 'seek_item', 'offer_help', 'report', 'general'
     content TEXT NOT NULL,
     author_name TEXT,                 -- 顯示名稱 (可匿名)
     author_id TEXT,                   -- FK to person.id (可為 NULL)
-    parent_id INTEGER,                -- FK to message.id (回覆用)
     image_data TEXT,                  -- Base64 壓縮圖片 (< 500KB)
     is_pinned BOOLEAN DEFAULT FALSE,  -- 置頂
     is_resolved BOOLEAN DEFAULT FALSE,-- 已解決 (尋人找到了)
@@ -565,19 +561,8 @@ GET    /api/events/item/:id              # 某物資的所有事件
 ### 5.5 Messages (留言板)
 
 ```
-GET    /api/messages                     # 最新 50 則 (含回覆)
+GET    /api/messages                     # 最新 50 則
 Query: ?category=seek_person&limit=20&offset=0
-Response: {
-    "messages": [
-        {
-            "id": 1,
-            "content": "...",
-            "replies": [
-                { "id": 10, "content": "回覆內容", "author_name": "匿名" }
-            ]
-        }
-    ]
-}
 
 GET    /api/messages/broadcast           # 目前置頂公告
 
@@ -592,13 +577,8 @@ Body: {
 POST   /api/messages/broadcast           # 發布公告 (Admin)
 Body: { "content": "物資車 14:00 抵達", "is_pinned": true }
 
-POST   /api/messages/:id/reply           # 回覆留言 (v1.1 新增)
-Body: { "content": "回覆內容", "author_name": "匿名" }
-
-POST   /api/messages/:id/resolve         # 標記已解決/取消解決 (v1.1 改為 POST)
-Body: { "is_resolved": true }
-
-DELETE /api/messages/:id                 # 刪除 (Admin only)
+PUT    /api/messages/:id/resolve         # 標記已解決
+DELETE /api/messages/:id                 # 刪除 (Admin 或原作者)
 ```
 
 ### 5.6 Sync & Stats
@@ -825,6 +805,131 @@ Response: {
 │ └ 連線狀態: 🟢 已連線               │
 └─────────────────────────────────────┘
 ```
+
+---
+
+## 6.5 多語系支援 (i18n)
+
+### 6.5.1 架構概述
+
+CIRS 採用 JSON-based i18n 架構，支援多語言介面：
+
+```
+frontend/
+└── lang/
+    ├── zh-TW.json    # 繁體中文 (預設)
+    └── ja.json       # 日本語
+```
+
+### 6.5.2 語言檔結構
+
+```json
+{
+  "meta": {
+    "code": "ja",
+    "name": "Japanese",
+    "nativeName": "日本語"
+  },
+  "nav": {
+    "people": "避難者",
+    "inventory": "支援物資",
+    "equipment": "設備",
+    "messages": "掲示板"
+  },
+  "triage": {
+    "title": "トリアージ",
+    "green": "軽症",
+    "yellow": "準緊急",
+    "red": "緊急",
+    "black": "死亡"
+  },
+  "equipment": {
+    "template": "テンプレート",
+    "templateTitle": "設備テンプレート",
+    "manageTemplate": "テンプレート管理"
+  }
+  // ... 其他翻譯
+}
+```
+
+### 6.5.3 Alpine.js i18n 實作
+
+```javascript
+// 在 cirsApp() 內新增
+langData: null,
+currentLang: 'zh-TW',
+availableLangs: [
+    { code: 'zh-TW', name: '繁體中文', nativeName: '繁體中文' },
+    { code: 'ja', name: 'Japanese', nativeName: '日本語' }
+],
+
+async loadLanguage(langCode) {
+    const response = await fetch(`/frontend/lang/${langCode}.json`);
+    this.langData = await response.json();
+    this.currentLang = langCode;
+    localStorage.setItem('cirs_lang', langCode);
+    document.documentElement.lang = langCode;
+},
+
+t(key, params = {}) {
+    if (!this.langData) return key;
+    const keys = key.split('.');
+    let value = this.langData;
+    for (const k of keys) {
+        if (value && typeof value === 'object' && k in value) {
+            value = value[k];
+        } else {
+            return key;
+        }
+    }
+    if (typeof value === 'string') {
+        return value.replace(/\{(\w+)\}/g, (_, k) => params[k] ?? `{${k}}`);
+    }
+    return key;
+},
+
+async setLanguage(langCode) {
+    await this.loadLanguage(langCode);
+    this.showToast(this.t('toast.saved'));
+}
+```
+
+### 6.5.4 HTML 使用方式
+
+```html
+<!-- 使用 x-text 綁定翻譯 -->
+<span x-text="t('nav.people')">人員</span>
+
+<!-- 使用參數替換 -->
+<span x-text="t('modal.batchMove.moveTo', {count: selectedPeople.length})"></span>
+
+<!-- 動態 placeholder -->
+<input :placeholder="t('people.searchPlaceholder')">
+```
+
+### 6.5.5 日文防災術語對照表
+
+| 台灣用語 | 日本防災用語 | 備註 |
+|----------|--------------|------|
+| 避難所 | 避難所 (Hinan-jo) | 通用 |
+| 物資 | 支援物資 (Shien-busshi) | 更有救援感 |
+| 檢傷分類 | トリアージ (Triage) | 日本醫療慣用片假名 |
+| 志工 | ボランティア (Volunteer) | 通用 |
+| 登出/離開 | 退所 (Taisyo) | 對應「入所」 |
+| 庫存 | 備蓄 (Bichiku) | 特指防災儲備 |
+| 家庭 | 世帯 (Setai) | 避難所以「世帯」為單位 |
+| 設備範本 | 設備テンプレート | |
+| 在場人數 | 在所人数 | |
+
+### 6.5.6 新增語言
+
+1. 複製 `zh-TW.json` 為新語言檔案 (例如 `en.json`)
+2. 翻譯所有字串
+3. 在 `availableLangs` 陣列新增語言項目：
+   ```javascript
+   { code: 'en', name: 'English', nativeName: 'English' }
+   ```
+4. 語言切換器會自動顯示新語言選項
 
 ---
 
@@ -1828,85 +1933,6 @@ Additional Instructions:
 
 ---
 
-**Version:** 1.3
+**Version:** 1.0
 **Last Updated:** 2024-12
 **Author:** De Novo Orthopedics Inc. / 谷盺生物科技股份有限公司
-
----
-
-## Changelog
-
-### v1.4.1 (2024-12)
-- **Fix**: 修復防災資料庫 404 錯誤（新增 /files/ 路由至 vercel.json）
-- **UI**: 登入視窗新增測試帳號提示（僅 Demo 模式顯示）
-  - 顯示三種角色帳號：admin001、staff001、medic001
-  - PIN 皆為 1234
-
-### v1.4 (2024-12) - Dual-Track Architecture
-- **Architecture**: 實施 Dual-Track 策略，明確分離 Portal（公共看板）和 Frontend（操作台）
-  - Portal = 公共資訊看板（唯讀、交通燈系統、無需登入）
-  - Frontend = 操作人員控制台（需認證、資料密集、CRUD 操作）
-- **Portal**: 重構為純公共看板
-  - 移除管理員登入、備份、設定等功能
-  - 新增交通燈狀態系統（綠/黃/紅）
-  - 四大指標：收容人數、飲用水、糧食、設備狀態
-  - 燈號邏輯：>3 天=綠、1-3 天=黃、<1 天=紅
-  - 公告自動從新 API 取得
-  - 新增狀態說明圖例
-  - 保留防災資料庫、互助留言（唯讀連結）
-- **Frontend**: 強化為操作人員專用控制台
-  - 統計列「收容人數」改為「在場人數」(checked_in)
-  - 新增系統按鈕（齒輪圖示，Admin 專用）
-  - 系統下拉選單：資料備份、站點設定、API 文件
-  - 備份管理整合至 Frontend（從 Portal 移除）
-- **API**: 新增 `GET /api/public/status` 輕量公開端點
-  - 回傳交通燈狀態：shelter、water、food、equipment
-  - 包含收容容量和人數
-  - 包含當前公告內容
-  - 無需認證，供 Portal 使用
-
-### v1.3 (2024-12)
-- **Messages**: 新增「找物」(seek_item) 篩選按鈕和紫色標籤
-- **Messages**: 即時統計改為顯示「待解決」數量（非今日留言數）
-- **Messages**: 新增置頂留言功能（管理員可置頂重要公告）
-- **Person**: 批次退場流程 - 支援多人同時辦理離站
-  - 退場原因：正常離站 / 轉送醫院 / 其他
-  - 可填寫去向和備註
-  - 一家人可一起離站，類似出院流程
-- **Portal**: 新增備份管理 UI（管理員專用）
-  - 支援本機 / 下載 / USB 三種備份目標
-  - 可選加密備份（需設定密碼）
-  - 顯示備份歷史記錄
-- **API**: POST `/api/messages/:id/pin` 置頂/取消置頂留言
-- **API**: POST `/api/person/batch-checkout` 批次退場
-
-### v1.2 (2024-12)
-- **Frontend**: 設備範本功能 - 預設 7 組常用範本
-  - 電力設備組（發電機、UPS、照明）
-  - 通訊設備組（對講機、擴音器、行動電源）
-  - 醫療設備組（血壓計、輪椅、AED）
-  - 收容基本設備（折疊床、睡袋、桌椅）
-  - 炊事設備組（瓦斯爐、鍋具、飲水機）
-  - 衛生設備組（移動廁所、消毒設備）
-  - 救援工具組（油壓剪、繩索、安全帽）
-- **Frontend**: 設備範本可自訂新增、編輯、刪除（管理員）
-- **Frontend**: 套用範本可批次建立設備，含預設檢查週期
-- **Frontend**: 物資發放按鈕改用大地色系 (amber-600)
-- **Frontend**: 人員清單區域/檢傷按鈕改用 primary 色系
-- **Frontend**: 新增單人快速移動區域功能
-- **Frontend**: 新增物資紀錄查詢（管理員）
-
-### v1.1 (2024-12)
-- **Database**: 新增 `parent_id` 欄位支援留言回覆
-- **API**: Messages resolve 改為 POST 方法
-- **API**: 新增 `/api/messages/:id/reply` 回覆路由
-- **API**: GET messages 回傳含 `replies` 陣列
-- **Accounts**: 預設新增 staff001 (志工) 和 medic001 (醫護) 帳號
-- **Frontend**: 設備管理新增檢查/編輯/刪除按鈕和統計
-- **Frontend**: 留言板新增回覆/解決/刪除功能
-- **Frontend**: 入庫/發放按鈕移至底部固定列
-- **Frontend**: 即時統計灰階顯示在上方
-- **Portal**: 管理員可編輯站點名稱和廣播公告
-
-### v1.0 (2024-12)
-- 初始版本
