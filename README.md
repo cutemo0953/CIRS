@@ -454,7 +454,15 @@ curl http://localhost:8090/api/person/P0001/audit-log
 
 ## 開發規格
 
-完整規格書請參閱 [CIRS_DEV_SPEC.md](./CIRS_DEV_SPEC.md)，包含：
+### 主要文件
+
+| 文件 | 說明 |
+|------|------|
+| [CIRS_DEV_SPEC.md](./CIRS_DEV_SPEC.md) | CIRS 完整開發規格書 |
+| [SATELLITE_PWA_SPEC.md](./docs/SATELLITE_PWA_SPEC.md) | Satellite PWA 架構與開發規格 |
+| [volunteer-pwa-guide.md](./docs/volunteer-pwa-guide.md) | 志工 PWA 安裝指南 |
+
+### CIRS_DEV_SPEC.md 包含：
 
 - Database Schema
 - API Endpoints
@@ -462,6 +470,15 @@ curl http://localhost:8090/api/person/P0001/audit-log
 - 離線同步策略
 - 備份機制
 - DS3231 RTC 安裝指南
+
+### SATELLITE_PWA_SPEC.md 包含：
+
+- Hub & Spoke 架構說明（指揮官與傳令兵）
+- CIRS Satellite PWA 功能規格
+- MIRS Satellite PWA 功能規格（Phase 2）
+- 離線同步策略
+- API Endpoints
+- 開發任務清單
 
 ## 更新日誌
 
