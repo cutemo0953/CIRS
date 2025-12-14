@@ -451,6 +451,16 @@ curl http://localhost:8090/api/person/P0001/audit-log
 
 ## 更新日誌
 
+### v1.5.1 (2024-12) - 完整 i18n 翻譯
+- **完成**：所有 UI 元件完整翻譯
+  - 全部 Modal（公告發佈、人員移動、組套入庫、寄贈接收、物資紀錄等）
+  - 設備範本選擇/管理/編輯介面
+  - 物資發放 QR Code、寄贈收據介面
+  - 動態日期格式（根據語言切換 locale）
+- **新增翻譯 Key**：
+  - `inventory.historyTitle/unknownItem/noHistory/noMatchingHistory/loadMore`
+- **改進**：Header 語言切換器（參考 denovortho-site 設計）
+
 ### v1.5 (2024-12) - 多語系支援 (i18n)
 - **新增**：國際化架構 (i18n)
   - JSON 語言檔架構 (`frontend/lang/`)
@@ -458,6 +468,7 @@ curl http://localhost:8090/api/person/P0001/audit-log
   - 日本語 (ja) 完整翻譯，含防災專有術語
 - **新增**：語言切換功能
   - 站點設定內可切換語言
+  - Header 快速語言切換
   - localStorage 持久化語言偏好
   - 即時切換無需重新整理
 - **翻譯範圍**：
