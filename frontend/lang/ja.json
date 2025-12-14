@@ -136,7 +136,12 @@
     "location": "保管場所",
     "expiryDate": "賞味期限",
     "similarFound": "類似の物資が見つかりました。直接入庫しますか？",
-    "noMatch": "該当する物資がありません"
+    "noMatch": "該当する物資がありません",
+    "historyTitle": "物資入出庫履歴",
+    "unknownItem": "不明な物資",
+    "noHistory": "履歴がありません",
+    "noMatchingHistory": "条件に一致する履歴がありません",
+    "loadMore": "さらに読み込む"
   },
   "equipment": {
     "ok": "正常",

@@ -39,10 +39,10 @@
 </head>
 <body class="bg-gray-50" x-data="cirsApp()" x-init="init()">
     <!-- Demo Mode Banner -->
-    <div id="demo-banner" style="display:none;" class="bg-amber-500 text-white text-center px-4 py-2 text-sm font-bold sticky top-0 z-50">
-        🚧 線上展示版 (Demo Mode) | 資料將在頁面重整後重置 |
-        <a href="https://denovortho-site.vercel.app/zh-TW/contact" target="_blank" class="underline text-white">洽詢正式版</a>
-        <button onclick="resetDemo()" class="ml-2 px-2 py-0.5 bg-white/20 rounded hover:bg-white/30">重置資料</button>
+    <div id="demo-banner" x-show="false" style="display:none;" class="bg-amber-500 text-white text-center px-4 py-2 text-sm font-bold sticky top-0 z-50">
+        🚧 <span x-text="t('demo.banner')">線上展示版 (Demo Mode) | 資料將在頁面重整後重置</span> |
+        <a href="https://denovortho-site.vercel.app/zh-TW/contact" target="_blank" class="underline text-white" x-text="t('demo.contact')">洽詢正式版</a>
+        <button onclick="resetDemo()" class="ml-2 px-2 py-0.5 bg-white/20 rounded hover:bg-white/30" x-text="t('demo.reset')">重置資料</button>
     </div>
     <script>
         // Demo mode detection
@@ -57,16 +57,22 @@
 
         // Reset demo data
         function resetDemo() {
-            if (confirm('確定要重置所有展示資料嗎？')) {
+            const app = Alpine.$data(document.querySelector('[x-data]'));
+            const confirmMsg = app?.t?.('demo.resetConfirm') || '確定要重置所有展示資料嗎？';
+            if (confirm(confirmMsg)) {
                 fetch('/api/demo/reset', { method: 'POST' })
                     .then(r => r.json())
                     .then(data => {
                         if (data.success) {
-                            alert('資料已重置！頁面將重新載入。');
+                            const successMsg = app?.t?.('demo.resetSuccess') || '資料已重置！頁面將重新載入。';
+                            alert(successMsg);
                             location.reload();
                         }
                     })
-                    .catch(e => alert('重置失敗: ' + e));
+                    .catch(e => {
+                        const failMsg = app?.t?.('demo.resetFailed') || '重置失敗';
+                        alert(failMsg + ': ' + e);
+                    });
             }
         }
     </script>
@@ -79,11 +85,29 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
                     </svg>
-                    <span class="text-sm ml-1">首頁</span>
+                    <span class="text-sm ml-1" x-text="t('nav.home')">首頁</span>
                 </a>
                 <h1 class="text-lg font-semibold" x-text="pageTitle">CIRS</h1>
             </div>
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2">
+                <!-- Language Switcher -->
+                <div class="flex items-center bg-white/10 rounded-lg px-1">
+                    <svg class="w-4 h-4 text-white/70 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/>
+                    </svg>
+                    <button @click="setLanguage('zh-TW')"
+                            class="px-1.5 py-0.5 text-xs rounded transition-colors"
+                            :class="currentLang === 'zh-TW' ? 'bg-white text-primary-700 font-medium' : 'text-white/80 hover:text-white'">
+                        中文
+                    </button>
+                    <span class="text-white/40">|</span>
+                    <button @click="setLanguage('ja')"
+                            class="px-1.5 py-0.5 text-xs rounded transition-colors"
+                            :class="currentLang === 'ja' ? 'bg-white text-primary-700 font-medium' : 'text-white/80 hover:text-white'">
+                        日本語
+                    </button>
+                </div>
+                <!-- User Section -->
                 <template x-if="currentUser">
                     <div class="flex items-center space-x-2">
                         <span class="text-sm bg-primary-700 px-2 py-1 rounded" x-text="currentUser.display_name"></span>
@@ -173,29 +197,29 @@
                     <svg class="w-5 h-5 mr-2 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
                     </svg>
-                    快速報到
+                    <span x-text="t('people.quickCheckIn')">快速報到</span>
                 </h3>
                 <div class="space-y-3">
-                    <input type="text" x-model="newPerson.display_name" placeholder="姓名 *" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                    <input type="text" x-model="newPerson.display_name" :placeholder="t('people.name') + ' *'" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                     <div class="grid grid-cols-2 gap-2">
-                        <input type="text" x-model="newPerson.national_id" placeholder="身分證 (選填)" class="border border-gray-200 rounded-lg px-3 py-2 uppercase" maxlength="10">
-                        <input type="tel" x-model="newPerson.phone" placeholder="電話 (選填)" class="border border-gray-200 rounded-lg px-3 py-2">
+                        <input type="text" x-model="newPerson.national_id" :placeholder="t('people.nationalId') + ' (' + t('people.optional') + ')'" class="border border-gray-200 rounded-lg px-3 py-2 uppercase" maxlength="10">
+                        <input type="tel" x-model="newPerson.phone" :placeholder="t('people.phone') + ' (' + t('people.optional') + ')'" class="border border-gray-200 rounded-lg px-3 py-2">
                     </div>
                     <!-- 區域選擇 -->
                     <div class="relative">
                         <select x-model="newPerson.current_location" class="w-full border border-gray-200 rounded-lg px-3 py-2 appearance-none bg-white">
-                            <option value="">選擇區域 (選填)</option>
-                            <optgroup label="收容區">
+                            <option value="" x-text="t('people.selectZone') + ' (' + t('people.optional') + ')'">選擇區域 (選填)</option>
+                            <optgroup :label="t('zone.shelter')">
                                 <template x-for="z in zones.filter(z => z.zone_type === 'shelter')" :key="z.id">
                                     <option :value="z.id" x-text="z.name"></option>
                                 </template>
                             </optgroup>
-                            <optgroup label="醫療區">
+                            <optgroup :label="t('zone.medical')">
                                 <template x-for="z in zones.filter(z => z.zone_type === 'medical')" :key="z.id">
                                     <option :value="z.id" x-text="z.name"></option>
                                 </template>
                             </optgroup>
-                            <optgroup label="服務區">
+                            <optgroup :label="t('zone.service')">
                                 <template x-for="z in zones.filter(z => z.zone_type === 'service')" :key="z.id">
                                     <option :value="z.id" x-text="z.name"></option>
                                 </template>
@@ -208,37 +232,37 @@
                     <!-- Photo capture for unidentified persons -->
                     <div x-show="!newPerson.national_id" class="border border-dashed border-gray-300 rounded-lg p-3">
                         <div class="flex items-center justify-between mb-2">
-                            <span class="text-sm text-gray-600">無法辨識身分時拍照</span>
+                            <span class="text-sm text-gray-600" x-text="t('people.photoCapture')">無法辨識身分時拍照</span>
                             <button type="button" @click="capturePhoto()" class="text-xs bg-blue-500 text-white px-3 py-1 rounded-lg">
                                 <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/>
                                 </svg>
-                                拍照
+                                <span x-text="t('people.takePhoto')">拍照</span>
                             </button>
                         </div>
                         <div x-show="newPerson.photo_data" class="mb-2">
                             <img :src="newPerson.photo_data" class="w-24 h-24 object-cover rounded-lg mx-auto">
-                            <button @click="newPerson.photo_data = ''" class="text-xs text-red-500 block mx-auto mt-1">移除照片</button>
+                            <button @click="newPerson.photo_data = ''" class="text-xs text-red-500 block mx-auto mt-1" x-text="t('people.removePhoto')">移除照片</button>
                         </div>
-                        <input type="text" x-model="newPerson.physical_desc" placeholder="外觀特徵描述 (選填)" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                        <input type="text" x-model="newPerson.physical_desc" :placeholder="t('people.physicalDesc') + ' (' + t('people.optional') + ')'" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
                     </div>
                     <!-- Triage Selection (light bg + dark text, like filter tags) -->
                     <div class="grid grid-cols-4 gap-2">
-                        <button @click="newPerson.triage_status = 'GREEN'" :class="newPerson.triage_status === 'GREEN' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700'" class="rounded-lg py-2 text-sm font-medium">輕傷</button>
-                        <button @click="newPerson.triage_status = 'YELLOW'" :class="newPerson.triage_status === 'YELLOW' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'" class="rounded-lg py-2 text-sm font-medium">延遲</button>
-                        <button @click="newPerson.triage_status = 'RED'" :class="newPerson.triage_status === 'RED' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700'" class="rounded-lg py-2 text-sm font-medium">立即</button>
-                        <button @click="newPerson.triage_status = 'BLACK'" :class="newPerson.triage_status === 'BLACK' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'" class="rounded-lg py-2 text-sm font-medium">死亡</button>
+                        <button @click="newPerson.triage_status = 'GREEN'" :class="newPerson.triage_status === 'GREEN' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700'" class="rounded-lg py-2 text-sm font-medium" x-text="t('triage.green')">輕傷</button>
+                        <button @click="newPerson.triage_status = 'YELLOW'" :class="newPerson.triage_status === 'YELLOW' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'" class="rounded-lg py-2 text-sm font-medium" x-text="t('triage.yellow')">延遲</button>
+                        <button @click="newPerson.triage_status = 'RED'" :class="newPerson.triage_status === 'RED' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700'" class="rounded-lg py-2 text-sm font-medium" x-text="t('triage.red')">立即</button>
+                        <button @click="newPerson.triage_status = 'BLACK'" :class="newPerson.triage_status === 'BLACK' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'" class="rounded-lg py-2 text-sm font-medium" x-text="t('triage.black')">死亡</button>
                     </div>
-                    <button @click="doQuickCheckIn()" class="w-full bg-primary-600 text-white rounded-lg py-2 font-medium">報到登記</button>
-                    <p class="text-xs text-gray-400 text-center">無身分證時系統自動產生序號</p>
+                    <button @click="doQuickCheckIn()" class="w-full bg-primary-600 text-white rounded-lg py-2 font-medium" x-text="t('people.checkIn')">報到登記</button>
+                    <p class="text-xs text-gray-400 text-center" x-text="t('people.autoGenerateId')">無身分證時系統自動產生序號</p>
                 </div>
             </div>
 
             <!-- Section Divider -->
             <div class="relative mb-4" x-show="currentUser">
                 <div class="absolute inset-0 flex items-center"><div class="w-full border-t border-gray-300"></div></div>
-                <div class="relative flex justify-center"><span class="bg-gray-50 px-3 text-sm text-gray-500">搜尋人員</span></div>
+                <div class="relative flex justify-center"><span class="bg-gray-50 px-3 text-sm text-gray-500" x-text="t('people.searchPeople')">搜尋人員</span></div>
             </div>
 
             <!-- Zone Overview (Collapsible) -->
@@ -250,8 +274,8 @@
                         <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
                         </svg>
-                        <span class="font-semibold">區域總覽</span>
-                        <span class="ml-2 text-xs text-gray-500" x-text="zones.length + ' 區'"></span>
+                        <span class="font-semibold" x-text="t('zone.overview')">區域總覽</span>
+                        <span class="ml-2 text-xs text-gray-500" x-text="zones.length + ' ' + t('zone.zones')"></span>
                         <svg class="w-4 h-4 ml-1 text-gray-400 transition-transform" :class="showZoneOverview ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
                         </svg>
@@ -264,17 +288,17 @@
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                         </svg>
-                        管理
+                        <span x-text="t('zone.manage')">管理</span>
                     </button>
                 </div>
                 <div x-show="showZoneOverview" x-collapse class="px-4 pb-4 pt-3">
                     <!-- Zone Type Tabs (單色風格) -->
                     <div class="flex space-x-1 mb-3 overflow-x-auto">
-                        <button @click="zoneTypeFilter = ''" :class="zoneTypeFilter === '' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition">全部</button>
-                        <button @click="zoneTypeFilter = 'shelter'" :class="zoneTypeFilter === 'shelter' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition">收容區</button>
-                        <button @click="zoneTypeFilter = 'medical'" :class="zoneTypeFilter === 'medical' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition">醫療區</button>
-                        <button @click="zoneTypeFilter = 'service'" :class="zoneTypeFilter === 'service' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition">服務區</button>
-                        <button @click="zoneTypeFilter = 'restricted'" :class="zoneTypeFilter === 'restricted' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition">管制區</button>
+                        <button @click="zoneTypeFilter = ''" :class="zoneTypeFilter === '' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition" x-text="t('zone.all')">全部</button>
+                        <button @click="zoneTypeFilter = 'shelter'" :class="zoneTypeFilter === 'shelter' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition" x-text="t('zone.shelter')">收容區</button>
+                        <button @click="zoneTypeFilter = 'medical'" :class="zoneTypeFilter === 'medical' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition" x-text="t('zone.medical')">醫療區</button>
+                        <button @click="zoneTypeFilter = 'service'" :class="zoneTypeFilter === 'service' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition" x-text="t('zone.service')">服務區</button>
+                        <button @click="zoneTypeFilter = 'restricted'" :class="zoneTypeFilter === 'restricted' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'" class="px-3 py-1 rounded-full text-xs whitespace-nowrap transition" x-text="t('zone.restricted')">管制區</button>
                     </div>
                     <!-- Zone Cards Grid (單色 + heroicon) -->
                     <div class="grid grid-cols-2 gap-2">
@@ -305,32 +329,32 @@
                         <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/>
                         </svg>
-                        移動 <span x-text="selectedPeople.length"></span> 人
+                        <span x-text="t('zone.movePersons')">移動</span> <span x-text="selectedPeople.length"></span> <span x-text="t('people.persons')">人</span>
                     </button>
                 </div>
             </div>
 
             <!-- Search -->
             <div class="flex space-x-2 mb-4">
-                <input type="text" x-model="peopleSearch" placeholder="搜尋姓名/ID..." class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <input type="text" x-model="peopleSearch" :placeholder="t('people.searchPlaceholder')" class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
             </div>
 
             <!-- Triage Filter with Stats -->
             <div class="flex space-x-2 mb-4 overflow-x-auto">
                 <button @click="triageFilter = ''" :class="triageFilter === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700 border'" class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap font-medium">
-                    全部 <span class="ml-1 opacity-75" x-text="stats.headcount?.total || 0"></span>
+                    <span x-text="t('zone.all')">全部</span> <span class="ml-1 opacity-75" x-text="stats.headcount?.total || 0"></span>
                 </button>
                 <button @click="triageFilter = 'GREEN'" :class="triageFilter === 'GREEN' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700'" class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap font-medium">
-                    輕傷 <span class="ml-1 opacity-75" x-text="stats.headcount?.green || 0"></span>
+                    <span x-text="t('triage.green')">輕傷</span> <span class="ml-1 opacity-75" x-text="stats.headcount?.green || 0"></span>
                 </button>
                 <button @click="triageFilter = 'YELLOW'" :class="triageFilter === 'YELLOW' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700'" class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap font-medium">
-                    延遲 <span class="ml-1 opacity-75" x-text="stats.headcount?.yellow || 0"></span>
+                    <span x-text="t('triage.yellow')">延遲</span> <span class="ml-1 opacity-75" x-text="stats.headcount?.yellow || 0"></span>
                 </button>
                 <button @click="triageFilter = 'RED'" :class="triageFilter === 'RED' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700'" class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap font-medium">
-                    立即 <span class="ml-1 opacity-75" x-text="stats.headcount?.red || 0"></span>
+                    <span x-text="t('triage.red')">立即</span> <span class="ml-1 opacity-75" x-text="stats.headcount?.red || 0"></span>
                 </button>
                 <button @click="triageFilter = 'BLACK'" :class="triageFilter === 'BLACK' ? 'bg-gray-800 text-white' : 'bg-gray-200 text-gray-700'" class="px-3 py-1.5 rounded-full text-sm whitespace-nowrap font-medium">
-                    死亡 <span class="ml-1 opacity-75" x-text="stats.headcount?.black || 0"></span>
+                    <span x-text="t('triage.black')">死亡</span> <span class="ml-1 opacity-75" x-text="stats.headcount?.black || 0"></span>
                 </button>
             </div>
 
@@ -340,12 +364,12 @@
                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    全選/取消
+                    <span x-text="t('people.selectAll')">全選/取消</span>
                 </button>
                 <span x-show="selectedPeople.length > 0" class="text-xs text-gray-500">
-                    已選 <span class="font-semibold text-primary-600" x-text="selectedPeople.length"></span> 人
-                    <button @click="openBatchMoveModal()" class="ml-2 text-primary-600 underline">移動</button>
-                    <button @click="openBatchCheckoutModal()" class="ml-2 text-red-600 underline">退場</button>
+                    <span x-text="t('people.selected')">已選</span> <span class="font-semibold text-primary-600" x-text="selectedPeople.length"></span> <span x-text="t('people.persons')">人</span>
+                    <button @click="openBatchMoveModal()" class="ml-2 text-primary-600 underline" x-text="t('people.move')">移動</button>
+                    <button @click="openBatchCheckoutModal()" class="ml-2 text-red-600 underline" x-text="t('people.checkout')">退場</button>
                 </span>
             </div>
 
@@ -397,12 +421,12 @@
                         </div>
                     </div>
                 </template>
-                <p x-show="filteredPeople.length === 0" class="text-center text-gray-400 py-8">無人員資料</p>
+                <p x-show="filteredPeople.length === 0" class="text-center text-gray-400 py-8" x-text="t('people.noData')">無人員資料</p>
             </div>
 
             <!-- Zone Filter Clear Button -->
             <div x-show="zoneFilter" class="mt-4 text-center">
-                <button @click="zoneFilter = ''" class="text-sm text-primary-600 underline">
+                <button @click="zoneFilter = ''" class="text-sm text-primary-600 underline" x-text="t('people.clearZoneFilter')">
                     清除區域篩選
                 </button>
             </div>
@@ -417,7 +441,7 @@
                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    即將到期
+                    <span x-text="t('inventory.expiringSoon')">即將到期</span>
                 </h4>
                 <div class="space-y-1">
                     <template x-for="item in expiringItems.slice(0, 3)" :key="item.id">
@@ -436,12 +460,12 @@
                     <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                     </svg>
-                    庫存不足
+                    <span x-text="t('inventory.lowStock')">庫存不足</span>
                 </h4>
                 <div class="space-y-1">
                     <template x-for="alert in stats.inventory_alerts?.slice(0, 3)" :key="alert.id">
                         <p class="text-xs text-red-700">
-                            <span x-text="alert.name"></span>: 剩 <span class="font-medium" x-text="alert.quantity"></span> <span x-text="alert.unit || '個'"></span>
+                            <span x-text="alert.name"></span>: <span x-text="t('inventory.remaining')">剩</span> <span class="font-medium" x-text="alert.quantity"></span> <span x-text="alert.unit || '個'"></span>
                         </p>
                     </template>
                 </div>
@@ -449,13 +473,13 @@
 
             <!-- Search & Filter -->
             <div class="flex space-x-2 mb-3">
-                <input type="text" x-model="inventorySearch" placeholder="搜尋物資..." class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
-                <button @click="showDonationModal = true" x-show="currentUser" class="bg-pink-500 text-white px-3 py-2 rounded-lg" title="接收捐贈">
+                <input type="text" x-model="inventorySearch" :placeholder="t('inventory.searchPlaceholder')" class="flex-1 bg-white border border-gray-200 rounded-lg px-3 py-2">
+                <button @click="showDonationModal = true" x-show="currentUser" class="bg-pink-500 text-white px-3 py-2 rounded-lg" :title="t('inventory.receiveDonation')">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
                     </svg>
                 </button>
-                <button @click="showAddInventoryModal = true" x-show="currentUser" class="bg-primary-600 text-white px-3 py-2 rounded-lg" title="新增庫存">
+                <button @click="showAddInventoryModal = true" x-show="currentUser" class="bg-primary-600 text-white px-3 py-2 rounded-lg" :title="t('inventory.addStock')">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                     </svg>
@@ -464,12 +488,12 @@
 
             <!-- Category Filter -->
             <div class="flex space-x-2 overflow-x-auto pb-2 mb-3">
-                <button @click="inventoryCategory = ''" :class="inventoryCategory === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">全部</button>
-                <button @click="inventoryCategory = 'water'" :class="inventoryCategory === 'water' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">水</button>
-                <button @click="inventoryCategory = 'food'" :class="inventoryCategory === 'food' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">食物</button>
-                <button @click="inventoryCategory = 'medical'" :class="inventoryCategory === 'medical' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">醫療</button>
-                <button @click="inventoryCategory = 'power'" :class="inventoryCategory === 'power' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">電力</button>
-                <button @click="inventoryCategory = 'daily'" :class="inventoryCategory === 'daily' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">日用品</button>
+                <button @click="inventoryCategory = ''" :class="inventoryCategory === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('inventory.all')">全部</button>
+                <button @click="inventoryCategory = 'water'" :class="inventoryCategory === 'water' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('inventory.water')">水</button>
+                <button @click="inventoryCategory = 'food'" :class="inventoryCategory === 'food' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('inventory.food')">食物</button>
+                <button @click="inventoryCategory = 'medical'" :class="inventoryCategory === 'medical' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('inventory.medical')">醫療</button>
+                <button @click="inventoryCategory = 'power'" :class="inventoryCategory === 'power' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('inventory.power')">電力</button>
+                <button @click="inventoryCategory = 'daily'" :class="inventoryCategory === 'daily' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('inventory.daily')">日用品</button>
             </div>
 
             <!-- Inventory List -->
@@ -487,7 +511,7 @@
                                     <span x-show="item.location" class="text-gray-400 ml-2">· <span x-text="item.location"></span></span>
                                 </p>
                                 <p x-show="item.expiry_date" class="text-xs text-gray-400">
-                                    效期: <span x-text="item.expiry_date"></span>
+                                    <span x-text="t('inventory.expiry')">效期</span>: <span x-text="item.expiry_date"></span>
                                 </p>
                             </div>
                             <div class="flex space-x-1" x-show="currentUser">
@@ -505,7 +529,7 @@
                         </div>
                     </div>
                 </template>
-                <p x-show="filteredInventory.length === 0" class="text-center text-gray-400 py-8">無物資資料</p>
+                <p x-show="filteredInventory.length === 0" class="text-center text-gray-400 py-8" x-text="t('inventory.noData')">無物資資料</p>
             </div>
 
             <!-- Fixed Bottom Buttons for Inventory -->
@@ -515,25 +539,25 @@
                         <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
-                        入庫
+                        <span x-text="t('inventory.intake')">入庫</span>
                     </button>
                     <button @click="openBundleModal()" class="rounded-xl py-3 text-center card-press shadow-sm font-medium" style="background-color: #e0f2f1; color: #00695c;">
                         <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>
                         </svg>
-                        組套
+                        <span x-text="t('inventory.bundle')">組套</span>
                     </button>
                     <button @click="showDistributeSelectModal = true" class="rounded-xl py-3 text-center card-press shadow-sm font-medium" style="background-color: #fee39a; color: #333;">
                         <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"/>
                         </svg>
-                        發放
+                        <span x-text="t('inventory.distribute')">發放</span>
                     </button>
                     <button x-show="currentUser.role === 'admin'" @click="openInventoryHistory()" class="rounded-xl py-3 text-center card-press shadow-sm font-medium bg-gray-100 text-gray-700">
                         <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                         </svg>
-                        紀錄
+                        <span x-text="t('inventory.history')">紀錄</span>
                     </button>
                 </div>
             </div>
@@ -545,15 +569,15 @@
             <div class="grid grid-cols-3 gap-2 mb-4">
                 <div class="bg-green-50 rounded-xl p-3 text-center border border-green-200">
                     <p class="text-2xl font-bold text-green-700" x-text="equipment.filter(e => e.check_status === 'OK').length"></p>
-                    <p class="text-xs text-green-600">正常</p>
+                    <p class="text-xs text-green-600" x-text="t('equipment.ok')">正常</p>
                 </div>
                 <div class="bg-yellow-50 rounded-xl p-3 text-center border border-yellow-200">
                     <p class="text-2xl font-bold text-yellow-700" x-text="equipment.filter(e => e.check_status === 'NEEDS_REPAIR').length"></p>
-                    <p class="text-xs text-yellow-600">待修</p>
+                    <p class="text-xs text-yellow-600" x-text="t('equipment.needsRepair')">待修</p>
                 </div>
                 <div class="bg-red-50 rounded-xl p-3 text-center border border-red-200">
                     <p class="text-2xl font-bold text-red-700" x-text="equipment.filter(e => e.check_status === 'OUT_OF_SERVICE').length"></p>
-                    <p class="text-xs text-red-600">停用</p>
+                    <p class="text-xs text-red-600" x-text="t('equipment.outOfService')">停用</p>
                 </div>
             </div>
 
@@ -563,7 +587,7 @@
                     <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    待檢設備 (<span x-text="equipmentPending.length"></span>)
+                    <span x-text="t('equipment.pending')">待檢設備</span> (<span x-text="equipmentPending.length"></span>)
                 </h3>
                 <div class="space-y-2">
                     <template x-for="eq in equipmentPending" :key="eq.id">
@@ -571,10 +595,10 @@
                             <div>
                                 <p class="font-medium" x-text="eq.name"></p>
                                 <p class="text-xs text-gray-500">
-                                    上次檢查: <span x-text="eq.last_check_date || '從未'"></span>
+                                    <span x-text="t('equipment.lastCheck')">上次檢查</span>: <span x-text="eq.last_check_date || t('equipment.never')"></span>
                                 </p>
                             </div>
-                            <button @click="startEquipmentCheck(eq)" x-show="currentUser" class="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm">
+                            <button @click="startEquipmentCheck(eq)" x-show="currentUser" class="bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm" x-text="t('equipment.check')">
                                 檢查
                             </button>
                         </div>
@@ -583,7 +607,7 @@
             </div>
 
             <!-- All Equipment -->
-            <h3 class="font-semibold mb-3">所有設備</h3>
+            <h3 class="font-semibold mb-3" x-text="t('equipment.allEquipment')">所有設備</h3>
             <div class="space-y-2">
                 <template x-for="eq in equipment" :key="eq.id">
                     <div class="bg-white rounded-xl p-3 shadow-sm">
@@ -601,7 +625,7 @@
                                         <span x-show="eq.specification" class="text-gray-500 font-normal text-sm">(<span x-text="eq.specification"></span>)</span>
                                     </h4>
                                 <p class="text-sm text-gray-600">
-                                    數量: <span x-text="eq.quantity"></span> <span x-text="eq.unit || '台'"></span>
+                                    <span x-text="t('equipment.qty')">數量</span>: <span x-text="eq.quantity"></span> <span x-text="eq.unit || t('equipment.unitDefault')"></span>
                                     <span x-show="eq.location" class="text-gray-400">· <span x-text="eq.location"></span></span>
                                 </p>
                                 <div class="flex items-center mt-1 text-xs">
@@ -614,23 +638,23 @@
                                           }"
                                           x-text="getCheckStatusText(eq.check_status)"></span>
                                     <span class="text-gray-400">
-                                        檢查週期: <span x-text="eq.check_interval_days || '-'"></span>天
+                                        <span x-text="t('equipment.checkInterval')">檢查週期</span>: <span x-text="eq.check_interval_days || '-'"></span><span x-text="t('equipment.days')">天</span>
                                     </span>
                                     </div>
                                 </div>
                             </div>
                             <div class="flex space-x-1" x-show="currentUser">
-                                <button @click="startEquipmentCheck(eq)" class="text-primary-600 p-1.5 bg-primary-50 rounded-lg" title="檢查">
+                                <button @click="startEquipmentCheck(eq)" class="text-primary-600 p-1.5 bg-primary-50 rounded-lg" :title="t('equipment.check')">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                                     </svg>
                                 </button>
-                                <button @click="startEditEquipment(eq)" class="text-blue-600 p-1.5 bg-blue-50 rounded-lg" title="編輯">
+                                <button @click="startEditEquipment(eq)" class="text-blue-600 p-1.5 bg-blue-50 rounded-lg" :title="t('actions.edit')">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
                                 </button>
-                                <button @click="confirmDeleteEquipment(eq)" x-show="currentUser.role === 'admin'" class="text-red-600 p-1.5 bg-red-50 rounded-lg" title="刪除">
+                                <button @click="confirmDeleteEquipment(eq)" x-show="currentUser.role === 'admin'" class="text-red-600 p-1.5 bg-red-50 rounded-lg" :title="t('actions.delete')">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                     </svg>
@@ -639,7 +663,7 @@
                         </div>
                     </div>
                 </template>
-                <p x-show="equipment.length === 0" class="text-center text-gray-400 py-8">無設備資料</p>
+                <p x-show="equipment.length === 0" class="text-center text-gray-400 py-8" x-text="t('equipment.noData')">無設備資料</p>
             </div>
 
             <!-- Fixed Bottom Buttons for Equipment -->
@@ -649,7 +673,7 @@
                         <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
                         </svg>
-                        新增設備
+                        <span x-text="t('equipment.addEquipment')">新增設備</span>
                     </button>
                     <button @click="openEquipmentTemplateModal()" class="rounded-xl py-3 text-center card-press shadow-sm font-medium bg-primary-100 text-primary-700">
                         <svg class="w-5 h-5 inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -670,7 +694,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
                     </svg>
                     <div>
-                        <p class="text-sm font-medium text-amber-800">公告</p>
+                        <p class="text-sm font-medium text-amber-800" x-text="t('messages.broadcast')">公告</p>
                         <p class="text-sm text-amber-700" x-text="broadcast"></p>
                     </div>
                 </div>
@@ -678,11 +702,11 @@
 
             <!-- Category Filter -->
             <div class="flex space-x-2 overflow-x-auto pb-2 mb-4">
-                <button @click="messageCategory = ''" :class="messageCategory === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">全部</button>
-                <button @click="messageCategory = 'seek_person'" :class="messageCategory === 'seek_person' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">尋人</button>
-                <button @click="messageCategory = 'seek_item'" :class="messageCategory === 'seek_item' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">找物</button>
-                <button @click="messageCategory = 'offer_help'" :class="messageCategory === 'offer_help' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">互助</button>
-                <button @click="messageCategory = 'report'" :class="messageCategory === 'report' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap">回報</button>
+                <button @click="messageCategory = ''" :class="messageCategory === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('messages.all')">全部</button>
+                <button @click="messageCategory = 'seek_person'" :class="messageCategory === 'seek_person' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('messages.seekPerson')">尋人</button>
+                <button @click="messageCategory = 'seek_item'" :class="messageCategory === 'seek_item' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('messages.seekItem')">找物</button>
+                <button @click="messageCategory = 'offer_help'" :class="messageCategory === 'offer_help' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('messages.offerHelp')">互助</button>
+                <button @click="messageCategory = 'report'" :class="messageCategory === 'report' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'" class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('messages.report')">回報</button>
             </div>
 
             <!-- Messages List -->
@@ -708,18 +732,18 @@
                                       x-text="getCategoryName(msg.category)"></span>
                             </div>
                             <div class="flex items-center space-x-2">
-                                <span x-show="msg.is_resolved" class="text-xs text-green-600">已解決</span>
+                                <span x-show="msg.is_resolved" class="text-xs text-green-600" x-text="t('messages.resolved')">已解決</span>
                                 <!-- Admin Controls -->
                                 <template x-if="currentUser && currentUser.role === 'admin'">
                                     <div class="flex space-x-1">
                                         <!-- 置頂/取消置頂按鈕 -->
-                                        <button @click="toggleMessagePinned(msg)" class="text-xs px-2 py-1 rounded" :class="msg.is_pinned ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-600'" :title="msg.is_pinned ? '取消置頂' : '置頂'">
+                                        <button @click="toggleMessagePinned(msg)" class="text-xs px-2 py-1 rounded" :class="msg.is_pinned ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-600'" :title="msg.is_pinned ? t('messages.unpin') : t('messages.pin')">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
                                             </svg>
                                         </button>
                                         <button @click="toggleMessageResolved(msg)" class="text-xs px-2 py-1 rounded" :class="msg.is_resolved ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-600'">
-                                            <span x-text="msg.is_resolved ? '取消解決' : '標為已解決'"></span>
+                                            <span x-text="msg.is_resolved ? t('messages.markUnresolved') : t('messages.markResolved')"></span>
                                         </button>
                                         <button @click="confirmDeleteMessage(msg)" class="text-red-500 p-1">
                                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -732,10 +756,10 @@
                         </div>
                         <p class="text-gray-800" x-text="msg.content"></p>
                         <div class="flex justify-between items-center mt-2 text-xs text-gray-400">
-                            <span x-text="msg.author_name || '匿名'"></span>
+                            <span x-text="msg.author_name || t('messages.anonymous')"></span>
                             <div class="flex items-center space-x-2">
                                 <span x-text="formatTime(msg.created_at)"></span>
-                                <button @click="startReply(msg)" class="text-primary-600 hover:underline">回覆</button>
+                                <button @click="startReply(msg)" class="text-primary-600 hover:underline" x-text="t('messages.reply')">回覆</button>
                             </div>
                         </div>
                         <!-- Replies -->
@@ -743,13 +767,13 @@
                             <template x-for="reply in msg.replies" :key="reply.id">
                                 <div class="bg-gray-50 rounded-lg p-2 text-sm">
                                     <p class="text-gray-700" x-text="reply.content"></p>
-                                    <p class="text-xs text-gray-400 mt-1"><span x-text="reply.author_name || '匿名'"></span> · <span x-text="formatTime(reply.created_at)"></span></p>
+                                    <p class="text-xs text-gray-400 mt-1"><span x-text="reply.author_name || t('messages.anonymous')"></span> · <span x-text="formatTime(reply.created_at)"></span></p>
                                 </div>
                             </template>
                         </div>
                     </div>
                 </template>
-                <p x-show="filteredMessages.length === 0" class="text-center text-gray-400 py-8">暫無留言</p>
+                <p x-show="filteredMessages.length === 0" class="text-center text-gray-400 py-8" x-text="t('messages.noMessages')">暫無留言</p>
             </div>
 
             <!-- New Message FAB -->
@@ -857,11 +881,11 @@
     <!-- Intake Modal -->
     <div x-show="showIntakeModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showIntakeModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-hidden flex flex-col">
-            <h3 class="text-lg font-semibold mb-4">入庫</h3>
+            <h3 class="text-lg font-semibold mb-4" x-text="t('modal.intake.title')">入庫</h3>
             <div class="space-y-4 overflow-y-auto flex-1">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">搜尋並選擇物資</label>
-                    <input type="text" x-model="intakeSearch" placeholder="輸入名稱搜尋..."
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.intake.searchSelect')">搜尋並選擇物資</label>
+                    <input type="text" x-model="intakeSearch" :placeholder="t('modal.intake.searchPlaceholder')"
                            class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-2 text-sm">
                     <div class="max-h-32 overflow-y-auto border border-gray-200 rounded-lg">
                         <template x-for="item in inventory.filter(i => i.category !== 'equipment' && (!intakeSearch || i.name.toLowerCase().includes(intakeSearch.toLowerCase())))" :key="item.id">
@@ -869,18 +893,18 @@
                                     class="w-full px-3 py-2 text-left text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0"
                                     :class="intakeForm.item_id === item.id ? 'bg-primary-50 text-primary-700' : ''">
                                 <span x-text="item.name + (item.specification ? ' (' + item.specification + ')' : '')"></span>
-                                <span class="text-gray-400 ml-1">庫存: <span x-text="item.quantity"></span></span>
+                                <span class="text-gray-400 ml-1"><span x-text="t('inventory.stock')">庫存</span>: <span x-text="item.quantity"></span></span>
                             </button>
                         </template>
                         <p x-show="inventory.filter(i => i.category !== 'equipment' && (!intakeSearch || i.name.toLowerCase().includes(intakeSearch.toLowerCase()))).length === 0"
-                           class="text-center text-gray-400 py-2 text-xs">沒有符合的物資</p>
+                           class="text-center text-gray-400 py-2 text-xs" x-text="t('inventory.noMatch')">沒有符合的物資</p>
                     </div>
                     <p x-show="intakeForm.item_id" class="text-xs text-primary-600 mt-1">
-                        已選: <span x-text="inventory.find(i => i.id === intakeForm.item_id)?.name || ''"></span>
+                        <span x-text="inventory.find(i => i.id === intakeForm.item_id)?.name || ''"></span>
                     </p>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">入庫數量</label>
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.intake.quantity')">入庫數量</label>
                     <div class="flex items-center space-x-3">
                         <button @click="intakeForm.quantity = Math.max(1, intakeForm.quantity - 1)" class="w-10 h-10 bg-gray-100 rounded-lg text-lg">-</button>
                         <input type="number" x-model.number="intakeForm.quantity" class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-center" min="1">
@@ -888,12 +912,12 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">備註</label>
-                    <input type="text" x-model="intakeForm.notes" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="選填">
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.intake.notes')">備註</label>
+                    <input type="text" x-model="intakeForm.notes" class="w-full border border-gray-200 rounded-lg px-3 py-2" :placeholder="t('people.optional')">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="showIntakeModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doIntake()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">確認入庫</button>
+                    <button @click="showIntakeModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                    <button @click="doIntake()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg" x-text="t('modal.intake.confirm')">確認入庫</button>
                 </div>
             </div>
         </div>
@@ -902,36 +926,36 @@
     <!-- Distribute Select Modal -->
     <div x-show="showDistributeSelectModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDistributeSelectModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[85vh] flex flex-col">
-            <h3 class="text-lg font-semibold mb-3">選擇發放物資</h3>
+            <h3 class="text-lg font-semibold mb-3" x-text="t('modal.distribute.selectItem')">選擇發放物資</h3>
             <!-- 搜尋欄 -->
-            <input type="text" x-model="distributeSearch" placeholder="搜尋物資名稱..."
+            <input type="text" x-model="distributeSearch" :placeholder="t('inventory.searchPlaceholder')"
                    class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm"
                    @input="$event.target.focus()">
             <div class="space-y-2 overflow-y-auto flex-1">
                 <template x-for="item in inventory.filter(i => i.category !== 'equipment' && i.quantity > 0 && (!distributeSearch || i.name.toLowerCase().includes(distributeSearch.toLowerCase())))" :key="item.id">
                     <button @click="startDistribute(item); showDistributeSelectModal = false; distributeSearch = ''" class="w-full bg-gray-50 hover:bg-gray-100 rounded-lg p-3 text-left">
                         <p class="font-medium" x-text="item.name + (item.specification ? ' (' + item.specification + ')' : '')"></p>
-                        <p class="text-sm text-gray-500">庫存: <span x-text="item.quantity"></span> <span x-text="item.unit || '個'"></span></p>
+                        <p class="text-sm text-gray-500"><span x-text="t('inventory.stock')">庫存</span>: <span x-text="item.quantity"></span> <span x-text="item.unit || '個'"></span></p>
                     </button>
                 </template>
                 <p x-show="inventory.filter(i => i.category !== 'equipment' && i.quantity > 0 && (!distributeSearch || i.name.toLowerCase().includes(distributeSearch.toLowerCase()))).length === 0"
-                   class="text-center text-gray-400 py-4 text-sm">沒有符合的物資</p>
+                   class="text-center text-gray-400 py-4 text-sm" x-text="t('inventory.noMatch')">沒有符合的物資</p>
             </div>
-            <button @click="showDistributeSelectModal = false; distributeSearch = ''" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+            <button @click="showDistributeSelectModal = false; distributeSearch = ''" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
         </div>
     </div>
 
     <!-- Distribute Modal -->
     <div x-show="showDistributeModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDistributeModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-4">發放: <span x-text="distributeItem?.name"></span></h3>
+            <h3 class="text-lg font-semibold mb-4"><span x-text="t('modal.distribute.title')">發放</span>: <span x-text="distributeItem?.name"></span></h3>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">領取人 ID</label>
-                    <input type="text" x-model="distributeForm.person_id" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="輸入 ID">
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.distribute.recipientId')">領取人 ID</label>
+                    <input type="text" x-model="distributeForm.person_id" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="ID">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">數量 (庫存: <span x-text="distributeItem?.quantity"></span>)</label>
+                    <label class="block text-sm text-gray-600 mb-1"><span x-text="t('modal.distribute.quantity')">數量</span> (<span x-text="t('inventory.stock')">庫存</span>: <span x-text="distributeItem?.quantity"></span>)</label>
                     <div class="flex items-center space-x-3">
                         <button @click="distributeForm.quantity = Math.max(1, distributeForm.quantity - 1)" class="w-10 h-10 bg-gray-100 rounded-lg">-</button>
                         <input type="number" x-model.number="distributeForm.quantity" class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-center" min="1">
@@ -939,12 +963,12 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">備註</label>
-                    <input type="text" x-model="distributeForm.notes" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="選填">
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.intake.notes')">備註</label>
+                    <input type="text" x-model="distributeForm.notes" class="w-full border border-gray-200 rounded-lg px-3 py-2" :placeholder="t('people.optional')">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="showDistributeModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doDistribute()" class="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg">確認發放</button>
+                    <button @click="showDistributeModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                    <button @click="doDistribute()" class="flex-1 px-4 py-2 bg-amber-600 text-white rounded-lg" x-text="t('modal.distribute.confirm')">確認發放</button>
                 </div>
             </div>
         </div>
@@ -953,15 +977,15 @@
     <!-- Add Inventory Modal -->
     <div x-show="showAddInventoryModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showAddInventoryModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[90vh] overflow-y-auto">
-            <h3 class="text-lg font-semibold mb-4">新增物資</h3>
+            <h3 class="text-lg font-semibold mb-4" x-text="t('inventory.addItem')">新增物資</h3>
             <div class="space-y-3">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">名稱 *</label>
-                    <input type="text" x-model="newInventory.name" @input="checkSimilarItems()" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 礦泉水">
+                    <label class="block text-sm text-gray-600 mb-1"><span x-text="t('inventory.itemName')">名稱</span> *</label>
+                    <input type="text" x-model="newInventory.name" @input="checkSimilarItems()" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                 </div>
                 <!-- Similar Items Suggestion -->
                 <div x-show="similarItems.length > 0" class="bg-blue-50 rounded-lg p-3">
-                    <p class="text-sm text-blue-700 mb-2">找到類似物資，是否直接入庫？</p>
+                    <p class="text-sm text-blue-700 mb-2" x-text="t('inventory.similarFound')">找到類似物資，是否直接入庫？</p>
                     <template x-for="si in similarItems" :key="si.id">
                         <button @click="quickIntake(si); showAddInventoryModal = false" class="w-full bg-white rounded p-2 mb-1 text-left text-sm hover:bg-blue-100">
                             <span x-text="si.name"></span>
@@ -971,41 +995,41 @@
                     </template>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">規格</label>
-                    <input type="text" x-model="newInventory.specification" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 600ml, 5公斤裝">
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.specification')">規格</label>
+                    <input type="text" x-model="newInventory.specification" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">分類 *</label>
+                    <label class="block text-sm text-gray-600 mb-1"><span x-text="t('inventory.category')">分類</span> *</label>
                     <select x-model="newInventory.category" class="w-full border border-gray-200 rounded-lg px-3 py-2">
-                        <option value="water">水</option>
-                        <option value="food">食物</option>
-                        <option value="medical">醫療</option>
-                        <option value="power">電力</option>
-                        <option value="daily">日用品</option>
-                        <option value="other">其他</option>
+                        <option value="water" x-text="t('inventory.water')">水</option>
+                        <option value="food" x-text="t('inventory.food')">食物</option>
+                        <option value="medical" x-text="t('inventory.medical')">醫療</option>
+                        <option value="power" x-text="t('inventory.power')">電力</option>
+                        <option value="daily" x-text="t('inventory.daily')">日用品</option>
+                        <option value="other" x-text="t('inventory.other')">其他</option>
                     </select>
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">數量</label>
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.quantity')">數量</label>
                         <input type="number" x-model.number="newInventory.quantity" class="w-full border border-gray-200 rounded-lg px-3 py-2" min="0">
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">單位</label>
-                        <input type="text" x-model="newInventory.unit" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="瓶/箱/個">
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.unit')">單位</label>
+                        <input type="text" x-model="newInventory.unit" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">位置</label>
-                    <input type="text" x-model="newInventory.location" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="倉庫A">
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.location')">位置</label>
+                    <input type="text" x-model="newInventory.location" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">效期</label>
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.expiryDate')">效期</label>
                     <input type="date" x-model="newInventory.expiry_date" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="showAddInventoryModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doAddInventory()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">新增</button>
+                    <button @click="showAddInventoryModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                    <button @click="doAddInventory()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg" x-text="t('actions.add')">新增</button>
                 </div>
             </div>
         </div>
@@ -1014,35 +1038,35 @@
     <!-- Equipment Check Modal -->
     <div x-show="showEquipmentCheckModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showEquipmentCheckModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-4">設備檢查: <span x-text="checkTarget?.name"></span></h3>
+            <h3 class="text-lg font-semibold mb-4"><span x-text="t('modal.equipmentCheck.title')">設備檢查</span>: <span x-text="checkTarget?.name"></span></h3>
             <div class="space-y-4">
                 <div class="grid grid-cols-3 gap-2">
                     <button @click="equipmentCheckForm.status = 'OK'" :class="equipmentCheckForm.status === 'OK' ? 'ring-2 ring-green-500' : ''" class="bg-green-100 text-green-700 rounded-xl p-4 text-center">
                         <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>
-                        <span class="text-sm font-medium">正常</span>
+                        <span class="text-sm font-medium" x-text="t('equipment.ok')">正常</span>
                     </button>
                     <button @click="equipmentCheckForm.status = 'NEEDS_REPAIR'" :class="equipmentCheckForm.status === 'NEEDS_REPAIR' ? 'ring-2 ring-yellow-500' : ''" class="bg-yellow-100 text-yellow-700 rounded-xl p-4 text-center">
                         <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                         </svg>
-                        <span class="text-sm font-medium">待修</span>
+                        <span class="text-sm font-medium" x-text="t('equipment.needsRepair')">待修</span>
                     </button>
                     <button @click="equipmentCheckForm.status = 'OUT_OF_SERVICE'" :class="equipmentCheckForm.status === 'OUT_OF_SERVICE' ? 'ring-2 ring-red-500' : ''" class="bg-red-100 text-red-700 rounded-xl p-4 text-center">
                         <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
-                        <span class="text-sm font-medium">停用</span>
+                        <span class="text-sm font-medium" x-text="t('equipment.outOfService')">停用</span>
                     </button>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">備註</label>
-                    <input type="text" x-model="equipmentCheckForm.notes" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="選填">
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.intake.notes')">備註</label>
+                    <input type="text" x-model="equipmentCheckForm.notes" class="w-full border border-gray-200 rounded-lg px-3 py-2" :placeholder="t('people.optional')">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="showEquipmentCheckModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doEquipmentCheck()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">確認</button>
+                    <button @click="showEquipmentCheckModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                    <button @click="doEquipmentCheck()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg" x-text="t('actions.confirm')">確認</button>
                 </div>
             </div>
         </div>
@@ -1051,37 +1075,37 @@
     <!-- Add Equipment Modal -->
     <div x-show="showAddEquipmentModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showAddEquipmentModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-4">新增設備</h3>
+            <h3 class="text-lg font-semibold mb-4" x-text="t('modal.addEquipment.title')">新增設備</h3>
             <div class="space-y-3">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">名稱 *</label>
-                    <input type="text" x-model="newEquipment.name" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 發電機">
+                    <label class="block text-sm text-gray-600 mb-1"><span x-text="t('inventory.itemName')">名稱</span> *</label>
+                    <input type="text" x-model="newEquipment.name" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">規格</label>
-                    <input type="text" x-model="newEquipment.specification" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 3kW">
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.specification')">規格</label>
+                    <input type="text" x-model="newEquipment.specification" class="w-full border border-gray-200 rounded-lg px-3 py-2" :placeholder="t('equipment.specPlaceholder')">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">數量</label>
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.quantity')">數量</label>
                         <input type="number" x-model.number="newEquipment.quantity" class="w-full border border-gray-200 rounded-lg px-3 py-2" min="1" value="1">
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">單位</label>
-                        <input type="text" x-model="newEquipment.unit" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="台">
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.unit')">單位</label>
+                        <input type="text" x-model="newEquipment.unit" class="w-full border border-gray-200 rounded-lg px-3 py-2" :placeholder="t('equipment.unitDefault')">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">位置</label>
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.location')">位置</label>
                     <input type="text" x-model="newEquipment.location" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">檢查週期 (天)</label>
-                    <input type="number" x-model.number="newEquipment.check_interval_days" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="1 = 每日檢查" min="1">
+                    <label class="block text-sm text-gray-600 mb-1"><span x-text="t('equipment.checkInterval')">檢查週期</span> (<span x-text="t('equipment.days')">天</span>)</label>
+                    <input type="number" x-model.number="newEquipment.check_interval_days" class="w-full border border-gray-200 rounded-lg px-3 py-2" :placeholder="t('modal.addEquipment.intervalHint')" min="1">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="showAddEquipmentModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doAddEquipment()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">新增</button>
+                    <button @click="showAddEquipmentModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                    <button @click="doAddEquipment()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg" x-text="t('actions.add')">新增</button>
                 </div>
             </div>
         </div>
@@ -1090,37 +1114,37 @@
     <!-- Edit Equipment Modal -->
     <div x-show="showEditEquipmentModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showEditEquipmentModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-4">編輯設備</h3>
+            <h3 class="text-lg font-semibold mb-4" x-text="t('modal.addEquipment.editTitle')">編輯設備</h3>
             <div class="space-y-3">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">名稱 *</label>
+                    <label class="block text-sm text-gray-600 mb-1"><span x-text="t('inventory.itemName')">名稱</span> *</label>
                     <input type="text" x-model="editEquipment.name" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">規格</label>
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.specification')">規格</label>
                     <input type="text" x-model="editEquipment.specification" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                 </div>
                 <div class="grid grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">數量</label>
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.quantity')">數量</label>
                         <input type="number" x-model.number="editEquipment.quantity" class="w-full border border-gray-200 rounded-lg px-3 py-2" min="1">
                     </div>
                     <div>
-                        <label class="block text-sm text-gray-600 mb-1">單位</label>
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.unit')">單位</label>
                         <input type="text" x-model="editEquipment.unit" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">位置</label>
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('inventory.location')">位置</label>
                     <input type="text" x-model="editEquipment.location" class="w-full border border-gray-200 rounded-lg px-3 py-2">
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">檢查週期 (天)</label>
+                    <label class="block text-sm text-gray-600 mb-1"><span x-text="t('equipment.checkInterval')">檢查週期</span> (<span x-text="t('equipment.days')">天</span>)</label>
                     <input type="number" x-model.number="editEquipment.check_interval_days" class="w-full border border-gray-200 rounded-lg px-3 py-2" min="1">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="showEditEquipmentModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doEditEquipment()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">儲存</button>
+                    <button @click="showEditEquipmentModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                    <button @click="doEditEquipment()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg" x-text="t('actions.save')">儲存</button>
                 </div>
             </div>
         </div>
@@ -1129,11 +1153,11 @@
     <!-- Delete Confirmation Modal -->
     <div x-show="showDeleteConfirmModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showDeleteConfirmModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-2 text-red-600">確認刪除</h3>
-            <p class="text-gray-600 mb-4">確定要刪除「<span x-text="deleteTarget?.name"></span>」嗎？此操作無法復原。</p>
+            <h3 class="text-lg font-semibold mb-2 text-red-600" x-text="t('modal.delete.title')">確認刪除</h3>
+            <p class="text-gray-600 mb-4" x-html="t('modal.delete.message', {name: deleteTarget?.name})"></p>
             <div class="flex space-x-3">
-                <button @click="showDeleteConfirmModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                <button @click="doDelete()" class="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg">刪除</button>
+                <button @click="showDeleteConfirmModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                <button @click="doDelete()" class="flex-1 px-4 py-2 bg-red-500 text-white rounded-lg" x-text="t('actions.delete')">刪除</button>
             </div>
         </div>
     </div>
@@ -1141,29 +1165,29 @@
     <!-- Add Message Modal -->
     <div x-show="showAddMessage" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showAddMessage = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-4">發布留言</h3>
+            <h3 class="text-lg font-semibold mb-4" x-text="t('messages.postMessage')">發布留言</h3>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">分類</label>
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('messages.messageCategory')">分類</label>
                     <select x-model="newMessage.category" class="w-full border border-gray-200 rounded-lg px-3 py-2">
-                        <option value="general">一般</option>
-                        <option value="seek_person">尋人</option>
-                        <option value="seek_item">尋物</option>
-                        <option value="offer_help">互助</option>
-                        <option value="report">狀況回報</option>
+                        <option value="general" x-text="t('messages.general')">一般</option>
+                        <option value="seek_person" x-text="t('messages.seekPerson')">尋人</option>
+                        <option value="seek_item" x-text="t('messages.seekItem')">尋物</option>
+                        <option value="offer_help" x-text="t('messages.offerHelp')">互助</option>
+                        <option value="report" x-text="t('messages.report')">狀況回報</option>
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">內容 *</label>
-                    <textarea x-model="newMessage.content" class="w-full border border-gray-200 rounded-lg px-3 py-2 h-24" placeholder="輸入留言內容..."></textarea>
+                    <label class="block text-sm text-gray-600 mb-1"><span x-text="t('messages.content')">內容</span> *</label>
+                    <textarea x-model="newMessage.content" class="w-full border border-gray-200 rounded-lg px-3 py-2 h-24"></textarea>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">顯示名稱</label>
-                    <input type="text" x-model="newMessage.author_name" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="匿名">
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('messages.displayName')">顯示名稱</label>
+                    <input type="text" x-model="newMessage.author_name" class="w-full border border-gray-200 rounded-lg px-3 py-2" :placeholder="t('messages.anonymous')">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="showAddMessage = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doAddMessage()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">發布</button>
+                    <button @click="showAddMessage = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                    <button @click="doAddMessage()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg" x-text="t('messages.post')">發布</button>
                 </div>
             </div>
         </div>
@@ -1172,20 +1196,20 @@
     <!-- Reply Modal -->
     <div x-show="showReplyModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showReplyModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-2">回覆留言</h3>
+            <h3 class="text-lg font-semibold mb-2" x-text="t('messages.replyTo')">回覆留言</h3>
             <p class="text-sm text-gray-500 mb-4 truncate" x-text="replyTarget?.content"></p>
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">回覆內容 *</label>
-                    <textarea x-model="replyForm.content" class="w-full border border-gray-200 rounded-lg px-3 py-2 h-24" placeholder="輸入回覆內容..."></textarea>
+                    <label class="block text-sm text-gray-600 mb-1"><span x-text="t('messages.replyContent')">回覆內容</span> *</label>
+                    <textarea x-model="replyForm.content" class="w-full border border-gray-200 rounded-lg px-3 py-2 h-24"></textarea>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">顯示名稱</label>
-                    <input type="text" x-model="replyForm.author_name" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="匿名">
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('messages.displayName')">顯示名稱</label>
+                    <input type="text" x-model="replyForm.author_name" class="w-full border border-gray-200 rounded-lg px-3 py-2" :placeholder="t('messages.anonymous')">
                 </div>
                 <div class="flex space-x-3">
-                    <button @click="showReplyModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                    <button @click="doReply()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg">回覆</button>
+                    <button @click="showReplyModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                    <button @click="doReply()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg" x-text="t('messages.reply')">回覆</button>
                 </div>
             </div>
         </div>
@@ -1195,8 +1219,8 @@
     <div x-show="showBundleModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold">選擇組套入庫</h3>
-                <button x-show="currentUser && currentUser.role === 'admin'" @click="showBundleModal = false; openBundleManage()" class="text-xs text-primary-600 hover:underline">管理組套</button>
+                <h3 class="text-lg font-semibold" x-text="t('modal.bundle.selectTitle')">選擇組套入庫</h3>
+                <button x-show="currentUser && currentUser.role === 'admin'" @click="showBundleModal = false; openBundleManage()" class="text-xs text-primary-600 hover:underline" x-text="t('modal.bundle.manageTitle')">管理組套</button>
             </div>
             <div class="space-y-2 overflow-y-auto flex-1">
                 <template x-for="bundle in bundles" :key="bundle.id">
@@ -1211,7 +1235,7 @@
                                 <p class="font-medium text-gray-800" x-text="bundle.name"></p>
                                 <p class="text-sm text-gray-500" x-text="bundle.description"></p>
                                 <p class="text-xs text-gray-400 mt-1">
-                                    包含 <span x-text="bundle.items?.length || 0"></span> 項物資
+                                    <span x-text="t('equipment.contains')">包含</span> <span x-text="bundle.items?.length || 0"></span> <span x-text="t('modal.bundle.items')">項物資</span>
                                 </p>
                             </div>
                             <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1220,9 +1244,9 @@
                         </div>
                     </button>
                 </template>
-                <p x-show="bundles.length === 0" class="text-center text-gray-400 py-8">無組套資料</p>
+                <p x-show="bundles.length === 0" class="text-center text-gray-400 py-8" x-text="t('modal.bundle.noBundle')">無組套資料</p>
             </div>
-            <button @click="showBundleModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+            <button @click="showBundleModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
         </div>
     </div>
 
@@ -1230,8 +1254,8 @@
     <div x-show="showBundleManageModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleManageModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm max-h-[80vh] overflow-hidden flex flex-col">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold">管理組套</h3>
-                <button @click="startCreateBundle()" class="bg-primary-600 text-white px-3 py-1 rounded-lg text-sm">新增組套</button>
+                <h3 class="text-lg font-semibold" x-text="t('modal.bundle.manageTitle')">管理組套</h3>
+                <button @click="startCreateBundle()" class="bg-primary-600 text-white px-3 py-1 rounded-lg text-sm" x-text="t('modal.bundle.createBundle')">新增組套</button>
             </div>
             <div class="space-y-2 overflow-y-auto flex-1">
                 <template x-for="bundle in bundles" :key="bundle.id">
@@ -1245,16 +1269,16 @@
                                 </div>
                                 <div class="min-w-0">
                                     <p class="font-medium text-gray-800 truncate" x-text="bundle.name"></p>
-                                    <p class="text-xs text-gray-400"><span x-text="bundle.items?.length || 0"></span> 項物資</p>
+                                    <p class="text-xs text-gray-400"><span x-text="bundle.items?.length || 0"></span> <span x-text="t('modal.bundle.items')">項物資</span></p>
                                 </div>
                             </div>
                             <div class="flex space-x-1 ml-2">
-                                <button @click="startEditBundle(bundle)" class="text-blue-600 p-1.5 bg-blue-50 rounded-lg" title="編輯">
+                                <button @click="startEditBundle(bundle)" class="text-blue-600 p-1.5 bg-blue-50 rounded-lg" :title="t('actions.edit')">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
                                 </button>
-                                <button @click="confirmDeleteBundle(bundle)" class="text-red-600 p-1.5 bg-red-50 rounded-lg" title="刪除">
+                                <button @click="confirmDeleteBundle(bundle)" class="text-red-600 p-1.5 bg-red-50 rounded-lg" :title="t('actions.delete')">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                     </svg>
@@ -1263,9 +1287,9 @@
                         </div>
                     </div>
                 </template>
-                <p x-show="bundles.length === 0" class="text-center text-gray-400 py-8">尚無組套，點擊上方新增</p>
+                <p x-show="bundles.length === 0" class="text-center text-gray-400 py-8" x-text="t('modal.bundle.noBundleHint')">尚無組套，點擊上方新增</p>
             </div>
-            <button @click="showBundleManageModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">關閉</button>
+            <button @click="showBundleManageModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.close')">關閉</button>
         </div>
     </div>
 
@@ -1273,7 +1297,7 @@
     <div x-show="showZoneManageModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showZoneManageModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold">區域管理</h3>
+                <h3 class="text-lg font-semibold" x-text="t('zone.manage') + ' ' + t('zone.zones')">區域管理</h3>
                 <button @click="showZoneManageModal = false" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -1283,22 +1307,22 @@
 
             <!-- New Zone Form -->
             <div class="bg-gray-50 rounded-xl p-4 mb-4">
-                <h4 class="font-medium text-sm mb-3">新增區域</h4>
+                <h4 class="font-medium text-sm mb-3" x-text="t('zone.newZone')">新增區域</h4>
                 <div class="grid grid-cols-2 gap-2 mb-2">
-                    <input type="text" x-model="newZone.id" placeholder="區域代碼 *" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                    <input type="text" x-model="newZone.name" placeholder="區域名稱 *" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                    <input type="text" x-model="newZone.id" :placeholder="t('zone.zoneCode') + ' *'" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
+                    <input type="text" x-model="newZone.name" :placeholder="t('zone.zoneName') + ' *'" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
                 </div>
                 <div class="grid grid-cols-2 gap-2 mb-2">
                     <select x-model="newZone.zone_type" class="border border-gray-200 rounded-lg px-3 py-2 text-sm">
-                        <option value="shelter">收容區域</option>
-                        <option value="medical">醫療區域</option>
-                        <option value="service">服務區域</option>
-                        <option value="restricted">管制區域</option>
+                        <option value="shelter" x-text="t('zone.shelter')">收容區域</option>
+                        <option value="medical" x-text="t('zone.medical')">醫療區域</option>
+                        <option value="service" x-text="t('zone.service')">服務區域</option>
+                        <option value="restricted" x-text="t('zone.restricted')">管制區域</option>
                     </select>
-                    <input type="number" x-model="newZone.capacity" placeholder="容量 (0=無限)" class="border border-gray-200 rounded-lg px-3 py-2 text-sm" min="0">
+                    <input type="number" x-model="newZone.capacity" :placeholder="t('zone.capacity') + ' (' + t('zone.capacityUnlimited') + ')'" class="border border-gray-200 rounded-lg px-3 py-2 text-sm" min="0">
                 </div>
-                <input type="text" x-model="newZone.description" placeholder="說明 (選填)" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2">
-                <button @click="createZone()" class="w-full bg-primary-600 text-white rounded-lg py-2 text-sm font-medium">新增區域</button>
+                <input type="text" x-model="newZone.description" :placeholder="t('zone.description') + ' (' + t('people.optional') + ')'" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm mb-2">
+                <button @click="createZone()" class="w-full bg-primary-600 text-white rounded-lg py-2 text-sm font-medium" x-text="t('zone.createZone')">新增區域</button>
             </div>
 
             <!-- Zone List -->
@@ -1319,7 +1343,7 @@
                                     <p class="font-medium text-sm truncate" x-text="zone.name"></p>
                                     <p class="text-xs text-gray-400">
                                         <span x-text="zone.id"></span>
-                                        <span x-show="zone.capacity > 0"> · 容量: <span x-text="zone.capacity"></span></span>
+                                        <span x-show="zone.capacity > 0"> · <span x-text="t('zone.capacity')">容量</span>: <span x-text="zone.capacity"></span></span>
                                     </p>
                                 </div>
                                 <div class="flex items-center space-x-2">
@@ -1341,10 +1365,8 @@
     <!-- Batch Move Modal (批次移動人員) -->
     <div x-show="showBatchMoveModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBatchMoveModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
-            <h3 class="text-lg font-semibold mb-4">批次移動人員</h3>
-            <p class="text-sm text-gray-600 mb-4">
-                將 <span class="font-semibold text-primary-600" x-text="selectedPeople.length"></span> 人移動至...
-            </p>
+            <h3 class="text-lg font-semibold mb-4" x-text="t('modal.batchMove.title')">批次移動人員</h3>
+            <p class="text-sm text-gray-600 mb-4" x-html="t('modal.batchMove.moveTo', {count: selectedPeople.length})"></p>
 
             <!-- Target Zone Selection -->
             <div class="space-y-2 max-h-60 overflow-y-auto mb-4">
@@ -1372,12 +1394,12 @@
             </div>
 
             <!-- Notes -->
-            <input type="text" x-model="batchMoveForm.notes" placeholder="備註 (選填)" class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-4 text-sm">
+            <input type="text" x-model="batchMoveForm.notes" :placeholder="t('modal.batchMove.notes') + ' (' + t('people.optional') + ')'" class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-4 text-sm">
 
             <!-- Actions -->
             <div class="grid grid-cols-2 gap-2">
-                <button @click="showBatchMoveModal = false" class="px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                <button @click="doBatchMove()" class="px-4 py-2 bg-primary-600 text-white rounded-lg font-medium">確認移動</button>
+                <button @click="showBatchMoveModal = false" class="px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                <button @click="doBatchMove()" class="px-4 py-2 bg-primary-600 text-white rounded-lg font-medium" x-text="t('modal.batchMove.confirm')">確認移動</button>
             </div>
         </div>
     </div>
@@ -1389,40 +1411,38 @@
                 <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
                 </svg>
-                批次退場
+                <span x-text="t('modal.batchCheckout.title')">批次退場</span>
             </h3>
-            <p class="text-gray-600 mb-4">
-                將 <span class="font-semibold text-red-600" x-text="selectedPeople.length"></span> 人辦理離站手續
-            </p>
+            <p class="text-gray-600 mb-4" x-html="t('modal.batchCheckout.message', {count: selectedPeople.length})"></p>
 
             <!-- Selected People Preview -->
             <div class="bg-gray-50 rounded-lg p-3 mb-4 max-h-32 overflow-y-auto">
-                <p class="text-xs text-gray-500 mb-2">即將退場人員：</p>
+                <p class="text-xs text-gray-500 mb-2"><span x-text="t('modal.batchCheckout.preview')">即將退場人員</span>：</p>
                 <div class="flex flex-wrap gap-1">
                     <template x-for="pid in selectedPeople.slice(0, 10)" :key="pid">
                         <span class="text-xs bg-white px-2 py-1 rounded border" x-text="people.find(p => p.id === pid)?.display_name || pid"></span>
                     </template>
-                    <span x-show="selectedPeople.length > 10" class="text-xs text-gray-400">...等 <span x-text="selectedPeople.length"></span> 人</span>
+                    <span x-show="selectedPeople.length > 10" class="text-xs text-gray-400">...<span x-text="t('modal.batchCheckout.andMore')">等</span> <span x-text="selectedPeople.length"></span> <span x-text="t('people.persons')">人</span></span>
                 </div>
             </div>
 
             <!-- Checkout Reason -->
             <div class="mb-4">
-                <label class="block text-sm text-gray-600 mb-2">退場原因</label>
+                <label class="block text-sm text-gray-600 mb-2" x-text="t('modal.batchCheckout.reason')">退場原因</label>
                 <div class="grid grid-cols-3 gap-2">
                     <button @click="batchCheckoutForm.reason = 'DISCHARGE'"
                             :class="batchCheckoutForm.reason === 'DISCHARGE' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'"
-                            class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                            class="px-3 py-2 rounded-lg text-sm font-medium transition" x-text="t('modal.batchCheckout.discharge')">
                         正常離站
                     </button>
                     <button @click="batchCheckoutForm.reason = 'TRANSFER'"
                             :class="batchCheckoutForm.reason === 'TRANSFER' ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-700'"
-                            class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                            class="px-3 py-2 rounded-lg text-sm font-medium transition" x-text="t('modal.batchCheckout.transfer')">
                         轉送醫院
                     </button>
                     <button @click="batchCheckoutForm.reason = 'OTHER'"
                             :class="batchCheckoutForm.reason === 'OTHER' ? 'bg-gray-600 text-white' : 'bg-gray-100 text-gray-700'"
-                            class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                            class="px-3 py-2 rounded-lg text-sm font-medium transition" x-text="t('modal.batchCheckout.other')">
                         其他
                     </button>
                 </div>
@@ -1430,19 +1450,19 @@
 
             <!-- Destination -->
             <div class="mb-4">
-                <label class="block text-sm text-gray-600 mb-1">去向（選填）</label>
-                <input type="text" x-model="batchCheckoutForm.destination" placeholder="例：返家、XX醫院"
+                <label class="block text-sm text-gray-600 mb-1"><span x-text="t('modal.batchCheckout.destination')">去向</span>（<span x-text="t('people.optional')">選填</span>）</label>
+                <input type="text" x-model="batchCheckoutForm.destination" :placeholder="t('modal.batchCheckout.destinationHint')"
                        class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
             </div>
 
             <!-- Notes -->
-            <input type="text" x-model="batchCheckoutForm.notes" placeholder="備註（選填）"
+            <input type="text" x-model="batchCheckoutForm.notes" :placeholder="t('modal.intake.notes') + '（' + t('people.optional') + '）'"
                    class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-4 text-sm">
 
             <!-- Actions -->
             <div class="grid grid-cols-2 gap-2">
-                <button @click="showBatchCheckoutModal = false" class="px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                <button @click="doBatchCheckout()" class="px-4 py-2 bg-red-600 text-white rounded-lg font-medium">確認退場</button>
+                <button @click="showBatchCheckoutModal = false" class="px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                <button @click="doBatchCheckout()" class="px-4 py-2 bg-red-600 text-white rounded-lg font-medium" x-text="t('modal.batchCheckout.confirm')">確認退場</button>
             </div>
         </div>
     </div>
@@ -1454,44 +1474,44 @@
                 <svg class="w-6 h-6 text-primary-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3zm0 5h16m-8 5v-5"/>
                 </svg>
-                資料備份管理
+                <span x-text="t('modal.backup.title')">資料備份管理</span>
             </h3>
 
             <!-- Last Backup Info -->
             <div class="bg-gray-50 rounded-lg p-4 mb-4">
-                <p class="text-sm text-gray-600 mb-1">最近備份</p>
+                <p class="text-sm text-gray-600 mb-1" x-text="t('modal.backup.lastBackup')">最近備份</p>
                 <template x-if="backupStatus.last_backup">
                     <div>
                         <p class="font-medium" x-text="formatBackupTime(backupStatus.last_backup.timestamp)"></p>
-                        <p class="text-xs text-gray-500" x-text="backupStatus.last_backup.backup_type + ' · ' + (backupStatus.last_backup.encrypted ? '已加密' : '未加密')"></p>
+                        <p class="text-xs text-gray-500" x-text="backupStatus.last_backup.backup_type + ' · ' + (backupStatus.last_backup.encrypted ? t('modal.backup.encrypted') : t('modal.backup.notEncrypted'))"></p>
                     </div>
                 </template>
                 <template x-if="!backupStatus.last_backup">
-                    <p class="text-gray-400">尚無備份記錄</p>
+                    <p class="text-gray-400" x-text="t('modal.backup.noBackup')">尚無備份記錄</p>
                 </template>
             </div>
 
             <!-- Create Backup Section -->
             <div class="border border-gray-200 rounded-lg p-4 mb-4">
-                <h4 class="font-medium mb-3">建立新備份</h4>
+                <h4 class="font-medium mb-3" x-text="t('modal.backup.createNew')">建立新備份</h4>
 
                 <!-- Backup Target -->
                 <div class="mb-3">
-                    <label class="block text-sm text-gray-600 mb-2">備份目標</label>
+                    <label class="block text-sm text-gray-600 mb-2" x-text="t('modal.backup.target')">備份目標</label>
                     <div class="grid grid-cols-3 gap-2">
                         <button @click="backupForm.target = 'local'"
                                 :class="backupForm.target === 'local' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'"
-                                class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                                class="px-3 py-2 rounded-lg text-sm font-medium transition" x-text="t('modal.backup.local')">
                             本機
                         </button>
                         <button @click="backupForm.target = 'download'"
                                 :class="backupForm.target === 'download' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'"
-                                class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                                class="px-3 py-2 rounded-lg text-sm font-medium transition" x-text="t('modal.backup.download')">
                             下載
                         </button>
                         <button @click="backupForm.target = 'usb'"
                                 :class="backupForm.target === 'usb' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-700'"
-                                class="px-3 py-2 rounded-lg text-sm font-medium transition">
+                                class="px-3 py-2 rounded-lg text-sm font-medium transition" x-text="t('modal.backup.usb')">
                             USB
                         </button>
                     </div>
@@ -1501,31 +1521,31 @@
                 <div class="mb-3">
                     <label class="flex items-center">
                         <input type="checkbox" x-model="backupForm.encrypt" class="rounded border-gray-300 text-primary-600 mr-2">
-                        <span class="text-sm text-gray-700">加密備份</span>
+                        <span class="text-sm text-gray-700" x-text="t('modal.backup.encrypt')">加密備份</span>
                     </label>
                 </div>
 
                 <!-- Password (if encrypted) -->
                 <div x-show="backupForm.encrypt" class="mb-3">
-                    <label class="block text-sm text-gray-600 mb-1">加密密碼</label>
-                    <input type="password" x-model="backupForm.password" placeholder="請輸入密碼"
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.backup.password')">加密密碼</label>
+                    <input type="password" x-model="backupForm.password"
                            class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm">
                 </div>
 
                 <!-- Notes -->
-                <input type="text" x-model="backupForm.notes" placeholder="備註（選填）"
+                <input type="text" x-model="backupForm.notes" :placeholder="t('modal.intake.notes') + '（' + t('people.optional') + '）'"
                        class="w-full border border-gray-200 rounded-lg px-3 py-2 mb-3 text-sm">
 
                 <button @click="createBackup()" :disabled="backupLoading"
                         class="w-full bg-primary-600 text-white rounded-lg py-2 font-medium disabled:opacity-50">
-                    <span x-show="!backupLoading">建立備份</span>
-                    <span x-show="backupLoading">備份中...</span>
+                    <span x-show="!backupLoading" x-text="t('modal.backup.create')">建立備份</span>
+                    <span x-show="backupLoading" x-text="t('modal.backup.creating')">備份中...</span>
                 </button>
             </div>
 
             <!-- Backup History -->
             <div class="border border-gray-200 rounded-lg p-4">
-                <h4 class="font-medium mb-3">備份記錄</h4>
+                <h4 class="font-medium mb-3" x-text="t('modal.backup.history')">備份記錄</h4>
                 <div class="space-y-2 max-h-40 overflow-y-auto">
                     <template x-for="backup in backupStatus.local_backups?.slice(0, 5)" :key="backup.filename">
                         <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 text-sm">
@@ -1543,12 +1563,12 @@
                             <span class="text-xs text-gray-400" x-text="formatBackupTime(backup.modified)"></span>
                         </div>
                     </template>
-                    <p x-show="!backupStatus.local_backups?.length" class="text-gray-400 text-sm text-center py-2">暫無本機備份</p>
+                    <p x-show="!backupStatus.local_backups?.length" class="text-gray-400 text-sm text-center py-2" x-text="t('modal.backup.noLocalBackup')">暫無本機備份</p>
                 </div>
             </div>
 
             <!-- Close Button -->
-            <button @click="showBackupModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg">
+            <button @click="showBackupModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.close')">
                 關閉
             </button>
         </div>
@@ -1599,39 +1619,41 @@
                 <svg class="w-6 h-6 text-amber-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/>
                 </svg>
-                發佈公告
+                <span x-text="t('modal.broadcast.title')">發佈公告</span>
             </h3>
 
             <!-- Current Broadcast -->
             <div x-show="broadcast" class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-                <p class="text-xs text-amber-600 mb-1">目前公告：</p>
+                <p class="text-xs text-amber-600 mb-1"><span x-text="t('modal.broadcast.current')">目前公告</span>：</p>
                 <p class="text-sm text-amber-800" x-text="broadcast"></p>
             </div>
 
             <div class="space-y-4">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">公告內容</label>
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.broadcast.content')">公告內容</label>
                     <textarea x-model="broadcastForm.content" rows="3"
                               class="w-full border border-gray-200 rounded-lg px-3 py-2 resize-none"
-                              placeholder="輸入要發佈到 Portal 的公告訊息..."></textarea>
+                              :placeholder="t('modal.broadcast.placeholder')"></textarea>
                 </div>
                 <p class="text-xs text-gray-500">
                     <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    公告會顯示在 Portal 公開看板，所有人都能看到
+                    <span x-text="t('modal.broadcast.hint')">公告會顯示在 Portal 公開看板，所有人都能看到</span>
                 </p>
                 <div class="flex space-x-3">
-                    <button @click="showBroadcastModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                    <button @click="showBroadcastModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
                     <button @click="publishBroadcast()"
                             :disabled="!broadcastForm.content.trim()"
                             :class="broadcastForm.content.trim() ? 'bg-amber-500 hover:bg-amber-600' : 'bg-gray-300 cursor-not-allowed'"
-                            class="flex-1 px-4 py-2 text-white rounded-lg transition-colors">
+                            class="flex-1 px-4 py-2 text-white rounded-lg transition-colors"
+                            x-text="t('modal.broadcast.publish')">
                         發佈
                     </button>
                 </div>
                 <button x-show="broadcast" @click="clearBroadcast()"
-                        class="w-full px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
+                        class="w-full px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+                        x-text="t('modal.broadcast.clear')">
                     清除目前公告
                 </button>
             </div>
@@ -1655,12 +1677,12 @@
                 <div>
                     <h3 class="font-semibold" x-text="personToMove?.display_name"></h3>
                     <p class="text-xs text-gray-500">
-                        目前位置：<span x-text="zones.find(z => z.id === personToMove?.current_location)?.name || '未指定'"></span>
+                        <span x-text="t('modal.personMove.currentLocation')">目前位置</span>：<span x-text="zones.find(z => z.id === personToMove?.current_location)?.name || t('modal.personMove.unassigned')"></span>
                     </p>
                 </div>
             </div>
 
-            <p class="text-sm text-gray-600 mb-3">選擇目標區域：</p>
+            <p class="text-sm text-gray-600 mb-3"><span x-text="t('modal.personMove.selectTarget')">選擇目標區域</span>：</p>
 
             <!-- Target Zone Selection -->
             <div class="space-y-2 max-h-52 overflow-y-auto mb-4">
@@ -1689,8 +1711,8 @@
 
             <!-- Actions -->
             <div class="grid grid-cols-2 gap-2">
-                <button @click="showPersonMoveModal = false" class="px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                <button @click="doPersonMove()" class="px-4 py-2 bg-primary-600 text-white rounded-lg font-medium">確認移動</button>
+                <button @click="showPersonMoveModal = false" class="px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                <button @click="doPersonMove()" class="px-4 py-2 bg-primary-600 text-white rounded-lg font-medium" x-text="t('modal.batchMove.confirm')">確認移動</button>
             </div>
         </div>
     </div>
@@ -1698,22 +1720,22 @@
     <!-- Bundle Edit Modal (新增/編輯組套) -->
     <div x-show="showBundleEditModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleEditModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-            <h3 class="text-lg font-semibold mb-4" x-text="editingBundle ? '編輯組套' : '新增組套'"></h3>
+            <h3 class="text-lg font-semibold mb-4" x-text="editingBundle ? t('modal.bundle.editBundle') : t('modal.bundle.createBundle')"></h3>
 
             <div class="space-y-3 overflow-y-auto flex-1">
                 <!-- Basic Info -->
                 <div>
-                    <label class="block text-xs text-gray-600 mb-1">名稱 *</label>
+                    <label class="block text-xs text-gray-600 mb-1"><span x-text="t('modal.bundle.bundleName')">名稱</span> *</label>
                     <input type="text" x-model="bundleForm.name" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 防災包">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-600 mb-1">說明</label>
+                    <label class="block text-xs text-gray-600 mb-1" x-text="t('modal.bundle.bundleDesc')">說明</label>
                     <input type="text" x-model="bundleForm.description" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="例: 標準緊急避難包">
                 </div>
 
                 <!-- Icon Selector (heroicon grid) -->
                 <div>
-                    <label class="block text-xs text-gray-600 mb-2">選擇圖示</label>
+                    <label class="block text-xs text-gray-600 mb-2" x-text="t('modal.bundle.selectIcon')">選擇圖示</label>
                     <div class="grid grid-cols-8 gap-1.5">
                         <template x-for="icon in bundleIconOptions" :key="icon.id">
                             <button type="button"
@@ -1731,7 +1753,7 @@
 
                 <!-- Items List with move buttons and quantity edit -->
                 <div class="border-t pt-3">
-                    <p class="text-sm font-medium text-gray-700 mb-2">物資清單 (<span x-text="bundleForm.items.length"></span> 項)</p>
+                    <p class="text-sm font-medium text-gray-700 mb-2"><span x-text="t('modal.bundle.itemList')">物資清單</span> (<span x-text="bundleForm.items.length"></span> <span x-text="t('modal.bundle.items')">項物資</span>)</p>
                     <div class="space-y-1 max-h-40 overflow-y-auto mb-3">
                         <template x-for="(item, idx) in bundleForm.items" :key="idx">
                             <div class="flex items-center bg-gray-50 rounded-lg px-2 py-2 text-sm">
@@ -1770,37 +1792,37 @@
                                 </button>
                             </div>
                         </template>
-                        <p x-show="bundleForm.items.length === 0" class="text-xs text-gray-400 text-center py-2">尚無物資</p>
+                        <p x-show="bundleForm.items.length === 0" class="text-xs text-gray-400 text-center py-2" x-text="t('modal.bundle.noItems')">尚無物資</p>
                     </div>
 
                     <!-- Add Item Form -->
                     <div class="bg-primary-100 rounded-xl p-3">
-                        <p class="text-xs font-medium text-primary-700 mb-2">新增物資</p>
+                        <p class="text-xs font-medium text-primary-700 mb-2" x-text="t('modal.bundle.addItem')">新增物資</p>
                         <div class="grid grid-cols-2 gap-2 mb-2">
-                            <input type="text" x-model="newBundleItem.name" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="名稱 *">
-                            <input type="text" x-model="newBundleItem.specification" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="規格">
+                            <input type="text" x-model="newBundleItem.name" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" :placeholder="t('inventory.itemName') + ' *'">
+                            <input type="text" x-model="newBundleItem.specification" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" :placeholder="t('inventory.specification')">
                         </div>
                         <div class="grid grid-cols-4 gap-2 mb-2">
                             <select x-model="newBundleItem.category" class="col-span-2 border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white">
-                                <option value="water">水</option>
-                                <option value="food">食物</option>
-                                <option value="medical">醫療</option>
-                                <option value="power">電力</option>
-                                <option value="daily">日用品</option>
-                                <option value="equipment">設備</option>
-                                <option value="other">其他</option>
+                                <option value="water" x-text="t('inventory.water')">水</option>
+                                <option value="food" x-text="t('inventory.food')">食物</option>
+                                <option value="medical" x-text="t('inventory.medical')">醫療</option>
+                                <option value="power" x-text="t('inventory.power')">電力</option>
+                                <option value="daily" x-text="t('inventory.daily')">日用品</option>
+                                <option value="equipment" x-text="t('inventory.equipment')">設備</option>
+                                <option value="other" x-text="t('inventory.other')">其他</option>
                             </select>
-                            <input type="number" x-model.number="newBundleItem.quantity" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white" min="1" placeholder="數量">
-                            <input type="text" x-model="newBundleItem.unit" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="單位">
+                            <input type="number" x-model.number="newBundleItem.quantity" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white" min="1" :placeholder="t('inventory.quantity')">
+                            <input type="text" x-model="newBundleItem.unit" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" :placeholder="t('inventory.unit')">
                         </div>
-                        <button @click="addBundleItem()" class="w-full bg-primary-600 text-white rounded-lg py-1.5 text-sm font-medium">+ 加入物資</button>
+                        <button @click="addBundleItem()" class="w-full bg-primary-600 text-white rounded-lg py-1.5 text-sm font-medium">+ <span x-text="t('modal.bundle.addToList')">加入物資</span></button>
                     </div>
                 </div>
             </div>
 
             <div class="flex space-x-3 mt-4 pt-3 border-t">
-                <button @click="showBundleEditModal = false; showBundleManageModal = true" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                <button @click="saveBundle()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium">儲存</button>
+                <button @click="showBundleEditModal = false; showBundleManageModal = true" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                <button @click="saveBundle()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium" x-text="t('actions.save')">儲存</button>
             </div>
         </div>
     </div>
@@ -1823,9 +1845,9 @@
             <!-- Bundle Items List with Checkboxes -->
             <div class="bg-gray-50 rounded-xl p-3 mb-4 overflow-y-auto min-h-0 flex-1">
                 <div class="flex justify-between items-center mb-2">
-                    <p class="text-xs text-gray-500 font-medium">勾選要入庫的物資：</p>
+                    <p class="text-xs text-gray-500 font-medium" x-text="t('modal.bundle.selectItems')">勾選要入庫的物資</p>
                     <button @click="toggleAllBundleItems()" class="text-xs text-primary-600 hover:underline">
-                        <span x-text="selectedBundleItems.length === (selectedBundle?.items?.length || 0) ? '取消全選' : '全選'"></span>
+                        <span x-text="selectedBundleItems.length === (selectedBundle?.items?.length || 0) ? t('modal.bundle.deselectAll') : t('modal.bundle.selectAll')"></span>
                     </button>
                 </div>
                 <div class="space-y-1">
@@ -1851,7 +1873,7 @@
             <!-- Multiplier & Location -->
             <div class="space-y-3 mb-4 flex-shrink-0">
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">入庫套數</label>
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.bundle.intakeQty')">入庫套數</label>
                     <div class="flex items-center space-x-3">
                         <button @click="bundleIntakeForm.multiplier = Math.max(1, bundleIntakeForm.multiplier - 1)" class="w-10 h-10 bg-gray-100 rounded-lg text-lg font-medium">-</button>
                         <input type="number" x-model.number="bundleIntakeForm.multiplier" class="flex-1 border border-gray-200 rounded-lg px-3 py-2 text-center text-lg font-medium" min="1">
@@ -1859,27 +1881,27 @@
                     </div>
                 </div>
                 <div>
-                    <label class="block text-sm text-gray-600 mb-1">存放位置</label>
-                    <input type="text" x-model="bundleIntakeForm.location" class="w-full border border-gray-200 rounded-lg px-3 py-2" placeholder="倉庫A (選填)">
+                    <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.bundle.storageLocation')">存放位置</label>
+                    <input type="text" x-model="bundleIntakeForm.location" class="w-full border border-gray-200 rounded-lg px-3 py-2" :placeholder="t('inventory.location') + ' (' + t('people.optional') + ')'">
                 </div>
             </div>
 
             <!-- Summary -->
             <div class="bg-primary-100 rounded-lg p-3 mb-4 text-sm flex-shrink-0">
                 <p class="text-primary-800">
-                    將入庫 <span class="font-bold" x-text="bundleIntakeForm.multiplier"></span> 套，
-                    共 <span class="font-bold" x-text="selectedBundleItems.length * bundleIntakeForm.multiplier"></span> 項物資
+                    <span x-text="t('modal.bundle.summary')">將入庫</span> <span class="font-bold" x-text="bundleIntakeForm.multiplier"></span> <span x-text="t('modal.bundle.sets')">套</span>，
+                    <span x-text="t('modal.bundle.totalItems')">共</span> <span class="font-bold" x-text="selectedBundleItems.length * bundleIntakeForm.multiplier"></span> <span x-text="t('modal.bundle.items')">項物資</span>
                     <span x-show="selectedBundleItems.length < (selectedBundle?.items?.length || 0)" class="text-primary-600">
-                        (已選 <span x-text="selectedBundleItems.length"></span>/<span x-text="selectedBundle?.items?.length || 0"></span>)
+                        (<span x-text="t('modal.bundle.selectedOf')">已選</span> <span x-text="selectedBundleItems.length"></span>/<span x-text="selectedBundle?.items?.length || 0"></span>)
                     </span>
                 </p>
             </div>
 
             <div class="flex space-x-3 flex-shrink-0">
-                <button @click="showBundleDetailModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">返回</button>
+                <button @click="showBundleDetailModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.back')">返回</button>
                 <button @click="doBundleIntake()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium"
                         :disabled="selectedBundleItems.length === 0"
-                        :class="selectedBundleItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''">確認入庫</button>
+                        :class="selectedBundleItems.length === 0 ? 'opacity-50 cursor-not-allowed' : ''" x-text="t('modal.intake.confirm')">確認入庫</button>
             </div>
         </div>
     </div>
@@ -1887,18 +1909,18 @@
     <!-- Distribute QR Code Modal (z-60 to show above other modals) -->
     <div x-show="showDistributeQRModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4" @click.self="showDistributeQRModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
-            <h3 class="text-lg font-semibold mb-2">發放記錄 QR Code</h3>
+            <h3 class="text-lg font-semibold mb-2" x-text="t('modal.distribute.qrTitle')">發放記錄 QR Code</h3>
             <p class="text-sm text-gray-600 mb-4">
                 <span x-text="lastDistributeResult?.item?.name"></span>
                 <span x-show="lastDistributeResult?.item?.specification" class="text-gray-400">(<span x-text="lastDistributeResult?.item?.specification"></span>)</span>
                 x <span x-text="lastDistributeResult?.quantity"></span>
                 <span x-show="lastDistributeResult?.person_id" class="block text-xs text-gray-400 mt-1">
-                    領取人: <span x-text="lastDistributeResult?.person_id"></span>
+                    <span x-text="t('modal.distribute.recipient')">領取人</span>: <span x-text="lastDistributeResult?.person_id"></span>
                 </span>
             </p>
             <div id="distribute-qrcode" class="flex justify-center mb-4"></div>
-            <p class="text-sm text-gray-500 mb-4">讓領取人用 HIRS App 掃描此 QR Code 同步到家庭物資</p>
-            <button @click="showDistributeQRModal = false" class="w-full py-2 bg-primary-600 text-white rounded-lg font-medium">關閉</button>
+            <p class="text-sm text-gray-500 mb-4" x-text="t('modal.distribute.scanHint')">讓領取人用 HIRS App 掃描此 QR Code 同步到家庭物資</p>
+            <button @click="showDistributeQRModal = false" class="w-full py-2 bg-primary-600 text-white rounded-lg font-medium" x-text="t('actions.close')">關閉</button>
         </div>
     </div>
 
@@ -1910,7 +1932,7 @@
                     <svg class="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
                     </svg>
-                    接收捐贈
+                    <span x-text="t('modal.donation.title')">接收捐贈</span>
                 </h3>
                 <button @click="showDonationModal = false" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1921,15 +1943,15 @@
 
             <!-- Donor Info -->
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">捐贈者姓名 (選填)</label>
-                <input type="text" x-model="donationDonorName" placeholder="例：王先生" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1"><span x-text="t('modal.donation.donorName')">捐贈者姓名</span> (<span x-text="t('people.optional')">選填</span>)</label>
+                <input type="text" x-model="donationDonorName" :placeholder="t('modal.donation.donorPlaceholder')" class="w-full border border-gray-200 rounded-lg px-3 py-2">
             </div>
 
             <!-- Item Selection -->
             <div class="flex-1 overflow-y-auto mb-4">
                 <div class="flex justify-between items-center mb-2">
-                    <label class="block text-sm font-medium text-gray-700">捐贈物資</label>
-                    <button @click="addDonationItem()" class="text-sm text-primary-600 hover:underline">+ 新增品項</button>
+                    <label class="block text-sm font-medium text-gray-700" x-text="t('modal.donation.items')">捐贈物資</label>
+                    <button @click="addDonationItem()" class="text-sm text-primary-600 hover:underline">+ <span x-text="t('modal.donation.addItem')">新增品項</span></button>
                 </div>
 
                 <div class="space-y-3">
@@ -1937,11 +1959,11 @@
                         <div class="bg-gray-50 rounded-lg p-3">
                             <div class="flex items-center gap-2 mb-2">
                                 <select x-model="item.item_id" @change="onDonationItemSelect(index)" class="flex-1 border border-gray-200 rounded px-2 py-1 text-sm">
-                                    <option value="">-- 選擇現有物品或新增 --</option>
+                                    <option value="">-- <span x-text="t('modal.donation.selectItem')">選擇現有物品或新增</span> --</option>
                                     <template x-for="inv in inventory" :key="inv.id">
                                         <option :value="inv.id" x-text="inv.name + (inv.specification ? ' (' + inv.specification + ')' : '')"></option>
                                     </template>
-                                    <option value="new">+ 新增物品</option>
+                                    <option value="new">+ <span x-text="t('modal.donation.newItem')">新增物品</span></option>
                                 </select>
                                 <button @click="removeDonationItem(index)" class="text-red-500 hover:text-red-700">
                                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1952,23 +1974,23 @@
 
                             <!-- New Item Fields -->
                             <div x-show="item.item_id === 'new'" class="space-y-2 mb-2">
-                                <input type="text" x-model="item.name" placeholder="物品名稱" class="w-full border border-gray-200 rounded px-2 py-1 text-sm">
+                                <input type="text" x-model="item.name" :placeholder="t('modal.donation.itemName')" class="w-full border border-gray-200 rounded px-2 py-1 text-sm">
                                 <div class="flex gap-2">
                                     <select x-model="item.category" class="flex-1 border border-gray-200 rounded px-2 py-1 text-sm">
-                                        <option value="water">水</option>
-                                        <option value="food">食物</option>
-                                        <option value="medical">醫療</option>
-                                        <option value="power">電力</option>
-                                        <option value="daily">日用品</option>
-                                        <option value="other">其他</option>
+                                        <option value="water" x-text="t('inventory.water')">水</option>
+                                        <option value="food" x-text="t('inventory.food')">食物</option>
+                                        <option value="medical" x-text="t('inventory.medical')">醫療</option>
+                                        <option value="power" x-text="t('inventory.power')">電力</option>
+                                        <option value="daily" x-text="t('inventory.daily')">日用品</option>
+                                        <option value="other" x-text="t('inventory.other')">其他</option>
                                     </select>
-                                    <input type="text" x-model="item.unit" placeholder="單位" class="w-20 border border-gray-200 rounded px-2 py-1 text-sm">
+                                    <input type="text" x-model="item.unit" :placeholder="t('inventory.unit')" class="w-20 border border-gray-200 rounded px-2 py-1 text-sm">
                                 </div>
                             </div>
 
                             <!-- Quantity -->
                             <div class="flex items-center gap-2">
-                                <label class="text-sm text-gray-600">數量:</label>
+                                <label class="text-sm text-gray-600"><span x-text="t('modal.donation.quantity')">數量</span>:</label>
                                 <input type="number" x-model.number="item.quantity" min="0.1" step="0.1" class="w-24 border border-gray-200 rounded px-2 py-1 text-sm">
                                 <span class="text-sm text-gray-500" x-text="item.unit || '個'"></span>
                             </div>
@@ -1976,21 +1998,21 @@
                     </template>
 
                     <div x-show="donationItems.length === 0" class="text-center py-8 text-gray-400">
-                        <p>點擊「新增品項」開始登記捐贈物資</p>
+                        <p x-text="t('modal.donation.noItems')">點擊「新增品項」開始登記捐贈物資</p>
                     </div>
                 </div>
             </div>
 
             <!-- Notes -->
             <div class="mb-4">
-                <label class="block text-sm font-medium text-gray-700 mb-1">備註</label>
-                <input type="text" x-model="donationNotes" placeholder="選填" class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                <label class="block text-sm font-medium text-gray-700 mb-1" x-text="t('modal.donation.notes')">備註</label>
+                <input type="text" x-model="donationNotes" :placeholder="t('people.optional')" class="w-full border border-gray-200 rounded-lg px-3 py-2">
             </div>
 
             <!-- Actions -->
             <div class="flex gap-2">
-                <button @click="showDonationModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                <button @click="submitDonation()" :disabled="donationItems.length === 0" class="flex-1 px-4 py-2 bg-pink-500 text-white rounded-lg disabled:opacity-50">
+                <button @click="showDonationModal = false" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                <button @click="submitDonation()" :disabled="donationItems.length === 0" class="flex-1 px-4 py-2 bg-pink-500 text-white rounded-lg disabled:opacity-50" x-text="t('modal.donation.confirm')">
                     確認入庫
                 </button>
             </div>
@@ -2004,15 +2026,15 @@
                 <svg class="w-6 h-6 text-pink-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                捐贈收據
+                <span x-text="t('modal.donation.receiptTitle')">捐贈收據</span>
             </h3>
             <p class="text-sm text-gray-600 mb-4">
-                感謝 <span class="font-semibold" x-text="lastDonationReceipt?.payload?.donor_name || '愛心人士'"></span> 的捐贈！
+                <span x-text="t('modal.donation.thanks')">感謝</span> <span class="font-semibold" x-text="lastDonationReceipt?.payload?.donor_name || t('modal.donation.donor')"></span> <span x-text="t('modal.donation.donation')">的捐贈！</span>
             </p>
             <div id="donation-receipt-qrcode" class="flex justify-center mb-4"></div>
-            <p class="text-sm text-gray-500 mb-2">捐贈者可用 HIRS App 掃描此 QR Code</p>
-            <p class="text-xs text-gray-400 mb-4">收據編號: <span x-text="lastDonationReceipt?.payload?.receipt_id"></span></p>
-            <button @click="showDonationReceiptModal = false" class="w-full py-2 bg-pink-500 text-white rounded-lg font-medium">關閉</button>
+            <p class="text-sm text-gray-500 mb-2" x-text="t('modal.donation.scanHint')">捐贈者可用 HIRS App 掃描此 QR Code</p>
+            <p class="text-xs text-gray-400 mb-4"><span x-text="t('modal.donation.receiptId')">收據編號</span>: <span x-text="lastDonationReceipt?.payload?.receipt_id"></span></p>
+            <button @click="showDonationReceiptModal = false" class="w-full py-2 bg-pink-500 text-white rounded-lg font-medium" x-text="t('actions.close')">關閉</button>
         </div>
     </div>
 
@@ -2020,7 +2042,7 @@
     <div x-show="showInventoryHistoryModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showInventoryHistoryModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[85vh] overflow-hidden flex flex-col">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-lg font-semibold">物資進出紀錄</h3>
+                <h3 class="text-lg font-semibold" x-text="t('inventory.historyTitle')">物資進出紀錄</h3>
                 <button @click="showInventoryHistoryModal = false" class="text-gray-400 hover:text-gray-600">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -2030,9 +2052,9 @@
 
             <!-- Filter Tabs -->
             <div class="flex space-x-2 mb-3">
-                <button @click="historyFilter = ''" :class="historyFilter === '' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded-full text-xs">全部</button>
-                <button @click="historyFilter = 'RESOURCE_IN'" :class="historyFilter === 'RESOURCE_IN' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded-full text-xs">入庫</button>
-                <button @click="historyFilter = 'RESOURCE_OUT'" :class="historyFilter === 'RESOURCE_OUT' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded-full text-xs">發放</button>
+                <button @click="historyFilter = ''" :class="historyFilter === '' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded-full text-xs" x-text="t('inventory.all')">全部</button>
+                <button @click="historyFilter = 'RESOURCE_IN'" :class="historyFilter === 'RESOURCE_IN' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded-full text-xs" x-text="t('inventory.intake')">入庫</button>
+                <button @click="historyFilter = 'RESOURCE_OUT'" :class="historyFilter === 'RESOURCE_OUT' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600'" class="px-3 py-1 rounded-full text-xs" x-text="t('inventory.distribute')">發放</button>
             </div>
 
             <!-- History List -->
@@ -2040,20 +2062,20 @@
                 <template x-for="event in filteredHistory" :key="event.id">
                     <div class="bg-gray-50 rounded-lg p-3 text-sm">
                         <div class="flex items-center justify-between mb-1">
-                            <span class="font-medium" x-text="event.item_name || '未知物資'"></span>
+                            <span class="font-medium" x-text="event.item_name || t('inventory.unknownItem')"></span>
                             <div class="flex items-center gap-2">
                                 <!-- QR Code button for RESOURCE_OUT events -->
                                 <button x-show="event.event_type === 'RESOURCE_OUT'"
                                         @click="regenerateDistributeQR(event)"
                                         class="p-1 text-primary-600 hover:bg-primary-50 rounded"
-                                        title="產生 QR Code">
+                                        title="QR Code">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
                                     </svg>
                                 </button>
                                 <span class="text-xs px-2 py-0.5 rounded"
                                       :class="event.event_type === 'RESOURCE_IN' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'"
-                                      x-text="event.event_type === 'RESOURCE_IN' ? '入庫' : '發放'"></span>
+                                      x-text="event.event_type === 'RESOURCE_IN' ? t('inventory.intake') : t('inventory.distribute')"></span>
                             </div>
                         </div>
                         <div class="flex items-center justify-between text-gray-500">
@@ -2061,17 +2083,17 @@
                                 <span :class="event.quantity_change > 0 ? 'text-green-600' : 'text-amber-600'" x-text="(event.quantity_change > 0 ? '+' : '') + event.quantity_change"></span>
                                 <span x-show="event.person_name" class="ml-2">→ <span x-text="event.person_name"></span></span>
                             </span>
-                            <span class="text-xs" x-text="new Date(event.timestamp).toLocaleString('zh-TW', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'})"></span>
+                            <span class="text-xs" x-text="new Date(event.timestamp).toLocaleString(currentLang === 'ja' ? 'ja-JP' : 'zh-TW', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'})"></span>
                         </div>
                         <p x-show="event.notes" class="text-xs text-gray-400 mt-1" x-text="event.notes"></p>
                     </div>
                 </template>
-                <p x-show="inventoryHistory.length === 0" class="text-center text-gray-400 py-8">尚無紀錄</p>
-                <p x-show="inventoryHistory.length > 0 && filteredHistory.length === 0" class="text-center text-gray-400 py-8">無符合條件的紀錄</p>
+                <p x-show="inventoryHistory.length === 0" class="text-center text-gray-400 py-8" x-text="t('inventory.noHistory')">尚無紀錄</p>
+                <p x-show="inventoryHistory.length > 0 && filteredHistory.length === 0" class="text-center text-gray-400 py-8" x-text="t('inventory.noMatchingHistory')">無符合條件的紀錄</p>
             </div>
 
             <!-- Load More -->
-            <button x-show="inventoryHistory.length >= 50" @click="loadMoreHistory()" class="mt-3 w-full py-2 text-sm text-primary-600 hover:underline">載入更多</button>
+            <button x-show="inventoryHistory.length >= 50" @click="loadMoreHistory()" class="mt-3 w-full py-2 text-sm text-primary-600 hover:underline" x-text="t('inventory.loadMore')">載入更多</button>
         </div>
     </div>
 
@@ -2129,10 +2151,10 @@
                     <!-- 全選/取消全選 -->
                     <div class="flex justify-between items-center mb-2 px-1 flex-shrink-0">
                         <span class="text-sm text-gray-600">
-                            已選 <span class="font-medium text-primary-600" x-text="selectedTemplateItems.length"></span> / <span x-text="selectedEquipmentTemplate.items?.length || 0"></span> 項
+                            <span x-text="t('equipment.selected')">已選</span> <span class="font-medium text-primary-600" x-text="selectedTemplateItems.length"></span> / <span x-text="selectedEquipmentTemplate.items?.length || 0"></span> <span x-text="t('equipment.items')">項</span>
                         </span>
                         <button @click="toggleAllTemplateItems()" class="text-xs text-primary-600 hover:underline">
-                            <span x-text="selectedTemplateItems.length === (selectedEquipmentTemplate.items?.length || 0) ? '取消全選' : '全選'"></span>
+                            <span x-text="selectedTemplateItems.length === (selectedEquipmentTemplate.items?.length || 0) ? t('equipment.deselectAll') : t('equipment.selectAll')"></span>
                         </button>
                     </div>
                     <!-- 設備清單 -->
@@ -2148,7 +2170,7 @@
                                     <p class="text-xs text-gray-500">
                                         <span x-text="item.specification || '-'"></span>
                                         · <span x-text="item.quantity"></span> <span x-text="item.unit"></span>
-                                        · 每 <span x-text="item.check_interval_days"></span> 天檢查
+                                        · <span x-text="t('equipment.checkInterval')">點検周期</span> <span x-text="item.check_interval_days"></span> <span x-text="t('equipment.days')">日</span>
                                     </p>
                                 </div>
                             </label>
@@ -2156,10 +2178,10 @@
                     </div>
                     <!-- 按鈕 -->
                     <div class="flex space-x-2 mt-4 flex-shrink-0">
-                        <button @click="selectedEquipmentTemplate = null; selectedTemplateItems = []" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">返回</button>
+                        <button @click="selectedEquipmentTemplate = null; selectedTemplateItems = []" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.back')">返回</button>
                         <button @click="applySelectedTemplateItems()" :disabled="selectedTemplateItems.length === 0"
                                 class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed">
-                            建立 (<span x-text="selectedTemplateItems.length"></span> 項)
+                            <span x-text="t('equipment.createItems')">建立</span> (<span x-text="selectedTemplateItems.length"></span> <span x-text="t('equipment.items')">項</span>)
                         </button>
                     </div>
                 </div>
@@ -2186,16 +2208,16 @@
                                 </div>
                                 <div class="min-w-0">
                                     <p class="font-medium text-gray-800 truncate" x-text="template.name"></p>
-                                    <p class="text-xs text-gray-400"><span x-text="template.items?.length || 0"></span> 項設備</p>
+                                    <p class="text-xs text-gray-400"><span x-text="template.items?.length || 0"></span> <span x-text="t('equipment.itemCount')">項設備</span></p>
                                 </div>
                             </div>
                             <div class="flex space-x-1 ml-2">
-                                <button @click="startEditEquipmentTemplate(template)" class="text-blue-600 p-1.5 bg-blue-50 rounded-lg" title="編輯">
+                                <button @click="startEditEquipmentTemplate(template)" class="text-blue-600 p-1.5 bg-blue-50 rounded-lg" :title="t('actions.edit')">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
                                     </svg>
                                 </button>
-                                <button @click="confirmDeleteEquipmentTemplate(template)" class="text-red-600 p-1.5 bg-red-50 rounded-lg" title="刪除">
+                                <button @click="confirmDeleteEquipmentTemplate(template)" class="text-red-600 p-1.5 bg-red-50 rounded-lg" :title="t('actions.delete')">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                                     </svg>
@@ -2204,31 +2226,31 @@
                         </div>
                     </div>
                 </template>
-                <p x-show="equipmentTemplates.length === 0" class="text-center text-gray-400 py-8">尚無範本，點擊上方新增</p>
+                <p x-show="equipmentTemplates.length === 0" class="text-center text-gray-400 py-8" x-text="t('equipment.noTemplateAdmin')">尚無範本，點擊上方新增</p>
             </div>
-            <button @click="showEquipmentTemplateManageModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg flex-shrink-0">關閉</button>
+            <button @click="showEquipmentTemplateManageModal = false" class="w-full mt-4 px-4 py-2 border border-gray-200 rounded-lg flex-shrink-0" x-text="t('actions.close')">關閉</button>
         </div>
     </div>
 
     <!-- Equipment Template Edit Modal (新增/編輯設備範本) -->
     <div x-show="showEquipmentTemplateEditModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showEquipmentTemplateEditModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] flex flex-col">
-            <h3 class="text-lg font-semibold mb-4 flex-shrink-0" x-text="editingEquipmentTemplate ? '編輯設備範本' : '新增設備範本'"></h3>
+            <h3 class="text-lg font-semibold mb-4 flex-shrink-0" x-text="editingEquipmentTemplate ? t('equipment.editTemplate') : t('equipment.createTemplate')"></h3>
 
             <div class="space-y-3 overflow-y-auto min-h-0 flex-1">
                 <!-- Basic Info -->
                 <div>
-                    <label class="block text-xs text-gray-600 mb-1">名稱 *</label>
-                    <input type="text" x-model="equipmentTemplateForm.name" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="例：發電機組">
+                    <label class="block text-xs text-gray-600 mb-1"><span x-text="t('equipment.templateName')">名稱</span> *</label>
+                    <input type="text" x-model="equipmentTemplateForm.name" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" :placeholder="t('equipment.templateNamePlaceholder')">
                 </div>
                 <div>
-                    <label class="block text-xs text-gray-600 mb-1">說明</label>
-                    <input type="text" x-model="equipmentTemplateForm.description" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" placeholder="例：緊急供電設備">
+                    <label class="block text-xs text-gray-600 mb-1" x-text="t('equipment.templateDesc')">說明</label>
+                    <input type="text" x-model="equipmentTemplateForm.description" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm" :placeholder="t('equipment.templateDescPlaceholder')">
                 </div>
 
                 <!-- Icon Selector -->
                 <div>
-                    <label class="block text-xs text-gray-600 mb-2">選擇圖示</label>
+                    <label class="block text-xs text-gray-600 mb-2" x-text="t('equipment.selectIcon')">選擇圖示</label>
                     <div class="grid grid-cols-8 gap-1.5">
                         <template x-for="icon in equipmentTemplateIconOptions" :key="icon.id">
                             <button type="button"
@@ -2246,7 +2268,7 @@
 
                 <!-- Items List -->
                 <div class="border-t pt-3">
-                    <p class="text-sm font-medium text-gray-700 mb-2">設備清單 (<span x-text="equipmentTemplateForm.items.length"></span> 項)</p>
+                    <p class="text-sm font-medium text-gray-700 mb-2"><span x-text="t('equipment.equipmentList')">設備清單</span> (<span x-text="equipmentTemplateForm.items.length"></span> <span x-text="t('equipment.items')">項</span>)</p>
                     <div class="space-y-1 max-h-40 overflow-y-auto mb-3">
                         <template x-for="(item, idx) in equipmentTemplateForm.items" :key="idx">
                             <div class="flex items-center bg-gray-50 rounded-lg px-2 py-2 text-sm">
@@ -2285,29 +2307,29 @@
                                 </button>
                             </div>
                         </template>
-                        <p x-show="equipmentTemplateForm.items.length === 0" class="text-xs text-gray-400 text-center py-2">尚無設備</p>
+                        <p x-show="equipmentTemplateForm.items.length === 0" class="text-xs text-gray-400 text-center py-2" x-text="t('equipment.noItems')">尚無設備</p>
                     </div>
 
                     <!-- Add Item Form -->
                     <div class="bg-primary-100 rounded-xl p-3">
-                        <p class="text-xs font-medium text-primary-700 mb-2">新增設備</p>
+                        <p class="text-xs font-medium text-primary-700 mb-2" x-text="t('equipment.addItem')">新增設備</p>
                         <div class="grid grid-cols-2 gap-2 mb-2">
-                            <input type="text" x-model="newEquipmentTemplateItem.name" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="名稱 *">
-                            <input type="text" x-model="newEquipmentTemplateItem.specification" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="規格">
+                            <input type="text" x-model="newEquipmentTemplateItem.name" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" :placeholder="t('equipment.templateName') + ' *'">
+                            <input type="text" x-model="newEquipmentTemplateItem.specification" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" :placeholder="t('equipment.specPlaceholder')">
                         </div>
                         <div class="grid grid-cols-3 gap-2 mb-2">
-                            <input type="number" x-model.number="newEquipmentTemplateItem.quantity" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white" min="1" placeholder="數量">
-                            <input type="text" x-model="newEquipmentTemplateItem.unit" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" placeholder="單位">
-                            <input type="number" x-model.number="newEquipmentTemplateItem.check_interval_days" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white" min="1" placeholder="檢查週期">
+                            <input type="number" x-model.number="newEquipmentTemplateItem.quantity" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white" min="1" :placeholder="t('equipment.qty')">
+                            <input type="text" x-model="newEquipmentTemplateItem.unit" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm bg-white" :placeholder="t('equipment.unitDefault')">
+                            <input type="number" x-model.number="newEquipmentTemplateItem.check_interval_days" class="border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center bg-white" min="1" :placeholder="t('equipment.intervalPlaceholder')">
                         </div>
-                        <button @click="addEquipmentTemplateItem()" class="w-full bg-primary-600 text-white rounded-lg py-1.5 text-sm font-medium">+ 加入設備</button>
+                        <button @click="addEquipmentTemplateItem()" class="w-full bg-primary-600 text-white rounded-lg py-1.5 text-sm font-medium">+ <span x-text="t('equipment.addToList')">加入設備</span></button>
                     </div>
                 </div>
             </div>
 
             <div class="flex space-x-3 mt-4 pt-3 border-t flex-shrink-0">
-                <button @click="showEquipmentTemplateEditModal = false; showEquipmentTemplateManageModal = true" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">取消</button>
-                <button @click="saveEquipmentTemplate()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium">儲存</button>
+                <button @click="showEquipmentTemplateEditModal = false; showEquipmentTemplateManageModal = true" class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                <button @click="saveEquipmentTemplate()" class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg font-medium" x-text="t('actions.save')">儲存</button>
             </div>
         </div>
     </div>

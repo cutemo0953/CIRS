@@ -136,7 +136,12 @@
     "location": "位置",
     "expiryDate": "效期",
     "similarFound": "找到類似物資，是否直接入庫？",
-    "noMatch": "沒有符合的物資"
+    "noMatch": "沒有符合的物資",
+    "historyTitle": "物資進出紀錄",
+    "unknownItem": "未知物資",
+    "noHistory": "尚無紀錄",
+    "noMatchingHistory": "無符合條件的紀錄",
+    "loadMore": "載入更多"
   },
   "equipment": {
     "ok": "正常",
