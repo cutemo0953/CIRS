@@ -375,5 +375,149 @@
     "success": "成功",
     "error": "錯誤",
     "loginFailed": "登入失敗"
+  },
+  "bundles": {
+    "emergency_kit": {
+      "name": "防災包",
+      "description": "標準緊急避難包"
+    },
+    "food_supply": {
+      "name": "糧食補給",
+      "description": "一週食物供給"
+    },
+    "medical_kit": {
+      "name": "醫療補給",
+      "description": "醫療用品補充"
+    },
+    "power_supply": {
+      "name": "電力補給",
+      "description": "電力與照明設備"
+    },
+    "baby_supply": {
+      "name": "嬰兒用品",
+      "description": "嬰幼兒所需物資"
+    },
+    "daily_supply": {
+      "name": "日用品",
+      "description": "日常生活必需品"
+    },
+    "shelter_equipment": {
+      "name": "收容所設備",
+      "description": "避難所基本設備"
+    }
+  },
+  "equipmentTemplates": {
+    "power_station": {
+      "name": "電力設備組",
+      "description": "發電機、延長線、照明等供電設備"
+    },
+    "comm_station": {
+      "name": "通訊設備組",
+      "description": "無線電、擴音器等通訊設備"
+    },
+    "medical_station": {
+      "name": "醫療設備組",
+      "description": "血壓計、輪椅等基本醫療設備"
+    },
+    "shelter_basic": {
+      "name": "收容基本設備",
+      "description": "帳篷、睡袋、桌椅等收容必需品"
+    },
+    "kitchen_set": {
+      "name": "炊事設備組",
+      "description": "瓦斯爐、鍋具等炊事設備"
+    },
+    "sanitation_set": {
+      "name": "衛生設備組",
+      "description": "簡易廁所、消毒設備等"
+    },
+    "rescue_tools": {
+      "name": "救援工具組",
+      "description": "破壞器材、繩索等救援工具"
+    }
+  },
+  "items": {
+    "mineralWater": "礦泉水",
+    "crackers": "餅乾",
+    "flashlight": "手電筒",
+    "battery": "電池",
+    "firstAidKit": "急救包",
+    "whistle": "哨子",
+    "radio": "收音機",
+    "instantNoodles": "泡麵",
+    "cannedMeat": "罐頭（肉類）",
+    "cannedVegetable": "罐頭（蔬菜）",
+    "rice": "米",
+    "bandage": "OK繃",
+    "gauze": "紗布",
+    "alcohol": "消毒酒精",
+    "iodine": "優碘",
+    "saline": "生理食鹽水",
+    "mask": "口罩",
+    "gloves": "手套",
+    "candle": "蠟燭",
+    "lighter": "打火機",
+    "powerBank": "行動電源",
+    "diaper": "尿布",
+    "formula": "奶粉",
+    "bottle": "奶瓶",
+    "wetWipes": "濕紙巾",
+    "babyFood": "嬰兒食品",
+    "toiletPaper": "衛生紙",
+    "towel": "毛巾",
+    "toothbrush": "牙刷",
+    "toothpaste": "牙膏",
+    "soap": "肥皂",
+    "shampoo": "洗髮精",
+    "blanket": "毛毯",
+    "sleepingBag": "睡袋",
+    "sleepingPad": "睡墊",
+    "tent": "帳篷",
+    "foldingTable": "摺疊桌",
+    "foldingChair": "摺疊椅",
+    "generator": "汽油發電機",
+    "ups": "UPS不斷電系統",
+    "ledLight": "LED工作燈",
+    "extensionCord": "工業延長線",
+    "walkieTalkie": "對講機",
+    "megaphone": "手持擴音器",
+    "usbCharger": "USB充電站",
+    "bloodPressure": "電子血壓計",
+    "thermometer": "額溫槍",
+    "oximeter": "血氧機",
+    "wheelchair": "輪椅",
+    "stretcher": "擔架",
+    "aed": "AED",
+    "foldingBed": "折疊床",
+    "gasStove": "卡式瓦斯爐",
+    "largePot": "大型湯鍋",
+    "thermos": "保溫桶",
+    "waterDispenser": "飲水機",
+    "portableToilet": "移動式廁所",
+    "sprayer": "消毒噴霧器",
+    "trashBin": "垃圾桶",
+    "hydraulicCutter": "油壓剪",
+    "crowbar": "鐵撬",
+    "rescueRope": "救援繩",
+    "helmet": "安全帽",
+    "workGloves": "工作手套"
+  },
+  "units": {
+    "bottle": "瓶",
+    "pack": "包",
+    "piece": "支",
+    "unit": "顆",
+    "set": "個",
+    "can": "罐",
+    "roll": "卷",
+    "pair": "雙",
+    "sheet": "片",
+    "strip": "條",
+    "top": "頂",
+    "table": "張",
+    "seat": "座",
+    "coil": "捲",
+    "group": "組",
+    "machine": "台"
   }
 }

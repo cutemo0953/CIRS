@@ -375,5 +375,149 @@
     "success": "成功",
     "error": "エラー",
     "loginFailed": "ログインに失敗しました"
+  },
+  "bundles": {
+    "emergency_kit": {
+      "name": "防災セット",
+      "description": "標準緊急避難セット"
+    },
+    "food_supply": {
+      "name": "食料補給セット",
+      "description": "1週間分の食料"
+    },
+    "medical_kit": {
+      "name": "医療補給セット",
+      "description": "医療用品の補充"
+    },
+    "power_supply": {
+      "name": "電力補給セット",
+      "description": "電力・照明設備"
+    },
+    "baby_supply": {
+      "name": "乳幼児用品セット",
+      "description": "乳幼児に必要な物資"
+    },
+    "daily_supply": {
+      "name": "日用品セット",
+      "description": "日常生活必需品"
+    },
+    "shelter_equipment": {
+      "name": "避難所設備セット",
+      "description": "避難所の基本設備"
+    }
+  },
+  "equipmentTemplates": {
+    "power_station": {
+      "name": "電力設備セット",
+      "description": "発電機、延長コード、照明等の電源設備"
+    },
+    "comm_station": {
+      "name": "通信設備セット",
+      "description": "無線機、拡声器等の通信設備"
+    },
+    "medical_station": {
+      "name": "医療設備セット",
+      "description": "血圧計、車椅子等の基本医療設備"
+    },
+    "shelter_basic": {
+      "name": "収容基本設備セット",
+      "description": "テント、寝袋、テーブル等の収容必需品"
+    },
+    "kitchen_set": {
+      "name": "炊き出し設備セット",
+      "description": "ガスコンロ、鍋等の炊事設備"
+    },
+    "sanitation_set": {
+      "name": "衛生設備セット",
+      "description": "仮設トイレ、消毒設備等"
+    },
+    "rescue_tools": {
+      "name": "救助工具セット",
+      "description": "破壊器具、ロープ等の救助工具"
+    }
+  },
+  "items": {
+    "mineralWater": "ミネラルウォーター",
+    "crackers": "クラッカー",
+    "flashlight": "懐中電灯",
+    "battery": "電池",
+    "firstAidKit": "救急セット",
+    "whistle": "ホイッスル",
+    "radio": "ラジオ",
+    "instantNoodles": "カップ麺",
+    "cannedMeat": "缶詰（肉類）",
+    "cannedVegetable": "缶詰（野菜）",
+    "rice": "米",
+    "bandage": "絆創膏",
+    "gauze": "ガーゼ",
+    "alcohol": "消毒用アルコール",
+    "iodine": "ヨードチンキ",
+    "saline": "生理食塩水",
+    "mask": "マスク",
+    "gloves": "手袋",
+    "candle": "ろうそく",
+    "lighter": "ライター",
+    "powerBank": "モバイルバッテリー",
+    "diaper": "おむつ",
+    "formula": "粉ミルク",
+    "bottle": "哺乳瓶",
+    "wetWipes": "ウェットティッシュ",
+    "babyFood": "離乳食",
+    "toiletPaper": "トイレットペーパー",
+    "towel": "タオル",
+    "toothbrush": "歯ブラシ",
+    "toothpaste": "歯磨き粉",
+    "soap": "石鹸",
+    "shampoo": "シャンプー",
+    "blanket": "毛布",
+    "sleepingBag": "寝袋",
+    "sleepingPad": "マット",
+    "tent": "テント",
+    "foldingTable": "折りたたみテーブル",
+    "foldingChair": "折りたたみ椅子",
+    "generator": "ガソリン発電機",
+    "ups": "無停電電源装置",
+    "ledLight": "LED作業灯",
+    "extensionCord": "延長コード",
+    "walkieTalkie": "トランシーバー",
+    "megaphone": "ハンドマイク",
+    "usbCharger": "USB充電ステーション",
+    "bloodPressure": "電子血圧計",
+    "thermometer": "非接触体温計",
+    "oximeter": "パルスオキシメーター",
+    "wheelchair": "車椅子",
+    "stretcher": "担架",
+    "aed": "AED",
+    "foldingBed": "折りたたみベッド",
+    "gasStove": "カセットコンロ",
+    "largePot": "大型鍋",
+    "thermos": "保温容器",
+    "waterDispenser": "ウォーターサーバー",
+    "portableToilet": "仮設トイレ",
+    "sprayer": "消毒噴霧器",
+    "trashBin": "ゴミ箱",
+    "hydraulicCutter": "油圧カッター",
+    "crowbar": "バール",
+    "rescueRope": "救助ロープ",
+    "helmet": "ヘルメット",
+    "workGloves": "作業用手袋"
+  },
+  "units": {
+    "bottle": "本",
+    "pack": "袋",
+    "piece": "本",
+    "unit": "個",
+    "set": "個",
+    "can": "缶",
+    "roll": "巻",
+    "pair": "組",
+    "sheet": "枚",
+    "strip": "本",
+    "top": "個",
+    "table": "台",
+    "seat": "基",
+    "coil": "巻",
+    "group": "組",
+    "machine": "台"
   }
 }

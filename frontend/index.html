@@ -1232,8 +1232,8 @@
                                 </svg>
                             </div>
                             <div class="flex-1">
-                                <p class="font-medium text-gray-800" x-text="bundle.name"></p>
-                                <p class="text-sm text-gray-500" x-text="bundle.description"></p>
+                                <p class="font-medium text-gray-800" x-text="getBundleName(bundle)"></p>
+                                <p class="text-sm text-gray-500" x-text="getBundleDescription(bundle)"></p>
                                 <p class="text-xs text-gray-400 mt-1">
                                     <span x-text="t('equipment.contains')">包含</span> <span x-text="bundle.items?.length || 0"></span> <span x-text="t('modal.bundle.items')">項物資</span>
                                 </p>
@@ -1268,7 +1268,7 @@
                                     </svg>
                                 </div>
                                 <div class="min-w-0">
-                                    <p class="font-medium text-gray-800 truncate" x-text="bundle.name"></p>
+                                    <p class="font-medium text-gray-800 truncate" x-text="getBundleName(bundle)"></p>
                                     <p class="text-xs text-gray-400"><span x-text="bundle.items?.length || 0"></span> <span x-text="t('modal.bundle.items')">項物資</span></p>
                                 </div>
                             </div>
@@ -1837,8 +1837,8 @@
                     </svg>
                 </div>
                 <div>
-                    <h3 class="text-lg font-semibold" x-text="selectedBundle?.name"></h3>
-                    <p class="text-sm text-gray-500" x-text="selectedBundle?.description"></p>
+                    <h3 class="text-lg font-semibold" x-text="getBundleName(selectedBundle)"></h3>
+                    <p class="text-sm text-gray-500" x-text="getBundleDescription(selectedBundle)"></p>
                 </div>
             </div>
 
@@ -2766,90 +2766,90 @@
                     return [
                         {
                             id: 'power_station',
-                            name: '電力設備組',
-                            description: '發電機、延長線、照明等供電設備',
+                            name: this.t('equipmentTemplates.power_station.name'),
+                            description: this.t('equipmentTemplates.power_station.description'),
                             icon: 'bolt',
                             items: [
-                                { name: '汽油發電機', specification: '3500W', quantity: 2, unit: '台', check_interval_days: 30 },
-                                { name: 'UPS不斷電系統', specification: '1000VA', quantity: 2, unit: '台', check_interval_days: 90 },
-                                { name: 'LED工作燈', specification: '50W', quantity: 6, unit: '組', check_interval_days: 30 },
-                                { name: '工業延長線', specification: '10米', quantity: 4, unit: '條', check_interval_days: 30 },
-                                { name: '手電筒', specification: 'LED充電式', quantity: 10, unit: '支', check_interval_days: 30 }
+                                { name: this.t('items.generator'), specification: '3500W', quantity: 2, unit: this.t('units.machine'), check_interval_days: 30 },
+                                { name: this.t('items.ups'), specification: '1000VA', quantity: 2, unit: this.t('units.machine'), check_interval_days: 90 },
+                                { name: this.t('items.ledLight'), specification: '50W', quantity: 6, unit: this.t('units.group'), check_interval_days: 30 },
+                                { name: this.t('items.extensionCord'), specification: '10m', quantity: 4, unit: this.t('units.strip'), check_interval_days: 30 },
+                                { name: this.t('items.flashlight'), specification: 'LED', quantity: 10, unit: this.t('units.piece'), check_interval_days: 30 }
                             ]
                         },
                         {
                             id: 'comm_station',
-                            name: '通訊設備組',
-                            description: '無線電、擴音器等通訊設備',
+                            name: this.t('equipmentTemplates.comm_station.name'),
+                            description: this.t('equipmentTemplates.comm_station.description'),
                             icon: 'signal',
                             items: [
-                                { name: '對講機', specification: 'VHF/UHF 雙頻', quantity: 6, unit: '台', check_interval_days: 30 },
-                                { name: '手持擴音器', specification: '25W', quantity: 2, unit: '台', check_interval_days: 30 },
-                                { name: '行動電源', specification: '20000mAh', quantity: 10, unit: '個', check_interval_days: 90 },
-                                { name: 'USB充電站', specification: '10孔', quantity: 2, unit: '台', check_interval_days: 90 }
+                                { name: this.t('items.walkieTalkie'), specification: 'VHF/UHF', quantity: 6, unit: this.t('units.machine'), check_interval_days: 30 },
+                                { name: this.t('items.megaphone'), specification: '25W', quantity: 2, unit: this.t('units.machine'), check_interval_days: 30 },
+                                { name: this.t('items.powerBank'), specification: '20000mAh', quantity: 10, unit: this.t('units.set'), check_interval_days: 90 },
+                                { name: this.t('items.usbCharger'), specification: '10port', quantity: 2, unit: this.t('units.machine'), check_interval_days: 90 }
                             ]
                         },
                         {
                             id: 'medical_station',
-                            name: '醫療設備組',
-                            description: '血壓計、輪椅等基本醫療設備',
+                            name: this.t('equipmentTemplates.medical_station.name'),
+                            description: this.t('equipmentTemplates.medical_station.description'),
                             icon: 'heart',
                             items: [
-                                { name: '電子血壓計', specification: '臂式', quantity: 3, unit: '台', check_interval_days: 30 },
-                                { name: '額溫槍', specification: '非接觸式', quantity: 5, unit: '支', check_interval_days: 30 },
-                                { name: '血氧機', specification: '指夾式', quantity: 3, unit: '台', check_interval_days: 30 },
-                                { name: '輪椅', specification: '標準型', quantity: 4, unit: '台', check_interval_days: 90 },
-                                { name: '擔架', specification: '折疊式', quantity: 2, unit: '組', check_interval_days: 90 },
-                                { name: 'AED', specification: '自動體外心臟電擊器', quantity: 1, unit: '台', check_interval_days: 30 }
+                                { name: this.t('items.bloodPressure'), specification: '', quantity: 3, unit: this.t('units.machine'), check_interval_days: 30 },
+                                { name: this.t('items.thermometer'), specification: '', quantity: 5, unit: this.t('units.piece'), check_interval_days: 30 },
+                                { name: this.t('items.oximeter'), specification: '', quantity: 3, unit: this.t('units.machine'), check_interval_days: 30 },
+                                { name: this.t('items.wheelchair'), specification: '', quantity: 4, unit: this.t('units.machine'), check_interval_days: 90 },
+                                { name: this.t('items.stretcher'), specification: '', quantity: 2, unit: this.t('units.group'), check_interval_days: 90 },
+                                { name: this.t('items.aed'), specification: '', quantity: 1, unit: this.t('units.machine'), check_interval_days: 30 }
                             ]
                         },
                         {
                             id: 'shelter_basic',
-                            name: '收容基本設備',
-                            description: '帳篷、睡袋、桌椅等收容必需品',
+                            name: this.t('equipmentTemplates.shelter_basic.name'),
+                            description: this.t('equipmentTemplates.shelter_basic.description'),
                             icon: 'home',
                             items: [
-                                { name: '折疊床', specification: '標準單人', quantity: 50, unit: '張', check_interval_days: 180 },
-                                { name: '睡袋', specification: '成人款', quantity: 50, unit: '個', check_interval_days: 180 },
-                                { name: '毛毯', specification: '150x200cm', quantity: 100, unit: '條', check_interval_days: 180 },
-                                { name: '折疊桌', specification: '180cm長桌', quantity: 10, unit: '張', check_interval_days: 180 },
-                                { name: '折疊椅', specification: '塑膠款', quantity: 50, unit: '張', check_interval_days: 180 }
+                                { name: this.t('items.foldingBed'), specification: '', quantity: 50, unit: this.t('units.table'), check_interval_days: 180 },
+                                { name: this.t('items.sleepingBag'), specification: '', quantity: 50, unit: this.t('units.set'), check_interval_days: 180 },
+                                { name: this.t('items.blanket'), specification: '150x200cm', quantity: 100, unit: this.t('units.strip'), check_interval_days: 180 },
+                                { name: this.t('items.foldingTable'), specification: '180cm', quantity: 10, unit: this.t('units.table'), check_interval_days: 180 },
+                                { name: this.t('items.foldingChair'), specification: '', quantity: 50, unit: this.t('units.table'), check_interval_days: 180 }
                             ]
                         },
                         {
                             id: 'kitchen_set',
-                            name: '炊事設備組',
-                            description: '瓦斯爐、鍋具等炊事設備',
+                            name: this.t('equipmentTemplates.kitchen_set.name'),
+                            description: this.t('equipmentTemplates.kitchen_set.description'),
                             icon: 'fire',
                             items: [
-                                { name: '卡式瓦斯爐', specification: '單口', quantity: 4, unit: '台', check_interval_days: 30 },
-                                { name: '大型湯鍋', specification: '50L', quantity: 2, unit: '個', check_interval_days: 90 },
-                                { name: '保溫桶', specification: '20L', quantity: 4, unit: '個', check_interval_days: 90 },
-                                { name: '飲水機', specification: '桶裝水用', quantity: 2, unit: '台', check_interval_days: 30 }
+                                { name: this.t('items.gasStove'), specification: '', quantity: 4, unit: this.t('units.machine'), check_interval_days: 30 },
+                                { name: this.t('items.largePot'), specification: '50L', quantity: 2, unit: this.t('units.set'), check_interval_days: 90 },
+                                { name: this.t('items.thermos'), specification: '20L', quantity: 4, unit: this.t('units.set'), check_interval_days: 90 },
+                                { name: this.t('items.waterDispenser'), specification: '', quantity: 2, unit: this.t('units.machine'), check_interval_days: 30 }
                             ]
                         },
                         {
                             id: 'sanitation_set',
-                            name: '衛生設備組',
-                            description: '簡易廁所、消毒設備等',
+                            name: this.t('equipmentTemplates.sanitation_set.name'),
+                            description: this.t('equipmentTemplates.sanitation_set.description'),
                             icon: 'beaker',
                             items: [
-                                { name: '移動式廁所', specification: '單人座', quantity: 4, unit: '座', check_interval_days: 7 },
-                                { name: '消毒噴霧器', specification: '手壓式8L', quantity: 4, unit: '台', check_interval_days: 30 },
-                                { name: '垃圾桶', specification: '120L有蓋', quantity: 10, unit: '個', check_interval_days: 90 }
+                                { name: this.t('items.portableToilet'), specification: '', quantity: 4, unit: this.t('units.seat'), check_interval_days: 7 },
+                                { name: this.t('items.sprayer'), specification: '8L', quantity: 4, unit: this.t('units.machine'), check_interval_days: 30 },
+                                { name: this.t('items.trashBin'), specification: '120L', quantity: 10, unit: this.t('units.set'), check_interval_days: 90 }
                             ]
                         },
                         {
                             id: 'rescue_tools',
-                            name: '救援工具組',
-                            description: '破壞器材、繩索等救援工具',
+                            name: this.t('equipmentTemplates.rescue_tools.name'),
+                            description: this.t('equipmentTemplates.rescue_tools.description'),
                             icon: 'wrench',
                             items: [
-                                { name: '油壓剪', specification: '手動式', quantity: 1, unit: '台', check_interval_days: 90 },
-                                { name: '鐵撬', specification: '90cm', quantity: 2, unit: '支', check_interval_days: 90 },
-                                { name: '救援繩', specification: '50米', quantity: 2, unit: '捲', check_interval_days: 90 },
-                                { name: '安全帽', specification: '工程用', quantity: 10, unit: '頂', check_interval_days: 180 },
-                                { name: '工作手套', specification: '防滑', quantity: 20, unit: '雙', check_interval_days: 90 }
+                                { name: this.t('items.hydraulicCutter'), specification: '', quantity: 1, unit: this.t('units.machine'), check_interval_days: 90 },
+                                { name: this.t('items.crowbar'), specification: '90cm', quantity: 2, unit: this.t('units.piece'), check_interval_days: 90 },
+                                { name: this.t('items.rescueRope'), specification: '50m', quantity: 2, unit: this.t('units.coil'), check_interval_days: 90 },
+                                { name: this.t('items.helmet'), specification: '', quantity: 10, unit: this.t('units.top'), check_interval_days: 180 },
+                                { name: this.t('items.workGloves'), specification: '', quantity: 20, unit: this.t('units.pair'), check_interval_days: 90 }
                             ]
                         }
                     ];
@@ -4069,6 +4069,24 @@
                 getBundleIconPath(iconId) {
                     const icon = this.bundleIconOptions.find(i => i.id === iconId);
                     return icon ? icon.path : this.bundleIconOptions[0].path;
+                },
+
+                // Get translated bundle name (falls back to raw name for custom bundles)
+                getBundleName(bundle) {
+                    if (!bundle) return '';
+                    const key = `bundles.${bundle.id}.name`;
+                    const translated = this.t(key);
+                    // If translation returns the key itself, use raw name
+                    return translated === key ? bundle.name : translated;
+                },
+
+                // Get translated bundle description (falls back to raw description for custom bundles)
+                getBundleDescription(bundle) {
+                    if (!bundle) return '';
+                    const key = `bundles.${bundle.id}.description`;
+                    const translated = this.t(key);
+                    // If translation returns the key itself, use raw description
+                    return translated === key ? (bundle.description || '') : translated;
                 },
 
                 async saveBundle() {
