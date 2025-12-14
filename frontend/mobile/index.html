@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#0ea5e9">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="CIRS Satellite">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+
+    <title>CIRS Satellite</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="icons/icon-152x152.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-192x192.png">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-96x96.png">
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            200: '#bae6fd',
+                            300: '#7dd3fc',
+                            400: '#38bdf8',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            800: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- QR Scanner Library -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <style>
+        /* iOS Safe Area */
+        :root {
+            --sat: env(safe-area-inset-top);
+            --sar: env(safe-area-inset-right);
+            --sab: env(safe-area-inset-bottom);
+            --sal: env(safe-area-inset-left);
+        }
+
+        body {
+            padding-top: var(--sat);
+            padding-bottom: var(--sab);
+            padding-left: var(--sal);
+            padding-right: var(--sar);
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Prevent pull-to-refresh */
+        html, body {
+            overscroll-behavior-y: contain;
+        }
+
+        /* Hide scrollbar */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Loading spinner */
+        .spinner {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Pulse animation for sync indicator */
+        .pulse {
+            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Slide transitions */
+        .slide-up-enter {
+            transform: translateY(100%);
+        }
+        .slide-up-enter-active {
+            transform: translateY(0);
+            transition: transform 0.3s ease-out;
+        }
+
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen" x-data="satelliteApp()" x-init="init()">
+
+    <!-- Connection Status Bar -->
+    <div x-show="!isOnline" x-cloak
+         class="fixed top-0 left-0 right-0 bg-amber-500 text-white text-center py-1 text-sm font-medium z-50"
+         style="padding-top: calc(var(--sat) + 4px);">
+        <span class="inline-flex items-center">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"/>
+            </svg>
+            離線模式
+        </span>
+    </div>
+
+    <!-- Pending Sync Indicator -->
+    <div x-show="pendingSyncCount > 0" x-cloak
+         class="fixed top-0 right-4 bg-primary-600 text-white text-xs px-2 py-1 rounded-b-lg z-40"
+         :style="{ top: isOnline ? '0' : 'calc(var(--sat) + 28px)' }">
+        <span class="pulse inline-flex items-center">
+            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span x-text="pendingSyncCount"></span> 待同步
+        </span>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="min-h-screen flex flex-col" :class="{ 'pt-8': !isOnline }">
+
+        <!-- Header -->
+        <header class="bg-white shadow-sm sticky top-0 z-30" :style="{ top: isOnline ? '0' : 'calc(var(--sat) + 28px)' }">
+            <div class="flex items-center justify-between px-4 py-3">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center mr-2">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-gray-800">CIRS Satellite</h1>
+                        <p class="text-xs text-gray-500" x-text="hubName || '未連接'"></p>
+                    </div>
+                </div>
+                <button @click="showSettings = true" class="p-2 text-gray-500 hover:text-gray-700">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Not Connected State -->
+        <template x-if="!isConnected">
+            <div class="flex-1 flex flex-col items-center justify-center p-8">
+                <div class="w-24 h-24 bg-gray-200 rounded-full flex items-center justify-center mb-6">
+                    <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                    </svg>
+                </div>
+                <h2 class="text-xl font-bold text-gray-700 mb-2">連接到 Hub</h2>
+                <p class="text-gray-500 text-center mb-8">掃描 Hub 的 QR Code 或手動輸入連接資訊</p>
+
+                <button @click="startQRScan('hub')"
+                        class="w-full max-w-xs bg-primary-600 text-white py-4 rounded-xl font-medium text-lg shadow-lg active:scale-95 transition-transform">
+                    <span class="flex items-center justify-center">
+                        <svg class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/>
+                        </svg>
+                        掃描 QR Code
+                    </span>
+                </button>
+
+                <button @click="showManualConnect = true"
+                        class="mt-4 text-primary-600 font-medium">
+                    手動輸入連接資訊
+                </button>
+            </div>
+        </template>
+
+        <!-- Connected State - Main Actions -->
+        <template x-if="isConnected">
+            <div class="flex-1 p-4">
+                <!-- User Info Card -->
+                <div class="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                    <div class="flex items-center">
+                        <div class="w-12 h-12 bg-primary-100 rounded-full flex items-center justify-center mr-3">
+                            <span class="text-primary-600 font-bold text-lg" x-text="volunteerName?.charAt(0) || 'V'"></span>
+                        </div>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800" x-text="volunteerName || '志工'"></p>
+                            <p class="text-sm text-gray-500">ID: <span x-text="volunteerId || '-'"></span></p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-xs text-gray-400">最後同步</p>
+                            <p class="text-sm text-gray-600" x-text="lastSyncTime || '從未'"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions Grid -->
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <!-- Check In/Out -->
+                    <button @click="startQRScan('checkin')"
+                            class="bg-white rounded-2xl p-6 shadow-sm active:bg-gray-50 transition-colors">
+                        <div class="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-3 mx-auto">
+                            <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                        </div>
+                        <p class="font-medium text-gray-800 text-center">報到/退場</p>
+                        <p class="text-xs text-gray-500 text-center mt-1">掃描人員 QR</p>
+                    </button>
+
+                    <!-- Receive Supplies -->
+                    <button @click="startQRScan('supply')"
+                            class="bg-white rounded-2xl p-6 shadow-sm active:bg-gray-50 transition-colors">
+                        <div class="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-3 mx-auto">
+                            <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                        </div>
+                        <p class="font-medium text-gray-800 text-center">領取物資</p>
+                        <p class="text-xs text-gray-500 text-center mt-1">掃描發放 QR</p>
+                    </button>
+
+                    <!-- View Inventory -->
+                    <button @click="currentView = 'inventory'"
+                            class="bg-white rounded-2xl p-6 shadow-sm active:bg-gray-50 transition-colors">
+                        <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-3 mx-auto">
+                            <svg class="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                            </svg>
+                        </div>
+                        <p class="font-medium text-gray-800 text-center">查看庫存</p>
+                        <p class="text-xs text-gray-500 text-center mt-1">離線可用</p>
+                    </button>
+
+                    <!-- Sync Now -->
+                    <button @click="syncNow()"
+                            :disabled="!isOnline || isSyncing"
+                            class="bg-white rounded-2xl p-6 shadow-sm active:bg-gray-50 transition-colors disabled:opacity-50">
+                        <div class="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-3 mx-auto">
+                            <svg class="w-7 h-7 text-amber-600" :class="{ 'spinner': isSyncing }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                        </div>
+                        <p class="font-medium text-gray-800 text-center">立即同步</p>
+                        <p class="text-xs text-gray-500 text-center mt-1" x-text="isSyncing ? '同步中...' : (pendingSyncCount > 0 ? pendingSyncCount + ' 筆待傳' : '已同步')"></p>
+                    </button>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="bg-white rounded-2xl shadow-sm">
+                    <div class="px-4 py-3 border-b border-gray-100">
+                        <h3 class="font-medium text-gray-800">最近活動</h3>
+                    </div>
+                    <div class="divide-y divide-gray-50">
+                        <template x-for="activity in recentActivities.slice(0, 5)" :key="activity.id">
+                            <div class="px-4 py-3 flex items-center">
+                                <div class="w-8 h-8 rounded-full flex items-center justify-center mr-3"
+                                     :class="{
+                                         'bg-green-100': activity.type === 'checkin',
+                                         'bg-red-100': activity.type === 'checkout',
+                                         'bg-blue-100': activity.type === 'supply'
+                                     }">
+                                    <svg class="w-4 h-4"
+                                         :class="{
+                                             'text-green-600': activity.type === 'checkin',
+                                             'text-red-600': activity.type === 'checkout',
+                                             'text-blue-600': activity.type === 'supply'
+                                         }"
+                                         fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path x-show="activity.type === 'checkin'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+                                        <path x-show="activity.type === 'checkout'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                                        <path x-show="activity.type === 'supply'" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4"/>
+                                    </svg>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="text-sm text-gray-800" x-text="activity.description"></p>
+                                    <p class="text-xs text-gray-400" x-text="formatTime(activity.timestamp)"></p>
+                                </div>
+                                <span x-show="!activity.synced" class="text-xs text-amber-500 bg-amber-50 px-2 py-0.5 rounded">待同步</span>
+                            </div>
+                        </template>
+                        <p x-show="recentActivities.length === 0" class="px-4 py-8 text-center text-gray-400 text-sm">
+                            尚無活動記錄
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div x-show="showQRScanner" x-cloak
+         class="fixed inset-0 bg-black z-50 flex flex-col"
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100">
+        <div class="flex items-center justify-between p-4 text-white" style="padding-top: calc(var(--sat) + 16px);">
+            <button @click="stopQRScan()" class="p-2">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+            <span class="font-medium" x-text="scanMode === 'hub' ? '掃描 Hub QR' : (scanMode === 'checkin' ? '掃描人員 QR' : '掃描物資 QR')"></span>
+            <div class="w-10"></div>
+        </div>
+        <div id="qr-reader" class="flex-1"></div>
+        <div class="p-4 text-center text-white text-sm" style="padding-bottom: calc(var(--sab) + 16px);">
+            將 QR Code 對準掃描框
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div x-show="showSettings" x-cloak
+         class="fixed inset-0 bg-black/50 z-50 flex items-end"
+         @click.self="showSettings = false">
+        <div class="bg-white rounded-t-3xl w-full max-h-[80vh] overflow-y-auto"
+             style="padding-bottom: calc(var(--sab) + 16px);"
+             x-transition:enter="transition ease-out duration-300"
+             x-transition:enter-start="translate-y-full"
+             x-transition:enter-end="translate-y-0">
+            <div class="sticky top-0 bg-white px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="text-lg font-semibold">設定</h3>
+                <button @click="showSettings = false" class="text-gray-500">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-4">
+                <!-- Hub Connection Info -->
+                <div class="bg-gray-50 rounded-xl p-4">
+                    <p class="text-sm text-gray-500 mb-1">連接的 Hub</p>
+                    <p class="font-medium" x-text="hubName || '未連接'"></p>
+                    <p class="text-xs text-gray-400 mt-1" x-text="hubUrl || '-'"></p>
+                </div>
+
+                <!-- Volunteer Info -->
+                <div class="bg-gray-50 rounded-xl p-4">
+                    <p class="text-sm text-gray-500 mb-1">志工資訊</p>
+                    <p class="font-medium" x-text="volunteerName || '未設定'"></p>
+                    <p class="text-xs text-gray-400 mt-1">ID: <span x-text="volunteerId || '-'"></span></p>
+                </div>
+
+                <!-- Actions -->
+                <button @click="disconnectHub()"
+                        x-show="isConnected"
+                        class="w-full bg-red-50 text-red-600 py-3 rounded-xl font-medium">
+                    中斷連接
+                </button>
+
+                <button @click="clearAllData()"
+                        class="w-full border border-gray-200 text-gray-600 py-3 rounded-xl font-medium">
+                    清除所有資料
+                </button>
+
+                <!-- Version Info -->
+                <p class="text-center text-xs text-gray-400 pt-4">
+                    CIRS Satellite v1.0.0
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manual Connect Modal -->
+    <div x-show="showManualConnect" x-cloak
+         class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+         @click.self="showManualConnect = false">
+        <div class="bg-white rounded-2xl w-full max-w-sm p-6">
+            <h3 class="text-lg font-semibold mb-4">手動連接</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">Hub URL</label>
+                    <input type="url" x-model="manualHubUrl"
+                           placeholder="https://example.com"
+                           class="w-full border border-gray-200 rounded-xl px-4 py-3">
+                </div>
+                <div>
+                    <label class="block text-sm text-gray-600 mb-1">連接 Token</label>
+                    <input type="text" x-model="manualToken"
+                           placeholder="輸入 Token"
+                           class="w-full border border-gray-200 rounded-xl px-4 py-3">
+                </div>
+                <div class="flex space-x-3">
+                    <button @click="showManualConnect = false"
+                            class="flex-1 border border-gray-200 py-3 rounded-xl font-medium">
+                        取消
+                    </button>
+                    <button @click="connectManually()"
+                            class="flex-1 bg-primary-600 text-white py-3 rounded-xl font-medium">
+                        連接
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div x-show="toast.show" x-cloak
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-4"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100 translate-y-0"
+         x-transition:leave-end="opacity-0 translate-y-4"
+         class="fixed bottom-20 left-4 right-4 z-50"
+         style="padding-bottom: var(--sab);">
+        <div class="rounded-xl px-4 py-3 shadow-lg text-center"
+             :class="{
+                 'bg-green-600 text-white': toast.type === 'success',
+                 'bg-red-600 text-white': toast.type === 'error',
+                 'bg-gray-800 text-white': toast.type === 'info'
+             }">
+            <span x-text="toast.message"></span>
+        </div>
+    </div>
+
+    <script>
+        function satelliteApp() {
+            return {
+                // Connection state
+                isConnected: false,
+                hubUrl: '',
+                hubName: '',
+                hubToken: '',
+                volunteerId: '',
+                volunteerName: '',
+
+                // Network state
+                isOnline: navigator.onLine,
+                isSyncing: false,
+                pendingSyncCount: 0,
+                lastSyncTime: null,
+
+                // UI state
+                currentView: 'home',
+                showSettings: false,
+                showManualConnect: false,
+                showQRScanner: false,
+                scanMode: null, // 'hub', 'checkin', 'supply'
+
+                // Data
+                recentActivities: [],
+                cachedInventory: [],
+
+                // Toast
+                toast: { show: false, message: '', type: 'info' },
+
+                // Manual connect
+                manualHubUrl: '',
+                manualToken: '',
+
+                // QR Scanner
+                html5QrCode: null,
+
+                async init() {
+                    // Load saved state
+                    this.loadState();
+
+                    // Register service worker
+                    if ('serviceWorker' in navigator) {
+                        try {
+                            const registration = await navigator.serviceWorker.register('/mobile/service-worker.js');
+                            console.log('SW registered:', registration);
+
+                            // Listen for sync completion messages
+                            navigator.serviceWorker.addEventListener('message', (event) => {
+                                if (event.data.type === 'SYNC_COMPLETE') {
+                                    this.onSyncComplete(event.data.results);
+                                }
+                            });
+                        } catch (error) {
+                            console.error('SW registration failed:', error);
+                        }
+                    }
+
+                    // Network status listeners
+                    window.addEventListener('online', () => {
+                        this.isOnline = true;
+                        this.showToast('已連接網路', 'success');
+                        this.syncNow();
+                    });
+
+                    window.addEventListener('offline', () => {
+                        this.isOnline = false;
+                        this.showToast('已離線，操作將在恢復連線後同步', 'info');
+                    });
+
+                    // Update pending sync count
+                    this.updatePendingSyncCount();
+                },
+
+                loadState() {
+                    const state = localStorage.getItem('cirs-satellite-state');
+                    if (state) {
+                        const parsed = JSON.parse(state);
+                        this.isConnected = parsed.isConnected || false;
+                        this.hubUrl = parsed.hubUrl || '';
+                        this.hubName = parsed.hubName || '';
+                        this.hubToken = parsed.hubToken || '';
+                        this.volunteerId = parsed.volunteerId || '';
+                        this.volunteerName = parsed.volunteerName || '';
+                        this.lastSyncTime = parsed.lastSyncTime || null;
+                        this.recentActivities = parsed.recentActivities || [];
+                    }
+                },
+
+                saveState() {
+                    const state = {
+                        isConnected: this.isConnected,
+                        hubUrl: this.hubUrl,
+                        hubName: this.hubName,
+                        hubToken: this.hubToken,
+                        volunteerId: this.volunteerId,
+                        volunteerName: this.volunteerName,
+                        lastSyncTime: this.lastSyncTime,
+                        recentActivities: this.recentActivities
+                    };
+                    localStorage.setItem('cirs-satellite-state', JSON.stringify(state));
+                },
+
+                startQRScan(mode) {
+                    this.scanMode = mode;
+                    this.showQRScanner = true;
+
+                    this.$nextTick(() => {
+                        this.html5QrCode = new Html5Qrcode("qr-reader");
+                        this.html5QrCode.start(
+                            { facingMode: "environment" },
+                            { fps: 10, qrbox: { width: 250, height: 250 } },
+                            (decodedText) => this.onQRScanned(decodedText),
+                            (errorMessage) => {}
+                        ).catch((err) => {
+                            console.error('Camera error:', err);
+                            this.showToast('無法開啟相機', 'error');
+                            this.stopQRScan();
+                        });
+                    });
+                },
+
+                stopQRScan() {
+                    if (this.html5QrCode) {
+                        this.html5QrCode.stop().catch(() => {});
+                        this.html5QrCode = null;
+                    }
+                    this.showQRScanner = false;
+                    this.scanMode = null;
+                },
+
+                onQRScanned(data) {
+                    this.stopQRScan();
+
+                    try {
+                        const parsed = JSON.parse(data);
+
+                        if (this.scanMode === 'hub') {
+                            this.connectToHub(parsed);
+                        } else if (this.scanMode === 'checkin') {
+                            this.processCheckin(parsed);
+                        } else if (this.scanMode === 'supply') {
+                            this.processSupply(parsed);
+                        }
+                    } catch (e) {
+                        this.showToast('無效的 QR Code', 'error');
+                    }
+                },
+
+                async connectToHub(data) {
+                    if (!data.url || !data.token) {
+                        this.showToast('無效的 Hub 資訊', 'error');
+                        return;
+                    }
+
+                    this.hubUrl = data.url;
+                    this.hubToken = data.token;
+                    this.hubName = data.name || 'Hub';
+                    this.volunteerId = data.volunteerId || 'V-' + Date.now();
+                    this.volunteerName = data.volunteerName || '志工';
+                    this.isConnected = true;
+                    this.saveState();
+
+                    this.showToast('已連接到 ' + this.hubName, 'success');
+                },
+
+                connectManually() {
+                    if (!this.manualHubUrl || !this.manualToken) {
+                        this.showToast('請輸入完整資訊', 'error');
+                        return;
+                    }
+
+                    this.connectToHub({
+                        url: this.manualHubUrl,
+                        token: this.manualToken,
+                        name: 'Hub'
+                    });
+
+                    this.showManualConnect = false;
+                    this.manualHubUrl = '';
+                    this.manualToken = '';
+                },
+
+                disconnectHub() {
+                    this.isConnected = false;
+                    this.hubUrl = '';
+                    this.hubName = '';
+                    this.hubToken = '';
+                    this.saveState();
+                    this.showSettings = false;
+                    this.showToast('已中斷連接', 'info');
+                },
+
+                async processCheckin(data) {
+                    const activity = {
+                        id: Date.now().toString(),
+                        type: data.action || 'checkin',
+                        description: `${data.name || '人員'} ${data.action === 'checkout' ? '退場' : '報到'}`,
+                        timestamp: Date.now(),
+                        synced: false,
+                        data: data
+                    };
+
+                    this.recentActivities.unshift(activity);
+                    this.saveState();
+
+                    await this.addToSyncQueue({
+                        type: 'checkin',
+                        url: `${this.hubUrl}/api/satellite/checkin`,
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.hubToken}`
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    this.showToast(activity.description, 'success');
+                },
+
+                async processSupply(data) {
+                    const activity = {
+                        id: Date.now().toString(),
+                        type: 'supply',
+                        description: `領取 ${data.item || '物資'} x${data.quantity || 1}`,
+                        timestamp: Date.now(),
+                        synced: false,
+                        data: data
+                    };
+
+                    this.recentActivities.unshift(activity);
+                    this.saveState();
+
+                    await this.addToSyncQueue({
+                        type: 'supply',
+                        url: `${this.hubUrl}/api/satellite/supply`,
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.hubToken}`
+                        },
+                        body: JSON.stringify(data)
+                    });
+
+                    this.showToast(activity.description, 'success');
+                },
+
+                async addToSyncQueue(item) {
+                    // Add to IndexedDB via service worker
+                    if (navigator.serviceWorker.controller) {
+                        navigator.serviceWorker.controller.postMessage({
+                            type: 'ADD_TO_SYNC_QUEUE',
+                            payload: item
+                        });
+                    }
+
+                    this.pendingSyncCount++;
+
+                    // Try to sync if online
+                    if (this.isOnline) {
+                        this.syncNow();
+                    }
+                },
+
+                async syncNow() {
+                    if (!this.isOnline || this.isSyncing) return;
+
+                    this.isSyncing = true;
+
+                    // Trigger sync via service worker
+                    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+                        // Try Background Sync API first (not supported on iOS)
+                        if ('sync' in self.registration) {
+                            try {
+                                await self.registration.sync.register('cirs-sync');
+                            } catch (e) {
+                                // Fallback to manual sync
+                                navigator.serviceWorker.controller.postMessage({ type: 'SYNC_NOW' });
+                            }
+                        } else {
+                            // iOS Safari fallback
+                            navigator.serviceWorker.controller.postMessage({ type: 'SYNC_NOW' });
+                        }
+                    }
+
+                    // Timeout fallback
+                    setTimeout(() => {
+                        this.isSyncing = false;
+                        this.updatePendingSyncCount();
+                    }, 10000);
+                },
+
+                onSyncComplete(results) {
+                    this.isSyncing = false;
+                    this.lastSyncTime = this.formatTime(Date.now());
+
+                    // Mark synced activities
+                    const successIds = results.filter(r => r.success).map(r => r.id);
+                    this.recentActivities.forEach(a => {
+                        if (successIds.includes(a.id)) {
+                            a.synced = true;
+                        }
+                    });
+
+                    this.saveState();
+                    this.updatePendingSyncCount();
+
+                    if (results.length > 0) {
+                        const successCount = results.filter(r => r.success).length;
+                        this.showToast(`同步完成: ${successCount}/${results.length}`, 'success');
+                    }
+                },
+
+                async updatePendingSyncCount() {
+                    // This would query IndexedDB for pending items
+                    // For now, count unsynced activities
+                    this.pendingSyncCount = this.recentActivities.filter(a => !a.synced).length;
+                },
+
+                clearAllData() {
+                    if (confirm('確定要清除所有資料嗎？')) {
+                        localStorage.removeItem('cirs-satellite-state');
+                        indexedDB.deleteDatabase('cirs-satellite');
+                        location.reload();
+                    }
+                },
+
+                formatTime(timestamp) {
+                    if (!timestamp) return '';
+                    const date = new Date(timestamp);
+                    const now = new Date();
+
+                    if (date.toDateString() === now.toDateString()) {
+                        return date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+                    }
+                    return date.toLocaleDateString('zh-TW', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                },
+
+                showToast(message, type = 'info') {
+                    this.toast = { show: true, message, type };
+                    setTimeout(() => {
+                        this.toast.show = false;
+                    }, 3000);
+                }
+            };
+        }
+    </script>
+</body>
+</html>
