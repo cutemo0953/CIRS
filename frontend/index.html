@@ -1859,11 +1859,11 @@
                                    @change="toggleBundleItem(idx)"
                                    class="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 mr-3">
                             <span class="flex-1 text-sm text-gray-700">
-                                <span x-text="item.name"></span>
+                                <span x-text="getBundleItemName(item)"></span>
                                 <span x-show="item.specification" class="text-gray-400">(<span x-text="item.specification"></span>)</span>
                             </span>
                             <span class="text-sm text-gray-500">
-                                <span x-text="item.quantity"></span> <span x-text="item.unit || '個'"></span>
+                                <span x-text="item.quantity"></span> <span x-text="getBundleItemUnit(item)"></span>
                             </span>
                         </label>
                     </template>
@@ -2857,6 +2857,17 @@
 
                 loadEquipmentTemplates() {
                     const saved = localStorage.getItem('cirs_equipment_templates');
+                    const savedLang = localStorage.getItem('cirs_equipment_templates_lang');
+                    const currentLang = this.currentLang;
+
+                    // Regenerate default templates if language changed
+                    if (savedLang !== currentLang) {
+                        this.equipmentTemplates = this.getDefaultEquipmentTemplates();
+                        this.saveEquipmentTemplatesToStorage();
+                        localStorage.setItem('cirs_equipment_templates_lang', currentLang);
+                        return;
+                    }
+
                     if (saved) {
                         try {
                             this.equipmentTemplates = JSON.parse(saved);
@@ -2873,6 +2884,7 @@
                         // 首次載入，使用預設範本
                         this.equipmentTemplates = this.getDefaultEquipmentTemplates();
                         this.saveEquipmentTemplatesToStorage();
+                        localStorage.setItem('cirs_equipment_templates_lang', currentLang);
                     }
                 },
 
@@ -4087,6 +4099,87 @@
                     const translated = this.t(key);
                     // If translation returns the key itself, use raw description
                     return translated === key ? (bundle.description || '') : translated;
+                },
+
+                // Mapping from Chinese item names to translation keys
+                bundleItemNameMap: {
+                    '礦泉水': 'mineralWater',
+                    '餅乾': 'crackers',
+                    '手電筒': 'flashlight',
+                    '電池': 'battery',
+                    '急救包': 'firstAidKit',
+                    '哨子': 'whistle',
+                    '收音機': 'radio',
+                    '泡麵': 'instantNoodles',
+                    '罐頭': 'canned',
+                    '米': 'rice',
+                    'OK繃': 'bandage',
+                    '紗布': 'gauze',
+                    '消毒酒精': 'alcohol',
+                    '優碘': 'iodine',
+                    '生理食鹽水': 'saline',
+                    '口罩': 'mask',
+                    '手套': 'gloves',
+                    '蠟燭': 'candle',
+                    '打火機': 'lighter',
+                    '行動電源': 'powerBank',
+                    '尿布': 'diaper',
+                    '奶粉': 'formula',
+                    '奶瓶': 'bottle',
+                    '濕紙巾': 'wetWipes',
+                    '嬰兒食品': 'babyFood',
+                    '衛生紙': 'toiletPaper',
+                    '毛巾': 'towel',
+                    '牙刷': 'toothbrush',
+                    '牙膏': 'toothpaste',
+                    '肥皂': 'soap',
+                    '洗髮精': 'shampoo',
+                    '毛毯': 'blanket',
+                    '睡袋': 'sleepingBag',
+                    '睡墊': 'sleepingPad',
+                    '帳篷': 'tent',
+                    '摺疊桌': 'foldingTable',
+                    '摺疊椅': 'foldingChair'
+                },
+
+                // Mapping from Chinese unit names to translation keys
+                bundleUnitMap: {
+                    '瓶': 'bottle',
+                    '包': 'pack',
+                    '支': 'piece',
+                    '顆': 'unit',
+                    '個': 'set',
+                    '罐': 'can',
+                    '卷': 'roll',
+                    '雙': 'pair',
+                    '片': 'sheet',
+                    '條': 'strip',
+                    '頂': 'top',
+                    '張': 'table',
+                    '塊': 'block',
+                    '座': 'seat',
+                    '台': 'machine'
+                },
+
+                // Get translated bundle item name
+                getBundleItemName(item) {
+                    if (!item || !item.name) return '';
+                    const key = this.bundleItemNameMap[item.name];
+                    if (key) {
+                        return this.t(`items.${key}`);
+                    }
+                    return item.name; // Fallback to original name for custom items
+                },
+
+                // Get translated bundle item unit
+                getBundleItemUnit(item) {
+                    if (!item) return '';
+                    const unit = item.unit || '個';
+                    const key = this.bundleUnitMap[unit];
+                    if (key) {
+                        return this.t(`units.${key}`);
+                    }
+                    return unit; // Fallback to original unit for custom items
                 },
 
                 async saveBundle() {
