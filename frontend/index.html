@@ -177,6 +177,13 @@
                             </svg>
                             <span x-text="t('systemMenu.settings')">站點設定</span>
                         </button>
+                        <button @click="generateSatelliteQR(); showSystemMenu = false"
+                                class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                            </svg>
+                            <span x-text="t('systemMenu.satelliteQR')">Satellite 配對</span>
+                        </button>
                         <a href="/docs" target="_blank"
                            class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
                             <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1612,6 +1619,63 @@
         </div>
     </div>
 
+    <!-- Satellite QR Modal (志工配對) -->
+    <div x-show="showSatelliteQRModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showSatelliteQRModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-6 h-6 text-primary-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                </svg>
+                <span x-text="t('modal.satellite.title')">Satellite 配對</span>
+            </h3>
+
+            <!-- Loading state -->
+            <div x-show="!satelliteQRUrl && !satellitePairingInfo" class="text-center py-8">
+                <svg class="w-8 h-8 mx-auto text-gray-400 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                <p class="text-gray-500 mt-2" x-text="t('modal.satellite.loading')">載入中...</p>
+            </div>
+
+            <!-- QR Code display -->
+            <div x-show="satelliteQRUrl" class="space-y-4">
+                <div class="bg-gray-50 rounded-xl p-4 flex justify-center">
+                    <img :src="satelliteQRUrl" alt="Satellite Pairing QR" class="w-48 h-48">
+                </div>
+
+                <div class="bg-primary-50 rounded-xl p-4">
+                    <p class="text-sm font-medium text-primary-800 mb-2" x-text="t('modal.satellite.instructions')">使用說明</p>
+                    <ol class="text-sm text-primary-700 space-y-1 list-decimal list-inside">
+                        <li x-text="t('modal.satellite.step1')">志工用手機開啟相機</li>
+                        <li x-text="t('modal.satellite.step2')">掃描此 QR Code</li>
+                        <li x-text="t('modal.satellite.step3')">依照提示安裝 PWA</li>
+                        <li x-text="t('modal.satellite.step4')">即可開始報到/發放作業</li>
+                    </ol>
+                </div>
+
+                <!-- Pairing Info (for manual connection) -->
+                <div x-show="satellitePairingInfo" class="bg-gray-100 rounded-xl p-3">
+                    <p class="text-xs text-gray-500 mb-1" x-text="t('modal.satellite.manualConnect')">手動連接資訊</p>
+                    <p class="text-xs font-mono text-gray-700 break-all" x-text="satellitePairingInfo?.pairing_url"></p>
+                </div>
+
+                <p class="text-xs text-gray-500 text-center">
+                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span x-text="t('modal.satellite.expiry')">配對連結有效期限：72 小時</span>
+                </p>
+            </div>
+
+            <div class="flex space-x-3 mt-4">
+                <button @click="showSatelliteQRModal = false; satelliteQRUrl = ''; satellitePairingInfo = null"
+                        class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.close')">關閉</button>
+                <button @click="generateSatelliteQR()"
+                        class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg" x-text="t('modal.satellite.regenerate')">重新產生</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Broadcast Modal (發佈公告) -->
     <div x-show="showBroadcastModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBroadcastModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md">
@@ -2428,6 +2492,9 @@
                 showBackupModal: false,
                 showSettingsModal: false,
                 showBroadcastModal: false,
+                showSatelliteQRModal: false,
+                satelliteQRUrl: '',
+                satellitePairingInfo: null,
                 editingEquipmentTemplate: null,
                 selectedEquipmentTemplate: null,
                 selectedTemplateItems: [],
@@ -3394,6 +3461,35 @@
                             this.showToast('更新失敗', 'error');
                         }
                     } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                async generateSatelliteQR() {
+                    this.satelliteQRUrl = '';
+                    this.satellitePairingInfo = null;
+                    this.showSatelliteQRModal = true;
+
+                    try {
+                        // Fetch pairing info (includes token and URL)
+                        const infoRes = await this.apiCall('/api/auth/pairing-info');
+                        if (infoRes.ok) {
+                            this.satellitePairingInfo = await infoRes.json();
+                        } else {
+                            throw new Error('Failed to get pairing info');
+                        }
+
+                        // Fetch QR code image
+                        const qrRes = await this.apiCall('/api/auth/pairing-qr');
+                        if (qrRes.ok) {
+                            const blob = await qrRes.blob();
+                            this.satelliteQRUrl = URL.createObjectURL(blob);
+                        } else {
+                            throw new Error('Failed to generate QR code');
+                        }
+                    } catch (e) {
+                        console.error('Satellite QR error:', e);
+                        this.showToast(this.t('modal.satellite.error') || 'QR Code 產生失敗', 'error');
+                        this.showSatelliteQRModal = false;
+                    }
                 },
 
                 async publishBroadcast() {

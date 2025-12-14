@@ -44,7 +44,8 @@
     "backup": "データバックアップ",
     "broadcast": "お知らせ配信",
     "settings": "避難所設定",
-    "apiDocs": "API ドキュメント"
+    "apiDocs": "API ドキュメント",
+    "satelliteQR": "Satellite ペアリング"
   },
   "people": {
     "quickCheckIn": "入所受付",
@@ -336,6 +337,19 @@
       "hint": "お知らせはポータルの掲示板に表示され、全員が閲覧できます",
       "publish": "配信",
       "clear": "現在のお知らせを削除"
+    },
+    "satellite": {
+      "title": "Satellite ペアリング",
+      "loading": "読み込み中...",
+      "instructions": "使用方法",
+      "step1": "スマートフォンのカメラを起動",
+      "step2": "このQRコードをスキャン",
+      "step3": "表示に従ってPWAをインストール",
+      "step4": "受付・配給作業を開始できます",
+      "manualConnect": "手動接続情報",
+      "expiry": "ペアリングリンク有効期限：72時間",
+      "regenerate": "再生成",
+      "error": "QRコード生成に失敗しました"
     },
     "donation": {
       "title": "寄付の受け入れ",

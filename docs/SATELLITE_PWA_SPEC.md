@@ -256,12 +256,13 @@ MIRS/
   - [x] URL token 解析
   - [x] sessionStorage 安全儲存
 
-#### 🔲 待開發
+- [x] Task 3: Hub 端 QR 顯示
+  - [x] CIRS Frontend 新增「Satellite 配對」按鈕
+  - [x] Modal 顯示 QR Code
+  - [x] 顯示連接說明與步驟
+  - [x] 多語言支援 (zh-TW, ja)
 
-- [ ] Task 3: Hub 端 QR 顯示
-  - [ ] CIRS Frontend 新增「產生配對 QR」按鈕
-  - [ ] Modal 顯示 QR Code
-  - [ ] 顯示連接說明
+#### 🔲 待開發
 
 - [ ] Task 4: 人員操作 API
   - [ ] POST /api/satellite/checkin

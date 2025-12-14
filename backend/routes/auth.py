@@ -230,7 +230,7 @@ def create_satellite_token(hub_name: str = "CIRS Hub") -> str:
         "sub": "satellite",
         "type": "satellite_pairing",
         "hub_name": hub_name,
-        "iat": datetime.utcnow().isoformat()
+        "issued_at": datetime.utcnow().isoformat()  # Custom field for display, not 'iat'
     }
     return create_access_token(data, timedelta(hours=SATELLITE_TOKEN_EXPIRE_HOURS))
 
@@ -364,5 +364,5 @@ async def verify_satellite_token(credentials: HTTPAuthorizationCredentials = Dep
     return {
         "valid": True,
         "hub_name": payload.get("hub_name", "CIRS Hub"),
-        "issued_at": payload.get("iat")
+        "issued_at": payload.get("issued_at")
     }

@@ -44,7 +44,8 @@
     "backup": "資料備份",
     "broadcast": "發佈公告",
     "settings": "站點設定",
-    "apiDocs": "API 文件"
+    "apiDocs": "API 文件",
+    "satelliteQR": "Satellite 配對"
   },
   "people": {
     "quickCheckIn": "快速報到",
@@ -336,6 +337,19 @@
       "hint": "公告會顯示在 Portal 公開看板，所有人都能看到",
       "publish": "發佈",
       "clear": "清除目前公告"
+    },
+    "satellite": {
+      "title": "Satellite 配對",
+      "loading": "載入中...",
+      "instructions": "使用說明",
+      "step1": "志工用手機開啟相機",
+      "step2": "掃描此 QR Code",
+      "step3": "依照提示安裝 PWA",
+      "step4": "即可開始報到/發放作業",
+      "manualConnect": "手動連接資訊",
+      "expiry": "配對連結有效期限：72 小時",
+      "regenerate": "重新產生",
+      "error": "QR Code 產生失敗"
     },
     "donation": {
       "title": "接收捐贈",
