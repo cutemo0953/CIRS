@@ -242,7 +242,11 @@
     "rejectConfirm": "確定要拒絕此申請？",
     "clockOutConfirm": "確定要下班？",
     "clockedOut": "已下班",
-    "verified": "已驗證"
+    "verified": "已驗證",
+    "goStandby": "轉待命",
+    "goActive": "上線",
+    "goStandbyConfirm": "確定要轉為待命？",
+    "goActiveConfirm": "確定要回到在值？"
   },
   "modal": {
     "login": {

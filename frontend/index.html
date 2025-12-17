@@ -799,11 +799,21 @@
                         </div>
                         <!-- Actions -->
                         <div class="flex items-center space-x-1">
+                            <!-- Toggle Status (for self or admin) -->
+                            <template x-if="currentUser && (staff.id === currentUser.id || currentUser.role === 'admin')">
+                                <button @click="toggleStaffStatus(staff.id, staff.staff_status)"
+                                        class="text-xs px-2 py-1 rounded"
+                                        :class="staff.staff_status === 'ACTIVE' ? 'bg-gray-100 text-gray-600 hover:bg-gray-200' : 'bg-primary-100 text-primary-700 hover:bg-primary-200'"
+                                        x-text="staff.staff_status === 'ACTIVE' ? t('staff.goStandby') : t('staff.goActive')">
+                                </button>
+                            </template>
+                            <!-- Clock Out (for self only, when ACTIVE) -->
                             <template x-if="currentUser && staff.id === currentUser.id">
                                 <button x-show="staff.staff_status === 'ACTIVE'"
                                         @click="clockOut(staff.id)"
-                                        class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200" x-text="t('staff.clockOut')">下班</button>
+                                        class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded hover:bg-gray-300" x-text="t('staff.clockOut')">下班</button>
                             </template>
+                            <!-- Verify (for admin only, when not verified) -->
                             <template x-if="currentUser && currentUser.role === 'admin' && staff.verification_status !== 'VERIFIED'">
                                 <button @click="verifyStaff(staff.id)"
                                         class="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded hover:bg-primary-200" x-text="t('staff.verify')">驗證</button>
@@ -3893,6 +3903,30 @@
                             this.loadStaffData();
                         } else {
                             this.showToast('下班失敗', 'error');
+                        }
+                    } catch (e) {
+                        this.showToast('操作失敗', 'error');
+                    }
+                },
+
+                async toggleStaffStatus(staffId, currentStatus) {
+                    const confirmMsg = currentStatus === 'ACTIVE'
+                        ? (this.t('staff.goStandbyConfirm') || '確定要轉為待命？')
+                        : (this.t('staff.goActiveConfirm') || '確定要回到在值？');
+                    if (!confirm(confirmMsg)) return;
+
+                    try {
+                        const res = await this.apiCall(`/api/staff/${staffId}/toggle-status`, {
+                            method: 'POST',
+                            body: {}
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.showToast(data.message || '狀態已更新', 'success');
+                            this.loadStaffData();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '狀態切換失敗', 'error');
                         }
                     } catch (e) {
                         this.showToast('操作失敗', 'error');

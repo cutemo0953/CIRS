@@ -746,6 +746,57 @@ async def clock_out(staff_id: str):
     }
 
 
+@router.post("/{staff_id}/toggle-status")
+async def toggle_staff_status(staff_id: str):
+    """
+    切換工作人員狀態 (ACTIVE ↔ STANDBY)
+    - ACTIVE → STANDBY (暫時離開)
+    - STANDBY → ACTIVE (回到崗位)
+    """
+    with write_db() as conn:
+        cursor = conn.execute(
+            "SELECT * FROM person WHERE id = ? AND staff_role IS NOT NULL",
+            (staff_id,)
+        )
+        person = cursor.fetchone()
+
+        if not person:
+            raise HTTPException(status_code=404, detail="工作人員不存在")
+
+        current_status = person['staff_status']
+
+        if current_status == 'ACTIVE':
+            new_status = 'STANDBY'
+            event_note = "轉為待命"
+        elif current_status == 'STANDBY':
+            new_status = 'ACTIVE'
+            event_note = "回到在值"
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail="目前狀態為離線，請使用報到功能"
+            )
+
+        conn.execute("""
+            UPDATE person
+            SET staff_status = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (new_status, staff_id))
+
+        conn.execute("""
+            INSERT INTO event_log (event_type, person_id, notes)
+            VALUES ('STATUS_CHANGE', ?, ?)
+        """, (staff_id, event_note))
+
+    return {
+        "success": True,
+        "previous_status": current_status,
+        "staff_status": new_status,
+        "message": "已轉為待命" if new_status == 'STANDBY' else "已回到在值"
+    }
+
+
 @router.post("/fast-pass")
 async def use_fast_pass(request: FastPassRequest):
     """
