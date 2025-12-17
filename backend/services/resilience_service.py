@@ -581,7 +581,12 @@ class CIRSResilienceEngine:
         )
 
     def _calculate_staff(self, conn, population: int, target_hours: float) -> Optional[CategoryResult]:
-        """計算人力韌性 (使用外部化規則)"""
+        """
+        計算人力韌性 (Staff Management v1.1)
+
+        使用加權計算: ACTIVE=1.0, STANDBY=0.5
+        改用 staff_role 和 staff_status 欄位
+        """
         cursor = conn.cursor()
 
         # Load staffing rules
@@ -591,24 +596,46 @@ class CIRSResilienceEngine:
         if not rules:
             return None
 
-        # Load current staff
+        # Load current staff with weighted calculation (v1.1)
+        # ACTIVE = 1.0, STANDBY = 0.5
         cursor.execute("""
-            SELECT role, COUNT(*) as count
+            SELECT
+                staff_role,
+                SUM(CASE WHEN staff_status = 'ACTIVE' THEN 1.0 ELSE 0 END) as active_count,
+                SUM(CASE WHEN staff_status = 'STANDBY' THEN 0.5 ELSE 0 END) as standby_weight,
+                COUNT(*) as total_count
             FROM person
-            WHERE role IN ('medic', 'staff', 'admin')
-              AND checked_in_at IS NOT NULL
-            GROUP BY role
+            WHERE staff_role IS NOT NULL
+              AND staff_status IN ('ACTIVE', 'STANDBY')
+            GROUP BY staff_role
         """)
-        current_staff = {}
+
+        staff_data = {}
         for row in cursor.fetchall():
-            role = row['role'].upper() if row['role'] else 'UNKNOWN'
-            # Map role names
-            if role == 'STAFF':
-                role = 'VOLUNTEER'
-            current_staff[role] = row['count']
+            role = row['staff_role']
+            effective = (row['active_count'] or 0) + (row['standby_weight'] or 0)
+            staff_data[role] = {
+                'effective': effective,
+                'active': int(row['active_count'] or 0),
+                'standby': int((row['standby_weight'] or 0) * 2),  # Convert back to count
+                'total': row['total_count']
+            }
+
+        # Merge MEDIC and NURSE for medical staffing requirement
+        medical_effective = 0
+        medical_active = 0
+        medical_standby = 0
+        if 'MEDIC' in staff_data:
+            medical_effective += staff_data['MEDIC']['effective']
+            medical_active += staff_data['MEDIC']['active']
+            medical_standby += staff_data['MEDIC']['standby']
+        if 'NURSE' in staff_data:
+            medical_effective += staff_data['NURSE']['effective']
+            medical_active += staff_data['NURSE']['active']
+            medical_standby += staff_data['NURSE']['standby']
 
         required = {}
-        on_duty = {}
+        on_duty = {}  # Now stores effective weighted count
         gap = {}
         limiting_role = None
         worst_ratio = float('inf')
@@ -642,11 +669,19 @@ class CIRSResilienceEngine:
 
             required_count = max(1, required_count)  # At least 1 for essential roles
             required[role_code] = required_count
-            on_duty[role_code] = current_staff.get(role_code, 0)
 
-            if on_duty[role_code] < required_count:
-                gap[role_code] = on_duty[role_code] - required_count
-                ratio = on_duty[role_code] / required_count if required_count > 0 else 0
+            # Get effective staff count (weighted)
+            if role_code == 'MEDIC':
+                # Use combined medical staff for MEDIC requirement
+                effective_count = medical_effective
+            else:
+                effective_count = staff_data.get(role_code, {}).get('effective', 0)
+
+            on_duty[role_code] = round(effective_count, 1)
+
+            if effective_count < required_count:
+                gap[role_code] = round(effective_count - required_count, 1)
+                ratio = effective_count / required_count if required_count > 0 else 0
                 if ratio < worst_ratio:
                     worst_ratio = ratio
                     limiting_role = role_code
@@ -661,6 +696,7 @@ class CIRSResilienceEngine:
 
         status = self._get_status(score)
 
+        # Generate recommendation
         recommendation = None
         if gap:
             shortage_msgs = []
@@ -668,9 +704,12 @@ class CIRSResilienceEngine:
                 if v < 0:
                     rule = next((r for r in rules if r['role_code'] == k), None)
                     role_name = rule['role_name'] if rule else k
-                    shortage_msgs.append(f"{abs(v)} 名{role_name}")
+                    shortage_msgs.append(f"{abs(v):.0f} 名{role_name}")
             if shortage_msgs:
                 recommendation = f"需增派: {', '.join(shortage_msgs)}"
+
+        # Check impending shortages (v1.1)
+        impending = self._check_impending_shortages(conn)
 
         return CategoryResult(
             category='STAFF',
@@ -683,16 +722,44 @@ class CIRSResilienceEngine:
             inventory={
                 'required': required,
                 'on_duty': on_duty,
-                'gap': gap
+                'gap': gap,
+                'by_role': {k: v for k, v in staff_data.items()},
+                'impending_shortages': impending
             },
             consumption={
-                'profile_name': '標準配置',
+                'profile_name': '加權配置 (v1.1)',
                 'rate': sum(required.values()),
                 'rate_unit': '人',
-                'rate_display': f"總需求 {sum(required.values())} 人"
+                'rate_display': f"總需求 {sum(required.values())} 人 (Active×1.0 + Standby×0.5)"
             },
             recommendation=recommendation
         )
+
+    def _check_impending_shortages(self, conn) -> List[Dict]:
+        """
+        檢查未來 30 分鐘內即將發生的人力缺口 (v1.1)
+        """
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT p.id, p.display_name, p.staff_role, p.shift_end
+            FROM person p
+            WHERE p.staff_status = 'ACTIVE'
+              AND p.shift_end IS NOT NULL
+              AND p.shift_end <= datetime('now', '+30 minutes')
+              AND p.shift_end > datetime('now')
+            ORDER BY p.shift_end
+        """)
+
+        impending = []
+        for row in cursor.fetchall():
+            impending.append({
+                'person_id': row['id'],
+                'person_name': row['display_name'],
+                'role': row['staff_role'],
+                'shift_end': row['shift_end']
+            })
+
+        return impending
 
     # =========================================================================
     # Helper Methods
