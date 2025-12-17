@@ -178,7 +178,168 @@ CREATE INDEX IF NOT EXISTS idx_zone_type ON zone(zone_type);
 CREATE INDEX IF NOT EXISTS idx_zone_active ON zone(is_active);
 
 -- ============================================
--- 9. 預設資料
+-- 9. Inventory Standards (物資標準 v2.0)
+-- ============================================
+CREATE TABLE IF NOT EXISTS inventory_standards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category TEXT NOT NULL,              -- 'WATER', 'FOOD', 'MEDICAL', 'POWER', 'DAILY'
+    item_name TEXT NOT NULL,
+    item_code TEXT UNIQUE,               -- 標準化代碼
+
+    -- 計算模式 (不允許 NULL)
+    calc_mode TEXT NOT NULL DEFAULT 'PER_PERSON_DAY',
+    -- ENUM: 'PER_PERSON_DAY', 'PER_N_PEOPLE', 'FIXED_MIN', 'CUSTOM_FORMULA'
+
+    calc_params TEXT NOT NULL DEFAULT '{}',  -- JSON
+
+    -- 韌性類別 (用於 Lifeline 分組)
+    resilience_category TEXT,            -- 'WATER', 'FOOD', 'POWER', 'MEDICAL', 'STAFF'
+
+    -- 容量/消耗設定
+    capacity_per_unit REAL,              -- 每單位容量
+    capacity_unit TEXT,                  -- 'ml', 'L', 'kcal', 'Wh'
+    consumption_rate REAL,               -- 每人每天消耗率
+    consumption_unit TEXT,               -- 'L/day', 'kcal/day'
+
+    -- 描述
+    description TEXT,
+    description_en TEXT,
+
+    -- 元資料
+    is_essential INTEGER DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_inv_std_category ON inventory_standards(category);
+CREATE INDEX IF NOT EXISTS idx_inv_std_resilience ON inventory_standards(resilience_category);
+
+-- ============================================
+-- 10. Staffing Rules (人力配置規則 v2.0)
+-- ============================================
+CREATE TABLE IF NOT EXISTS staffing_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_code TEXT NOT NULL UNIQUE,      -- 'MEDIC', 'VOLUNTEER', 'ADMIN', 'SECURITY'
+    role_name TEXT NOT NULL,
+    role_name_en TEXT,
+
+    -- 計算規則
+    calc_mode TEXT NOT NULL DEFAULT 'PER_N_PEOPLE',
+    calc_params TEXT NOT NULL,           -- JSON
+
+    rounding_mode TEXT DEFAULT 'CEILING', -- 'CEILING', 'FLOOR', 'ROUND'
+
+    -- 依賴設定
+    depends_on_role TEXT,
+
+    -- UI 設定
+    icon TEXT,
+    color TEXT,
+    sort_order INTEGER DEFAULT 0,
+
+    -- 元資料
+    is_essential INTEGER DEFAULT 1,
+    description TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ============================================
+-- 11. Resilience Configuration (韌性設定 v2.0)
+-- ============================================
+CREATE TABLE IF NOT EXISTS resilience_config (
+    station_id TEXT PRIMARY KEY,
+
+    -- 目標設定
+    isolation_target_days INTEGER DEFAULT 3,
+    isolation_source TEXT DEFAULT 'manual',
+
+    -- 人口設定
+    population_count INTEGER DEFAULT 0,
+    population_label TEXT DEFAULT '收容人數',
+    special_needs TEXT DEFAULT '{}',     -- JSON
+
+    -- 閾值設定
+    threshold_safe REAL DEFAULT 1.2,
+    threshold_warning REAL DEFAULT 1.0,
+
+    -- 計算權重
+    weight_weakest REAL DEFAULT 0.6,
+    weight_average REAL DEFAULT 0.4,
+
+    -- 規則版本
+    rules_version TEXT DEFAULT 'v2.0',
+
+    -- Profile 連結
+    water_profile_id INTEGER,
+    food_profile_id INTEGER,
+    power_profile_id INTEGER,
+    staff_profile_id INTEGER,
+
+    -- 元資料
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_by TEXT
+);
+
+-- ============================================
+-- 12. Resilience History (韌性計算快照 v2.0)
+-- ============================================
+CREATE TABLE IF NOT EXISTS resilience_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    station_id TEXT NOT NULL,
+
+    calc_timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    input_snapshot TEXT NOT NULL,        -- JSON
+    result_snapshot TEXT NOT NULL,       -- JSON
+
+    rules_version TEXT NOT NULL,
+    input_hash TEXT,
+    result_hash TEXT,
+
+    calc_duration_ms INTEGER,
+    triggered_by TEXT DEFAULT 'MANUAL',
+
+    FOREIGN KEY (station_id) REFERENCES resilience_config(station_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_res_hist_station ON resilience_history(station_id);
+CREATE INDEX IF NOT EXISTS idx_res_hist_time ON resilience_history(calc_timestamp);
+
+-- ============================================
+-- 13. Shelter Network (避難所網路 v2.0)
+-- ============================================
+CREATE TABLE IF NOT EXISTS shelter_network (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    local_station_id TEXT NOT NULL,
+    remote_station_id TEXT NOT NULL,
+    remote_station_name TEXT,
+    remote_ip TEXT,
+    remote_port INTEGER DEFAULT 8090,
+
+    connection_status TEXT DEFAULT 'UNKNOWN',
+    last_sync_at DATETIME,
+    last_heartbeat DATETIME,
+
+    data_confidence_score INTEGER DEFAULT 100,
+
+    remote_population INTEGER DEFAULT 0,
+    remote_capacity INTEGER DEFAULT 0,
+    remote_score INTEGER DEFAULT 0,
+
+    sync_enabled INTEGER DEFAULT 1,
+    sync_interval_minutes INTEGER DEFAULT 30,
+
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    UNIQUE(local_station_id, remote_station_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_shelter_net_status ON shelter_network(connection_status);
+
+-- ============================================
+-- 14. 預設資料
 -- ============================================
 
 -- 預設設定
@@ -189,6 +350,36 @@ INSERT OR IGNORE INTO config (key, value) VALUES
     ('water_per_person_per_day', '3'),
     ('food_per_person_per_day', '2100'),
     ('polling_interval', '5000');
+
+-- 預設物資標準 (v2.0)
+INSERT OR IGNORE INTO inventory_standards (category, item_name, item_code, calc_mode, calc_params, resilience_category, capacity_per_unit, capacity_unit, consumption_rate, consumption_unit, description, is_essential) VALUES
+    -- 飲水
+    ('WATER', '飲用水', 'WATER-DRINK', 'PER_PERSON_DAY', '{"rate": 3.0, "unit": "L"}', 'WATER', 0.6, 'L', 3.0, 'L/day', '內政部標準: 每人每天 3 公升', 1),
+    ('WATER', '生活用水', 'WATER-DAILY', 'PER_PERSON_DAY', '{"rate": 10.0, "unit": "L"}', 'WATER', 20.0, 'L', 10.0, 'L/day', '洗漱、沖廁等生活用水', 0),
+    -- 食物
+    ('FOOD', '主食熱量', 'FOOD-MAIN', 'PER_PERSON_DAY', '{"rate": 1800, "unit": "kcal"}', 'FOOD', NULL, 'kcal', 1800, 'kcal/day', '成人每日基本熱量需求', 1),
+    ('FOOD', '嬰兒奶粉', 'FOOD-BABY', 'CUSTOM_FORMULA', '{"formula": "baby_count * 6", "unit": "罐"}', 'FOOD', NULL, '罐', NULL, NULL, '每嬰兒每天約需 6 餐', 0),
+    -- 醫療
+    ('MEDICAL', '急救包', 'MED-FIRSTAID', 'PER_N_PEOPLE', '{"n": 50, "qty": 1, "unit": "組"}', 'MEDICAL', NULL, '組', NULL, NULL, '每 50 人配置 1 組急救包', 1),
+    ('MEDICAL', 'N95 口罩', 'MED-MASK-N95', 'PER_PERSON_DAY', '{"rate": 1, "unit": "個"}', 'MEDICAL', NULL, '個', 1.0, '個/day', '傳染病防護用', 0),
+    -- 電力
+    ('POWER', '行動電源站', 'PWR-STATION', 'FIXED_MIN', '{"min_qty": 1, "unit": "台"}', 'POWER', NULL, 'Wh', NULL, NULL, '至少需要 1 台備用電源', 1),
+    ('POWER', '發電機', 'PWR-GENERATOR', 'FIXED_MIN', '{"min_qty": 1, "unit": "台"}', 'POWER', NULL, 'L', NULL, NULL, '至少需要 1 台發電機', 1),
+    -- 日用品
+    ('DAILY', '毛毯', 'DAILY-BLANKET', 'PER_N_PEOPLE', '{"n": 1, "qty": 1, "unit": "件"}', NULL, NULL, '件', NULL, NULL, '每人 1 件', 0),
+    ('DAILY', '睡袋', 'DAILY-SLEEPBAG', 'PER_N_PEOPLE', '{"n": 2, "qty": 1, "unit": "個"}', NULL, NULL, '個', NULL, NULL, '每 2 人 1 個', 0);
+
+-- 預設人力配置規則 (v2.0)
+INSERT OR IGNORE INTO staffing_rules (role_code, role_name, role_name_en, calc_mode, calc_params, rounding_mode, description, is_essential, sort_order) VALUES
+    ('MEDIC', '醫護人員', 'Medical Staff', 'PER_N_PEOPLE', '{"n": 100, "qty": 1}', 'CEILING', '每 100 人至少需要 1 位醫護', 1, 1),
+    ('VOLUNTEER', '志工', 'Volunteer', 'PER_N_PEOPLE', '{"n": 30, "qty": 1}', 'CEILING', '每 30 人需要 1 位志工', 1, 2),
+    ('ADMIN', '行政人員', 'Admin Staff', 'FIXED_MIN', '{"min_qty": 2}', 'CEILING', '至少需要 2 位行政人員', 1, 3),
+    ('SECURITY', '保全人員', 'Security', 'PER_SHIFT', '{"qty_per_shift": 1, "shifts_per_day": 3}', 'CEILING', '24 小時輪班，每班 1 人', 0, 4),
+    ('COOK', '廚房人員', 'Kitchen Staff', 'PER_N_PEOPLE', '{"n": 50, "qty": 1}', 'CEILING', '每 50 人需要 1 位廚房人員', 0, 5);
+
+-- 預設韌性設定
+INSERT OR IGNORE INTO resilience_config (station_id, isolation_target_days, population_count, population_label) VALUES
+    ('default', 3, 0, '收容人數');
 
 -- 預設帳號 (PIN 皆為: 1234)
 -- bcrypt hash for '1234': $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC

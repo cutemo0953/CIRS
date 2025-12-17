@@ -16,11 +16,12 @@ from database import init_db, get_db, dict_from_row, IS_VERCEL, reset_memory_db
 BACKEND_DIR = Path(__file__).parent
 BASE_DIR = BACKEND_DIR.parent
 FRONTEND_DIR = BASE_DIR / 'frontend'
+MOBILE_DIR = BASE_DIR / 'frontend' / 'mobile'
 PORTAL_DIR = BASE_DIR / 'portal'
 FILES_DIR = BASE_DIR / 'files'
 
 # Import routes
-from routes import auth, inventory, person, events, messages, system, backup, zone
+from routes import auth, inventory, person, events, messages, system, backup, zone, resilience
 
 
 @asynccontextmanager
@@ -69,6 +70,7 @@ app.include_router(messages.router, prefix="/api/messages", tags=["Messages"])
 app.include_router(system.router, prefix="/api/system", tags=["System"])
 app.include_router(backup.router, prefix="/api/backup", tags=["Backup"])
 app.include_router(zone.router, prefix="/api/zone", tags=["Zone"])
+app.include_router(resilience.router, prefix="/api/resilience", tags=["Resilience"])
 
 
 @app.get("/")
@@ -368,6 +370,10 @@ async def serve_frontend():
 # Mount static directories (only if they exist and not on Vercel)
 # On Vercel, static files are served by the static build
 if not IS_VERCEL:
+    # Mount mobile PWA first (more specific path)
+    if MOBILE_DIR.exists():
+        app.mount("/mobile", StaticFiles(directory=str(MOBILE_DIR), html=True), name="mobile")
+
     if FRONTEND_DIR.exists():
         app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
 
