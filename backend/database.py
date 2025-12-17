@@ -190,6 +190,113 @@ def apply_migrations(conn):
         conn.execute("ALTER TABLE person ADD COLUMN id_status TEXT DEFAULT 'confirmed'")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_person_id_status ON person(id_status)")
 
+    # Staff Management v1.1 migrations
+    if 'staff_role' not in person_columns:
+        print("Migration: Adding Staff Management v1.1 columns to person")
+        conn.execute("ALTER TABLE person ADD COLUMN staff_role TEXT")
+        conn.execute("ALTER TABLE person ADD COLUMN staff_status TEXT DEFAULT 'OFF_DUTY'")
+        conn.execute("ALTER TABLE person ADD COLUMN verification_status TEXT DEFAULT 'UNVERIFIED'")
+        conn.execute("ALTER TABLE person ADD COLUMN verified_at DATETIME")
+        conn.execute("ALTER TABLE person ADD COLUMN verified_by TEXT")
+        conn.execute("ALTER TABLE person ADD COLUMN shift_start DATETIME")
+        conn.execute("ALTER TABLE person ADD COLUMN shift_end DATETIME")
+        conn.execute("ALTER TABLE person ADD COLUMN expected_hours REAL")
+        conn.execute("ALTER TABLE person ADD COLUMN skills TEXT")
+        conn.execute("ALTER TABLE person ADD COLUMN emergency_contact TEXT")
+        conn.execute("ALTER TABLE person ADD COLUMN certification TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_person_staff_role ON person(staff_role)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_person_staff_status ON person(staff_status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_person_verification ON person(verification_status)")
+
+        # Migrate existing roles to staff_role
+        conn.execute("UPDATE person SET staff_role = 'NURSE' WHERE role = 'medic' AND staff_role IS NULL")
+        conn.execute("UPDATE person SET staff_role = 'COORDINATOR' WHERE role = 'admin' AND staff_role IS NULL")
+        conn.execute("UPDATE person SET staff_role = 'VOLUNTEER' WHERE role = 'staff' AND staff_role IS NULL")
+
+        # Set staff_status based on checked_in_at
+        conn.execute("""
+            UPDATE person SET staff_status = 'ACTIVE'
+            WHERE staff_role IS NOT NULL AND checked_in_at IS NOT NULL
+        """)
+
+        # Set verification_status for existing staff
+        conn.execute("""
+            UPDATE person SET verification_status = 'VERIFIED', verified_at = CURRENT_TIMESTAMP
+            WHERE staff_role IS NOT NULL AND role IN ('admin', 'medic')
+        """)
+
+    # Staff Join Requests table migration
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='staff_join_requests'")
+    if not cursor.fetchone():
+        print("Migration: Creating staff_join_requests table")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS staff_join_requests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                qr_token TEXT UNIQUE NOT NULL,
+                display_name TEXT NOT NULL,
+                phone TEXT,
+                claimed_role TEXT NOT NULL,
+                skills TEXT,
+                expected_hours REAL DEFAULT 4,
+                notes TEXT,
+                status TEXT DEFAULT 'PENDING',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expires_at DATETIME NOT NULL,
+                processed_at DATETIME,
+                processed_by TEXT,
+                person_id TEXT
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_join_request_token ON staff_join_requests(qr_token)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_join_request_status ON staff_join_requests(status)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_join_request_expires ON staff_join_requests(expires_at)")
+
+    # Staff Badge Tokens table migration
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='staff_badge_tokens'")
+    if not cursor.fetchone():
+        print("Migration: Creating staff_badge_tokens table")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS staff_badge_tokens (
+                token_id TEXT PRIMARY KEY,
+                person_id TEXT NOT NULL,
+                issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expires_at DATETIME NOT NULL,
+                is_revoked INTEGER DEFAULT 0,
+                FOREIGN KEY (person_id) REFERENCES person(id)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_badge_token_person ON staff_badge_tokens(person_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_badge_token_expires ON staff_badge_tokens(expires_at)")
+
+    # Staff Role Config table migration
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='staff_role_config'")
+    if not cursor.fetchone():
+        print("Migration: Creating staff_role_config table")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS staff_role_config (
+                role_code TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                display_name_en TEXT,
+                color_hex TEXT NOT NULL,
+                icon_name TEXT,
+                resilience_weight REAL DEFAULT 1.0,
+                requires_verification INTEGER DEFAULT 0,
+                sort_order INTEGER DEFAULT 0
+            )
+        """)
+        # Insert default role configs
+        conn.executemany(
+            "INSERT OR IGNORE INTO staff_role_config VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                ('MEDIC', '醫師', 'Doctor', '#E53935', 'medical_services', 1.0, 1, 1),
+                ('NURSE', '護理師', 'Nurse', '#E91E63', 'vaccines', 1.0, 1, 2),
+                ('VOLUNTEER', '志工', 'Volunteer', '#4CAF50', 'volunteer_activism', 1.0, 0, 3),
+                ('ADMIN', '行政人員', 'Admin', '#FFC107', 'assignment_ind', 1.0, 0, 4),
+                ('SECURITY', '保全人員', 'Security', '#2196F3', 'security', 1.0, 0, 5),
+                ('COORDINATOR', '指揮官', 'Coordinator', '#9C27B0', 'campaign', 1.0, 1, 6),
+            ]
+        )
+
     # Zone table migration
     cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='zone'")
     if not cursor.fetchone():

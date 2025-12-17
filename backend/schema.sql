@@ -1,5 +1,6 @@
--- CIRS Database Schema v1.0
+-- CIRS Database Schema v2.0
 -- SQLite with WAL mode
+-- Updated: 2025-12-17 (Staff Management v1.1)
 
 -- ============================================
 -- 1. Inventory (物資表)
@@ -36,7 +37,7 @@ CREATE TABLE IF NOT EXISTS person (
     national_id_hash TEXT UNIQUE,    -- 身分證字號 hash (隱私保護，可為空)
     display_name TEXT NOT NULL,
     phone_hash TEXT,                 -- 手機號碼 hash (選填)
-    role TEXT DEFAULT 'public',      -- 'admin', 'staff', 'medic', 'public'
+    role TEXT DEFAULT 'public',      -- 'admin', 'staff', 'medic', 'public' (系統權限)
     pin_hash TEXT,                   -- bcrypt hash (有PIN才能操作)
     triage_status TEXT,              -- 'GREEN', 'YELLOW', 'RED', 'BLACK', NULL
     current_location TEXT,           -- 目前位置
@@ -45,6 +46,20 @@ CREATE TABLE IF NOT EXISTS person (
     id_status TEXT DEFAULT 'confirmed', -- 'confirmed', 'unidentified', 'pending'
     metadata TEXT,                   -- JSON: {"blood_type": "O", "allergies": "無", "emergency_contact": "..."}
     checked_in_at DATETIME,
+
+    -- Staff Management v1.1 欄位
+    staff_role TEXT,                 -- 職能: 'MEDIC', 'NURSE', 'VOLUNTEER', 'ADMIN', 'SECURITY', 'COORDINATOR'
+    staff_status TEXT DEFAULT 'OFF_DUTY', -- 'ACTIVE', 'STANDBY', 'OFF_DUTY', 'ON_LEAVE'
+    verification_status TEXT DEFAULT 'UNVERIFIED', -- 'UNVERIFIED', 'VERIFIED'
+    verified_at DATETIME,            -- 驗證時間
+    verified_by TEXT,                -- 驗證者 person_id
+    shift_start DATETIME,            -- 本班開始時間
+    shift_end DATETIME,              -- 本班預計結束 (用於缺口預測)
+    expected_hours REAL,             -- 預計工作時數
+    skills TEXT,                     -- JSON: 技能標籤
+    emergency_contact TEXT,          -- 緊急聯絡人
+    certification TEXT,              -- JSON: 證照資訊
+
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -53,6 +68,9 @@ CREATE INDEX IF NOT EXISTS idx_person_role ON person(role);
 CREATE INDEX IF NOT EXISTS idx_person_triage ON person(triage_status);
 CREATE INDEX IF NOT EXISTS idx_person_national_id ON person(national_id_hash);
 CREATE INDEX IF NOT EXISTS idx_person_id_status ON person(id_status);
+CREATE INDEX IF NOT EXISTS idx_person_staff_role ON person(staff_role);
+CREATE INDEX IF NOT EXISTS idx_person_staff_status ON person(staff_status);
+CREATE INDEX IF NOT EXISTS idx_person_verification ON person(verification_status);
 
 -- ============================================
 -- 3. EventLog (事件紀錄表)
@@ -339,7 +357,70 @@ CREATE TABLE IF NOT EXISTS shelter_network (
 CREATE INDEX IF NOT EXISTS idx_shelter_net_status ON shelter_network(connection_status);
 
 -- ============================================
--- 14. 預設資料
+-- 14. Staff Join Requests (自助登錄申請 v1.1)
+-- ============================================
+CREATE TABLE IF NOT EXISTS staff_join_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    qr_token TEXT UNIQUE NOT NULL,   -- 'JR-{uuid[:12]}'
+
+    -- 申請資料
+    display_name TEXT NOT NULL,
+    phone TEXT,
+    claimed_role TEXT NOT NULL,      -- 自稱職能: 'VOLUNTEER', 'MEDIC', etc.
+    skills TEXT,                     -- JSON: 技能標籤
+    expected_hours REAL DEFAULT 4,
+    notes TEXT,
+
+    -- 狀態
+    status TEXT DEFAULT 'PENDING',   -- 'PENDING', 'APPROVED', 'REJECTED', 'EXPIRED'
+
+    -- 時間戳
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,    -- 30 分鐘後過期
+    processed_at DATETIME,
+    processed_by TEXT,               -- Admin person_id
+
+    -- 核准後關聯
+    person_id TEXT                   -- 核准後建立的 person.id
+);
+
+CREATE INDEX IF NOT EXISTS idx_join_request_token ON staff_join_requests(qr_token);
+CREATE INDEX IF NOT EXISTS idx_join_request_status ON staff_join_requests(status);
+CREATE INDEX IF NOT EXISTS idx_join_request_expires ON staff_join_requests(expires_at);
+
+-- ============================================
+-- 15. Staff Badge Tokens (快速回鍋通行證 v1.1)
+-- ============================================
+CREATE TABLE IF NOT EXISTS staff_badge_tokens (
+    token_id TEXT PRIMARY KEY,       -- 'BT-{uuid[:12]}'
+    person_id TEXT NOT NULL,
+
+    issued_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,    -- 12 小時後過期
+    is_revoked INTEGER DEFAULT 0,
+
+    FOREIGN KEY (person_id) REFERENCES person(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_badge_token_person ON staff_badge_tokens(person_id);
+CREATE INDEX IF NOT EXISTS idx_badge_token_expires ON staff_badge_tokens(expires_at);
+
+-- ============================================
+-- 16. Staff Role Config (職能 UI 設定 v1.1)
+-- ============================================
+CREATE TABLE IF NOT EXISTS staff_role_config (
+    role_code TEXT PRIMARY KEY,
+    display_name TEXT NOT NULL,
+    display_name_en TEXT,
+    color_hex TEXT NOT NULL,
+    icon_name TEXT,
+    resilience_weight REAL DEFAULT 1.0,
+    requires_verification INTEGER DEFAULT 0,  -- 是否需要證照驗證
+    sort_order INTEGER DEFAULT 0
+);
+
+-- ============================================
+-- 17. 預設資料
 -- ============================================
 
 -- 預設設定
@@ -383,10 +464,19 @@ INSERT OR IGNORE INTO resilience_config (station_id, isolation_target_days, popu
 
 -- 預設帳號 (PIN 皆為: 1234)
 -- bcrypt hash for '1234': $2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC
-INSERT OR IGNORE INTO person (id, display_name, role, pin_hash) VALUES
-    ('admin001', '管理員', 'admin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC'),
-    ('staff001', '志工小明', 'staff', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC'),
-    ('medic001', '醫護小華', 'medic', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC');
+INSERT OR IGNORE INTO person (id, display_name, role, pin_hash, staff_role, staff_status, verification_status) VALUES
+    ('admin001', '管理員', 'admin', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC', 'COORDINATOR', 'ACTIVE', 'VERIFIED'),
+    ('staff001', '志工小明', 'staff', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC', 'VOLUNTEER', 'ACTIVE', 'VERIFIED'),
+    ('medic001', '醫護小華', 'medic', '$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC', 'NURSE', 'ACTIVE', 'VERIFIED');
+
+-- 預設職能 UI 設定 (Staff Role Config v1.1)
+INSERT OR IGNORE INTO staff_role_config (role_code, display_name, display_name_en, color_hex, icon_name, resilience_weight, requires_verification, sort_order) VALUES
+    ('MEDIC', '醫師', 'Doctor', '#E53935', 'medical_services', 1.0, 1, 1),
+    ('NURSE', '護理師', 'Nurse', '#E91E63', 'vaccines', 1.0, 1, 2),
+    ('VOLUNTEER', '志工', 'Volunteer', '#4CAF50', 'volunteer_activism', 1.0, 0, 3),
+    ('ADMIN', '行政人員', 'Admin', '#FFC107', 'assignment_ind', 1.0, 0, 4),
+    ('SECURITY', '保全人員', 'Security', '#2196F3', 'security', 1.0, 0, 5),
+    ('COORDINATOR', '指揮官', 'Coordinator', '#9C27B0', 'campaign', 1.0, 1, 6);
 
 -- 預設區域 (icon 使用 heroicon 名稱)
 INSERT OR IGNORE INTO zone (id, name, zone_type, capacity, description, icon, sort_order) VALUES
