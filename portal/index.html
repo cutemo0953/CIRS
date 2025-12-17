@@ -193,7 +193,7 @@
                       :class="getResilienceStatusClass(resilience.status)"
                       x-text="getResilienceStatusText(resilience.status)"></span>
                 <span class="text-xs text-gray-500" x-show="resilience.weakest_link">
-                    最弱環節：<span class="font-medium" x-text="getCategoryName(resilience.weakest_link)"></span>
+                    最弱環節：<span class="font-medium" x-text="getCategoryName(resilience.weakest_link?.category || resilience.weakest_link)"></span>
                 </span>
             </div>
 
@@ -217,10 +217,10 @@
                  class="mt-4 pt-3 border-t border-gray-100">
                 <p class="text-xs text-red-600 font-medium mb-1">⚠️ 建議行動：</p>
                 <ul class="text-xs text-gray-600 space-y-1">
-                    <template x-for="rec in (resilience.recommendations || []).slice(0, 2)" :key="rec">
+                    <template x-for="rec in (resilience.recommendations || []).slice(0, 2)" :key="rec.message || rec">
                         <li class="flex items-start">
                             <span class="mr-1">•</span>
-                            <span x-text="rec"></span>
+                            <span x-text="rec.message || rec"></span>
                         </li>
                     </template>
                 </ul>
