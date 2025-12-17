@@ -27,6 +27,7 @@
     "people": "人員",
     "inventory": "物資",
     "equipment": "設備",
+    "staff": "工作人員",
     "messages": "留言板"
   },
   "header": {
@@ -220,6 +221,29 @@
     "replyTo": "回覆留言",
     "replyContent": "回覆內容"
   },
+  "staff": {
+    "summary": "人力概況",
+    "active": "在值",
+    "standby": "待命",
+    "effective": "有效人力",
+    "coverage": "覆蓋率",
+    "shortages": "⚠️ 人力缺口",
+    "need": "需",
+    "gap": "缺",
+    "all": "全部",
+    "joinVolunteer": "我要加入",
+    "pending": "待審核",
+    "noStaff": "目前沒有工作人員",
+    "clockOut": "下班",
+    "verify": "驗證",
+    "nameRequired": "請輸入姓名",
+    "approved": "已核准",
+    "rejected": "已拒絕",
+    "rejectConfirm": "確定要拒絕此申請？",
+    "clockOutConfirm": "確定要下班？",
+    "clockedOut": "已下班",
+    "verified": "已驗證"
+  },
   "modal": {
     "login": {
       "title": "登入",
@@ -351,6 +375,24 @@
       "regenerate": "重新產生",
       "error": "QR Code 產生失敗"
     },
+    "staffJoin": {
+      "title": "志工登錄",
+      "submitted": "申請已送出！",
+      "waitApproval": "請出示此畫面給管理員審核",
+      "expiry": "QR Code 有效期限：30 分鐘",
+      "name": "姓名 *",
+      "namePlaceholder": "請輸入您的姓名",
+      "phone": "聯絡電話",
+      "role": "希望擔任職務 *",
+      "hours": "預計服務時數",
+      "notes": "備註",
+      "notesPlaceholder": "其他要說明的事項...",
+      "submit": "送出申請"
+    },
+    "staffPending": {
+      "title": "待審核申請",
+      "noPending": "沒有待審核的申請"
+    },
     "donation": {
       "title": "接收捐贈",
       "donorName": "捐贈者姓名",
@@ -381,7 +423,10 @@
     "edit": "編輯",
     "delete": "刪除",
     "back": "返回",
-    "next": "下一步"
+    "next": "下一步",
+    "approve": "核准",
+    "reject": "拒絕",
+    "approveVerify": "核准+驗證"
   },
   "toast": {
     "saved": "已儲存",

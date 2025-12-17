@@ -692,6 +692,139 @@
             </div>
         </div>
 
+        <!-- ==================== 工作人員 Tab ==================== -->
+        <div x-show="currentTab === 'staff'" x-cloak class="p-4 pb-28">
+            <!-- Staff Summary Card -->
+            <div class="bg-white rounded-xl p-4 shadow-sm mb-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-semibold text-gray-800" x-text="t('staff.summary')">人力概況</h3>
+                    <button @click="loadStaffData()" class="text-primary-600 text-sm">
+                        <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                    </button>
+                </div>
+                <div class="grid grid-cols-4 gap-2 text-center mb-3">
+                    <div class="bg-green-50 rounded-lg p-2">
+                        <p class="text-xl font-bold text-green-600" x-text="staffStats.active_count || 0"></p>
+                        <p class="text-xs text-green-700" x-text="t('staff.active')">在值</p>
+                    </div>
+                    <div class="bg-yellow-50 rounded-lg p-2">
+                        <p class="text-xl font-bold text-yellow-600" x-text="staffStats.standby_count || 0"></p>
+                        <p class="text-xs text-yellow-700" x-text="t('staff.standby')">待命</p>
+                    </div>
+                    <div class="bg-blue-50 rounded-lg p-2">
+                        <p class="text-xl font-bold text-blue-600" x-text="staffStats.effective_staff || 0"></p>
+                        <p class="text-xs text-blue-700" x-text="t('staff.effective')">有效人力</p>
+                    </div>
+                    <div class="bg-purple-50 rounded-lg p-2">
+                        <p class="text-xl font-bold text-purple-600" x-text="Math.round(staffStats.coverage_score || 0) + '%'"></p>
+                        <p class="text-xs text-purple-700" x-text="t('staff.coverage')">覆蓋率</p>
+                    </div>
+                </div>
+                <!-- Shortages Alert -->
+                <template x-if="staffStats.shortages && staffStats.shortages.length > 0">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-2 text-sm">
+                        <p class="font-medium text-red-700 mb-1" x-text="t('staff.shortages')">⚠️ 人力缺口</p>
+                        <template x-for="shortage in staffStats.shortages" :key="shortage.role">
+                            <p class="text-red-600 text-xs">
+                                <span x-text="shortage.role_name"></span>:
+                                <span x-text="t('staff.need')">需</span> <span x-text="shortage.required"></span>,
+                                <span x-text="t('staff.gap')">缺</span> <span x-text="shortage.gap"></span>
+                            </p>
+                        </template>
+                    </div>
+                </template>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex space-x-2 mb-4">
+                <!-- Self-Service Join (for everyone) -->
+                <button @click="showStaffJoinModal = true"
+                        class="flex-1 bg-primary-600 text-white rounded-lg py-3 font-medium flex items-center justify-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                    </svg>
+                    <span x-text="t('staff.joinVolunteer')">我要加入</span>
+                </button>
+                <!-- Admin: Pending Requests -->
+                <template x-if="currentUser && (currentUser.role === 'admin' || currentUser.role === 'staff')">
+                    <button @click="loadPendingRequests(); showStaffPendingModal = true"
+                            class="bg-amber-500 text-white rounded-lg py-3 px-4 font-medium flex items-center relative">
+                        <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                        </svg>
+                        <span x-text="t('staff.pending')">待審核</span>
+                        <span x-show="pendingRequests.length > 0"
+                              class="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center"
+                              x-text="pendingRequests.length"></span>
+                    </button>
+                </template>
+            </div>
+
+            <!-- Role Filter -->
+            <div class="flex space-x-2 overflow-x-auto pb-2 mb-4">
+                <button @click="staffRoleFilter = ''" :class="staffRoleFilter === '' ? 'bg-primary-600 text-white' : 'bg-white text-gray-700'"
+                        class="px-3 py-1 rounded-full text-sm whitespace-nowrap" x-text="t('staff.all')">全部</button>
+                <template x-for="role in roleConfigs" :key="role.role_code">
+                    <button @click="staffRoleFilter = role.role_code"
+                            :class="staffRoleFilter === role.role_code ? 'text-white' : 'bg-white text-gray-700'"
+                            :style="staffRoleFilter === role.role_code ? 'background-color:' + role.color_hex : ''"
+                            class="px-3 py-1 rounded-full text-sm whitespace-nowrap flex items-center">
+                        <span x-text="role.display_name"></span>
+                        <span class="ml-1 text-xs opacity-75" x-text="'(' + (staffStats.by_role?.[role.role_code]?.total || 0) + ')'"></span>
+                    </button>
+                </template>
+            </div>
+
+            <!-- On-Duty Staff List -->
+            <div class="space-y-2">
+                <template x-for="staff in filteredStaff" :key="staff.id">
+                    <div class="bg-white rounded-lg p-3 shadow-sm flex items-center justify-between">
+                        <div class="flex items-center">
+                            <!-- Role Color Badge -->
+                            <div class="w-10 h-10 rounded-full flex items-center justify-center mr-3 text-white text-sm font-bold"
+                                 :style="'background-color:' + (staff.color_hex || '#6B7280')">
+                                <span x-text="staff.display_name?.charAt(0) || '?'"></span>
+                            </div>
+                            <div>
+                                <p class="font-medium text-gray-800" x-text="staff.display_name"></p>
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs px-2 py-0.5 rounded-full text-white"
+                                          :style="'background-color:' + (staff.color_hex || '#6B7280')"
+                                          x-text="staff.role_display || staff.staff_role"></span>
+                                    <span class="text-xs"
+                                          :class="staff.staff_status === 'ACTIVE' ? 'text-green-600' : 'text-yellow-600'"
+                                          x-text="staff.staff_status === 'ACTIVE' ? '●在值' : '○待命'"></span>
+                                    <span x-show="staff.verification_status === 'VERIFIED'" class="text-xs text-blue-500">✓已驗證</span>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Actions -->
+                        <div class="flex items-center space-x-1">
+                            <template x-if="currentUser && staff.id === currentUser.id">
+                                <button x-show="staff.staff_status === 'ACTIVE'"
+                                        @click="clockOut(staff.id)"
+                                        class="text-xs bg-gray-200 text-gray-700 px-2 py-1 rounded" x-text="t('staff.clockOut')">下班</button>
+                            </template>
+                            <template x-if="currentUser && currentUser.role === 'admin' && staff.verification_status !== 'VERIFIED'">
+                                <button @click="verifyStaff(staff.id)"
+                                        class="text-xs bg-blue-500 text-white px-2 py-1 rounded" x-text="t('staff.verify')">驗證</button>
+                            </template>
+                        </div>
+                    </div>
+                </template>
+                <template x-if="filteredStaff.length === 0">
+                    <div class="text-center text-gray-500 py-8">
+                        <svg class="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/>
+                        </svg>
+                        <p x-text="t('staff.noStaff')">目前沒有工作人員</p>
+                    </div>
+                </template>
+            </div>
+        </div>
+
         <!-- ==================== 留言板 Tab ==================== -->
         <div x-show="currentTab === 'messages'" x-cloak class="p-4">
             <!-- Broadcast -->
@@ -813,6 +946,12 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                 </svg>
                 <span class="text-xs mt-1" x-text="t('nav.equipment')">設備</span>
+            </button>
+            <button @click="switchTab('staff')" :class="currentTab === 'staff' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                </svg>
+                <span class="text-xs mt-1" x-text="t('nav.staff')">工作人員</span>
             </button>
             <button @click="switchTab('messages')" :class="currentTab === 'messages' ? 'text-primary-600' : 'text-gray-400'" class="flex-1 py-3 flex flex-col items-center">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1676,6 +1815,160 @@
         </div>
     </div>
 
+    <!-- Staff Join Modal (自助登錄) -->
+    <div x-show="showStaffJoinModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showStaffJoinModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-6 h-6 text-primary-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                </svg>
+                <span x-text="t('modal.staffJoin.title')">志工登錄</span>
+            </h3>
+
+            <!-- QR Code Success State -->
+            <template x-if="staffJoinQR">
+                <div class="space-y-4">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-3 text-center">
+                        <svg class="w-12 h-12 mx-auto text-green-500 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p class="font-medium text-green-800" x-text="t('modal.staffJoin.submitted')">申請已送出！</p>
+                        <p class="text-sm text-green-600" x-text="t('modal.staffJoin.waitApproval')">請出示此畫面給管理員審核</p>
+                    </div>
+                    <div class="bg-gray-50 rounded-xl p-4 text-center">
+                        <div id="staff-join-qr" class="inline-block"></div>
+                        <p class="text-xs text-gray-500 mt-2" x-text="'Token: ' + staffJoinQR.qr_token"></p>
+                    </div>
+                    <div class="bg-amber-50 rounded-lg p-3">
+                        <p class="text-sm text-amber-700">
+                            <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span x-text="t('modal.staffJoin.expiry')">QR Code 有效期限：30 分鐘</span>
+                        </p>
+                    </div>
+                    <button @click="showStaffJoinModal = false; staffJoinQR = null; resetStaffJoinForm()"
+                            class="w-full px-4 py-2 bg-primary-600 text-white rounded-lg" x-text="t('actions.close')">關閉</button>
+                </div>
+            </template>
+
+            <!-- Form State -->
+            <template x-if="!staffJoinQR">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.staffJoin.name')">姓名 *</label>
+                        <input type="text" x-model="staffJoinForm.display_name"
+                               class="w-full border border-gray-200 rounded-lg px-3 py-2"
+                               :placeholder="t('modal.staffJoin.namePlaceholder')">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.staffJoin.phone')">聯絡電話</label>
+                        <input type="tel" x-model="staffJoinForm.phone"
+                               class="w-full border border-gray-200 rounded-lg px-3 py-2"
+                               placeholder="0912-345-678">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.staffJoin.role')">希望擔任職務 *</label>
+                        <select x-model="staffJoinForm.claimed_role"
+                                class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                            <template x-for="role in roleConfigs" :key="role.role_code">
+                                <option :value="role.role_code" x-text="role.display_name"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.staffJoin.hours')">預計服務時數</label>
+                        <select x-model="staffJoinForm.expected_hours"
+                                class="w-full border border-gray-200 rounded-lg px-3 py-2">
+                            <option value="2">2 小時</option>
+                            <option value="4" selected>4 小時</option>
+                            <option value="6">6 小時</option>
+                            <option value="8">8 小時</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm text-gray-600 mb-1" x-text="t('modal.staffJoin.notes')">備註</label>
+                        <textarea x-model="staffJoinForm.notes" rows="2"
+                                  class="w-full border border-gray-200 rounded-lg px-3 py-2 resize-none"
+                                  :placeholder="t('modal.staffJoin.notesPlaceholder')"></textarea>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button @click="showStaffJoinModal = false; resetStaffJoinForm()"
+                                class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.cancel')">取消</button>
+                        <button @click="submitStaffJoin()"
+                                :disabled="!staffJoinForm.display_name"
+                                class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg disabled:opacity-50"
+                                x-text="t('modal.staffJoin.submit')">送出申請</button>
+                    </div>
+                </div>
+            </template>
+        </div>
+    </div>
+
+    <!-- Staff Pending Requests Modal (待審核) -->
+    <div x-show="showStaffPendingModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showStaffPendingModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col">
+            <h3 class="text-lg font-semibold mb-4 flex items-center">
+                <svg class="w-6 h-6 text-amber-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                </svg>
+                <span x-text="t('modal.staffPending.title')">待審核申請</span>
+                <span class="ml-2 text-sm bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full" x-text="pendingRequests.length"></span>
+            </h3>
+
+            <div class="overflow-y-auto flex-1 -mx-6 px-6">
+                <template x-if="pendingRequests.length === 0">
+                    <div class="text-center text-gray-500 py-8">
+                        <svg class="w-12 h-12 mx-auto text-gray-300 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <p x-text="t('modal.staffPending.noPending')">沒有待審核的申請</p>
+                    </div>
+                </template>
+
+                <div class="space-y-3">
+                    <template x-for="req in pendingRequests" :key="req.id">
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="flex items-start justify-between mb-2">
+                                <div>
+                                    <p class="font-medium text-gray-800" x-text="req.display_name"></p>
+                                    <div class="flex items-center space-x-2 mt-1">
+                                        <span class="text-xs px-2 py-0.5 rounded-full text-white"
+                                              :style="'background-color:' + (req.color_hex || '#6B7280')"
+                                              x-text="req.role_display || req.claimed_role"></span>
+                                        <span class="text-xs text-gray-500" x-text="req.expected_hours + ' 小時'"></span>
+                                    </div>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs text-gray-400" x-text="'剩餘 ' + Math.floor(req.remaining_seconds / 60) + ' 分鐘'"></p>
+                                </div>
+                            </div>
+                            <p x-show="req.phone" class="text-xs text-gray-500 mb-1">📞 <span x-text="req.phone"></span></p>
+                            <p x-show="req.notes" class="text-xs text-gray-600 mb-3 bg-white rounded p-2" x-text="req.notes"></p>
+                            <div class="flex space-x-2">
+                                <button @click="rejectStaffRequest(req.qr_token)"
+                                        class="flex-1 px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm"
+                                        x-text="t('actions.reject')">拒絕</button>
+                                <button @click="approveStaffRequest(req.qr_token, false)"
+                                        class="flex-1 px-3 py-1.5 bg-primary-600 text-white rounded-lg text-sm"
+                                        x-text="t('actions.approve')">核准</button>
+                                <button x-show="['MEDIC', 'NURSE', 'COORDINATOR'].includes(req.claimed_role)"
+                                        @click="approveStaffRequest(req.qr_token, true)"
+                                        class="px-3 py-1.5 bg-blue-500 text-white rounded-lg text-sm"
+                                        x-text="t('actions.approveVerify')">核准+驗證</button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <button @click="showStaffPendingModal = false"
+                        class="w-full px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.close')">關閉</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Broadcast Modal (發佈公告) -->
     <div x-show="showBroadcastModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBroadcastModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md">
@@ -2448,6 +2741,15 @@
                 selectedPeople: [],
                 zoneTypeLabels: { shelter: '收容', medical: '醫療', service: '服務', restricted: '管制' },
 
+                // Staff Management data
+                staffList: [],
+                staffStats: {},
+                roleConfigs: [],
+                pendingRequests: [],
+                staffRoleFilter: '',
+                staffJoinQR: null,
+                staffJoinForm: { display_name: '', phone: '', claimed_role: 'VOLUNTEER', expected_hours: 4, notes: '' },
+
                 // i18n
                 langData: null,
                 currentLang: 'zh-TW',
@@ -2495,6 +2797,8 @@
                 showSatelliteQRModal: false,
                 satelliteQRUrl: '',
                 satellitePairingInfo: null,
+                showStaffJoinModal: false,
+                showStaffPendingModal: false,
                 editingEquipmentTemplate: null,
                 selectedEquipmentTemplate: null,
                 selectedTemplateItems: [],
@@ -2675,12 +2979,13 @@
                         case 'people': this.loadPeople(); this.loadZones(); break;
                         case 'inventory': this.loadInventory(); this.loadExpiringItems(); this.loadBundles(); break;
                         case 'equipment': this.loadEquipment(); this.loadEquipmentPending(); this.loadEquipmentTemplates(); break;
+                        case 'staff': this.loadStaffData(); break;
                         case 'messages': this.loadMessages(); break;
                     }
                 },
 
                 get pageTitle() {
-                    const titles = { 'people': '人員管理', 'inventory': '物資管理', 'equipment': '設備檢查', 'messages': '互助留言板' };
+                    const titles = { 'people': '人員管理', 'inventory': '物資管理', 'equipment': '設備檢查', 'staff': '工作人員', 'messages': '互助留言板' };
                     return titles[this.currentTab] || 'CIRS';
                 },
 
@@ -2720,6 +3025,11 @@
                         if (!a.is_pinned && b.is_pinned) return 1;
                         return 0; // 保持原本的時間排序
                     });
+                },
+
+                get filteredStaff() {
+                    if (!this.staffRoleFilter) return this.staffList;
+                    return this.staffList.filter(s => s.staff_role === this.staffRoleFilter);
                 },
 
                 async apiCall(url, options = {}) {
@@ -3461,6 +3771,153 @@
                             this.showToast('更新失敗', 'error');
                         }
                     } catch (e) { this.showToast('操作失敗', 'error'); }
+                },
+
+                // ==================== Staff Management Methods ====================
+                async loadStaffData() {
+                    try {
+                        // Load staff stats, on-duty list, and role configs in parallel
+                        const [statsRes, onDutyRes, configRes] = await Promise.all([
+                            fetch('/api/staff/summary/stats'),
+                            fetch('/api/staff/on-duty'),
+                            fetch('/api/staff/role-config')
+                        ]);
+
+                        if (statsRes.ok) {
+                            this.staffStats = await statsRes.json();
+                        }
+                        if (onDutyRes.ok) {
+                            const data = await onDutyRes.json();
+                            this.staffList = data.staff || [];
+                        }
+                        if (configRes.ok) {
+                            const data = await configRes.json();
+                            this.roleConfigs = data.roles || [];
+                        }
+                    } catch (e) {
+                        console.error('Failed to load staff data:', e);
+                    }
+                },
+
+                async loadPendingRequests() {
+                    try {
+                        const res = await fetch('/api/staff/join/pending');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.pendingRequests = data.requests || [];
+                        }
+                    } catch (e) {
+                        console.error('Failed to load pending requests:', e);
+                    }
+                },
+
+                resetStaffJoinForm() {
+                    this.staffJoinForm = { display_name: '', phone: '', claimed_role: 'VOLUNTEER', expected_hours: 4, notes: '' };
+                },
+
+                async submitStaffJoin() {
+                    if (!this.staffJoinForm.display_name) {
+                        this.showToast(this.t('staff.nameRequired') || '請輸入姓名', 'error');
+                        return;
+                    }
+                    try {
+                        const res = await fetch('/api/staff/join', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(this.staffJoinForm)
+                        });
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.staffJoinQR = data;
+                            // Generate QR code
+                            this.$nextTick(() => {
+                                const qr = qrcode(0, 'M');
+                                qr.addData(data.qr_token);
+                                qr.make();
+                                const qrEl = document.getElementById('staff-join-qr');
+                                if (qrEl) {
+                                    qrEl.innerHTML = qr.createImgTag(5);
+                                }
+                            });
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '申請失敗', 'error');
+                        }
+                    } catch (e) {
+                        this.showToast('網路錯誤', 'error');
+                    }
+                },
+
+                async approveStaffRequest(token, verify = false) {
+                    try {
+                        const res = await this.apiCall(`/api/staff/join/${token}/approve`, {
+                            method: 'POST',
+                            body: { verified: verify, approver_id: this.currentUser?.id || 'admin001' }
+                        });
+                        if (res.ok) {
+                            this.showToast(this.t('staff.approved') || '已核准', 'success');
+                            this.loadPendingRequests();
+                            this.loadStaffData();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '核准失敗', 'error');
+                        }
+                    } catch (e) {
+                        this.showToast('操作失敗', 'error');
+                    }
+                },
+
+                async rejectStaffRequest(token) {
+                    if (!confirm(this.t('staff.rejectConfirm') || '確定要拒絕此申請？')) return;
+                    try {
+                        const res = await this.apiCall(`/api/staff/join/${token}/reject`, {
+                            method: 'POST',
+                            body: { approver_id: this.currentUser?.id || 'admin001' }
+                        });
+                        if (res.ok) {
+                            this.showToast(this.t('staff.rejected') || '已拒絕', 'success');
+                            this.loadPendingRequests();
+                        } else {
+                            this.showToast('拒絕失敗', 'error');
+                        }
+                    } catch (e) {
+                        this.showToast('操作失敗', 'error');
+                    }
+                },
+
+                async clockOut(staffId) {
+                    if (!confirm(this.t('staff.clockOutConfirm') || '確定要下班？')) return;
+                    try {
+                        const res = await this.apiCall(`/api/staff/${staffId}/clock-out`, {
+                            method: 'POST',
+                            body: {}
+                        });
+                        if (res.ok) {
+                            this.showToast(this.t('staff.clockedOut') || '已下班', 'success');
+                            this.loadStaffData();
+                        } else {
+                            this.showToast('下班失敗', 'error');
+                        }
+                    } catch (e) {
+                        this.showToast('操作失敗', 'error');
+                    }
+                },
+
+                async verifyStaff(staffId) {
+                    try {
+                        const res = await this.apiCall(`/api/staff/${staffId}/verify`, {
+                            method: 'POST',
+                            body: { verifier_id: this.currentUser?.id || 'admin001' }
+                        });
+                        if (res.ok) {
+                            this.showToast(this.t('staff.verified') || '已驗證', 'success');
+                            this.loadStaffData();
+                        } else {
+                            this.showToast('驗證失敗', 'error');
+                        }
+                    } catch (e) {
+                        this.showToast('操作失敗', 'error');
+                    }
                 },
 
                 async generateSatelliteQR() {
