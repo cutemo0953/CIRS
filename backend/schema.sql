@@ -425,6 +425,7 @@ CREATE TABLE IF NOT EXISTS staff_role_config (
 CREATE TABLE IF NOT EXISTS satellite_pairing_codes (
     code TEXT PRIMARY KEY,               -- 6 位大寫字母數字: 'XYZ123'
     hub_name TEXT NOT NULL,
+    allowed_roles TEXT DEFAULT 'volunteer',  -- v1.3.1: 允許角色 (volunteer,admin)
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     expires_at DATETIME NOT NULL,        -- 5 分鐘後過期
     used_at DATETIME,                    -- 使用時間

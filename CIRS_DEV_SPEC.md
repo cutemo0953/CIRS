@@ -1902,7 +1902,7 @@ curl http://localhost:8091/api/stats
 - [x] 人員狀態統計
 - [x] 前端 Dashboard 整合
 
-### Phase 8: Satellite PWA ✅ (v1.1)
+### Phase 8: Satellite PWA ✅ (v1.2)
 - [x] QR Code 配對機制
 - [x] URL Token 連接
 - [x] 離線暫存 (IndexedDB)
@@ -1915,6 +1915,10 @@ curl http://localhost:8091/api/stats
 - [x] 庫存查詢介面 (分類篩選、離線快取)
 - [x] Portal 綠色主題配色同步 (#4c826b)
 - [x] iOS Fallback (Pending 指示器 + Sync Now)
+- [x] v1.2: 相機錯誤處理 (iOS Safari 權限引導 + 手動輸入 fallback)
+- [x] v1.2: 智慧貼上 (自動解析 pairing_code URL、自動分離 Hub URL 與配對碼)
+- [x] v1.2: 配對後角色選擇 (志工/管理員)
+- [x] v1.2: 設定頁角色顯示與切換功能
 - [ ] MIRS Satellite 支援
 
 ### Phase 9: xIRS Secure Exchange ✅ (v2.0)

@@ -334,6 +334,36 @@ async def get_inventory_summary(device: dict = Depends(get_satellite_device)):
     }
 
 
+@router.get("/zones")
+async def get_zones(device: dict = Depends(get_satellite_device)):
+    """
+    Get available zones for Satellite PWA (v1.3.1).
+    Used for new person registration location selection.
+    """
+    with get_db() as conn:
+        cursor = conn.execute("""
+            SELECT id, name, zone_type, capacity, description, icon
+            FROM zone
+            WHERE is_active = 1
+            ORDER BY sort_order, name
+        """)
+        zones = [dict_from_row(row) for row in cursor.fetchall()]
+
+    # Group by zone_type
+    grouped = {}
+    for zone in zones:
+        zone_type = zone.get('zone_type', 'other')
+        if zone_type not in grouped:
+            grouped[zone_type] = []
+        grouped[zone_type].append(zone)
+
+    return {
+        "zones": zones,
+        "grouped": grouped,
+        "server_time": int(datetime.utcnow().timestamp())
+    }
+
+
 @router.get("/persons")
 async def get_checked_in_persons(device: dict = Depends(get_satellite_device)):
     """
@@ -380,4 +410,223 @@ async def get_action_logs(
         "device_id": device_id,
         "logs": logs,
         "server_time": int(datetime.utcnow().timestamp())
+    }
+
+
+# ============================================================================
+# Direct Action Endpoints (v1.3.1) - Simpler than batch sync
+# ============================================================================
+
+class CheckinRequest(BaseModel):
+    """Direct check-in request from Satellite PWA"""
+    person_id: str
+    name: Optional[str] = None
+    action: str = 'checkin'  # 'register', 'checkin', 'checkout'
+    triage_status: Optional[str] = 'green'  # green/yellow/red/black
+    zone_id: Optional[str] = None
+    zone_name: Optional[str] = None
+    card_number: Optional[str] = None
+    notes: Optional[str] = None
+    is_new: Optional[bool] = False
+
+
+class SupplyRequest(BaseModel):
+    """Direct supply distribution request from Satellite PWA"""
+    person_id: str
+    person_name: Optional[str] = None
+    item_id: Optional[int] = None
+    item: Optional[str] = None
+    quantity: int = 1
+
+
+@router.post("/checkin")
+async def direct_checkin(request: CheckinRequest, device: dict = Depends(get_satellite_device)):
+    """
+    Direct check-in/check-out/register endpoint (v1.3.1).
+    Simpler alternative to batch sync for individual operations.
+    """
+    device_id = device.get("device_id", "unknown")
+    action = request.action
+
+    with write_db() as conn:
+        if action == 'register':
+            # Register new person with triage status and zone
+            location = request.zone_name or request.zone_id or ''
+            cursor = conn.execute(
+                """INSERT INTO person (display_name, role, triage_status, current_location, notes, card_number, checked_in_at, created_at, updated_at)
+                   VALUES (?, 'public', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
+                (request.name or request.person_id, request.triage_status, location, request.notes, request.card_number)
+            )
+            new_id = cursor.lastrowid
+
+            # Record in event_log
+            conn.execute(
+                """INSERT INTO event_log (event_type, person_id, location, notes, operator_id)
+                   VALUES ('REGISTER', ?, ?, ?, ?)""",
+                (new_id, location, f"Satellite registration: {request.name} ({request.triage_status})", device_id)
+            )
+
+            # Triage status labels for response
+            triage_labels = {'green': '輕傷', 'yellow': '延遲', 'red': '立即', 'black': '死亡'}
+            triage_label = triage_labels.get(request.triage_status, request.triage_status)
+
+            return {
+                "success": True,
+                "action": "register",
+                "person_id": new_id,
+                "name": request.name,
+                "triage_status": request.triage_status,
+                "location": location,
+                "message": f"已登記：{request.name}（{triage_label}）"
+            }
+
+        elif action == 'checkin':
+            # Check in existing person (try to find by ID or name)
+            cursor = conn.execute(
+                """SELECT id, display_name FROM person
+                   WHERE id = ? OR display_name LIKE ? OR card_number = ?""",
+                (request.person_id, f"%{request.name or request.person_id}%", request.person_id)
+            )
+            person = cursor.fetchone()
+
+            if person is None:
+                # Auto-register if not found
+                cursor = conn.execute(
+                    """INSERT INTO person (display_name, role, checked_in_at, created_at, updated_at)
+                       VALUES (?, 'public', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
+                    (request.name or request.person_id,)
+                )
+                person_id = cursor.lastrowid
+                person_name = request.name or request.person_id
+            else:
+                person_id = person['id']
+                person_name = person['display_name']
+
+                # Update check-in status
+                conn.execute(
+                    """UPDATE person SET checked_in_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                       WHERE id = ?""",
+                    (person_id,)
+                )
+
+            # Record in event_log
+            conn.execute(
+                """INSERT INTO event_log (event_type, person_id, notes, operator_id)
+                   VALUES ('CHECK_IN', ?, ?, ?)""",
+                (person_id, f"Satellite check-in", device_id)
+            )
+
+            return {
+                "success": True,
+                "action": "checkin",
+                "person_id": person_id,
+                "name": person_name,
+                "message": f"{person_name} 報到成功"
+            }
+
+        elif action == 'checkout':
+            # Check out
+            cursor = conn.execute(
+                """SELECT id, display_name FROM person
+                   WHERE id = ? OR display_name LIKE ? OR card_number = ?""",
+                (request.person_id, f"%{request.name or request.person_id}%", request.person_id)
+            )
+            person = cursor.fetchone()
+
+            if person is None:
+                return {
+                    "success": False,
+                    "action": "checkout",
+                    "message": f"找不到人員：{request.person_id}"
+                }
+
+            person_id = person['id']
+            person_name = person['display_name']
+
+            # Update check-out status
+            conn.execute(
+                """UPDATE person SET checked_in_at = NULL, current_location = NULL, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ?""",
+                (person_id,)
+            )
+
+            # Record in event_log
+            conn.execute(
+                """INSERT INTO event_log (event_type, person_id, notes, operator_id)
+                   VALUES ('CHECK_OUT', ?, ?, ?)""",
+                (person_id, f"Satellite check-out", device_id)
+            )
+
+            return {
+                "success": True,
+                "action": "checkout",
+                "person_id": person_id,
+                "name": person_name,
+                "message": f"{person_name} 退場成功"
+            }
+
+    return {"success": False, "message": "Unknown action"}
+
+
+@router.post("/supply")
+async def direct_supply(request: SupplyRequest, device: dict = Depends(get_satellite_device)):
+    """
+    Direct supply distribution endpoint (v1.3.1).
+    Simpler alternative to batch sync for individual operations.
+    """
+    device_id = device.get("device_id", "unknown")
+
+    with write_db() as conn:
+        # Find item
+        item = None
+        if request.item_id:
+            cursor = conn.execute(
+                "SELECT id, name, quantity FROM inventory WHERE id = ?",
+                (request.item_id,)
+            )
+            item = cursor.fetchone()
+
+        if item is None and request.item:
+            # Try to find by name
+            cursor = conn.execute(
+                "SELECT id, name, quantity FROM inventory WHERE name LIKE ?",
+                (f"%{request.item}%",)
+            )
+            item = cursor.fetchone()
+
+        if item is None:
+            return {
+                "success": False,
+                "message": f"找不到物資：{request.item or request.item_id}"
+            }
+
+        # Check quantity
+        current_qty = item['quantity'] or 0
+        if current_qty < request.quantity:
+            return {
+                "success": False,
+                "message": f"庫存不足：{item['name']} 只剩 {current_qty}"
+            }
+
+        # Update inventory
+        new_qty = current_qty - request.quantity
+        conn.execute(
+            "UPDATE inventory SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_qty, item['id'])
+        )
+
+        # Record in event_log
+        conn.execute(
+            """INSERT INTO event_log (event_type, item_id, quantity_change, notes, operator_id)
+               VALUES ('RESOURCE_OUT', ?, ?, ?, ?)""",
+            (item['id'], -request.quantity, f"Satellite dispense to {request.person_name or request.person_id}", device_id)
+        )
+
+    return {
+        "success": True,
+        "item_id": item['id'],
+        "item_name": item['name'],
+        "quantity": request.quantity,
+        "remaining": new_qty,
+        "message": f"已發放 {item['name']} x{request.quantity} 給 {request.person_name or request.person_id}"
     }

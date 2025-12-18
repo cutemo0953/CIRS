@@ -348,6 +348,7 @@ def apply_migrations(conn):
             CREATE TABLE IF NOT EXISTS satellite_pairing_codes (
                 code TEXT PRIMARY KEY,
                 hub_name TEXT NOT NULL,
+                allowed_roles TEXT DEFAULT 'volunteer',
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 expires_at DATETIME NOT NULL,
                 used_at DATETIME,
@@ -355,6 +356,13 @@ def apply_migrations(conn):
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_pairing_code_expires ON satellite_pairing_codes(expires_at)")
+    else:
+        # v1.3.1: Add allowed_roles column if missing
+        cursor = conn.execute("PRAGMA table_info(satellite_pairing_codes)")
+        pairing_columns = [row['name'] for row in cursor.fetchall()]
+        if 'allowed_roles' not in pairing_columns:
+            print("Migration: Adding 'allowed_roles' column to satellite_pairing_codes")
+            conn.execute("ALTER TABLE satellite_pairing_codes ADD COLUMN allowed_roles TEXT DEFAULT 'volunteer'")
 
     # Action Logs table migration (v1.1)
     cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='action_logs'")

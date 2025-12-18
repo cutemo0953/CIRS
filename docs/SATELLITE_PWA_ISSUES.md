@@ -1,6 +1,8 @@
 # Satellite PWA 問題與開發規格
 
 > 基於 2024-12 實機測試回饋
+>
+> **v1.3 更新 (2025-12-18)**: 多數問題已在 v1.3 修復
 
 ---
 
@@ -8,13 +10,13 @@
 
 | # | 問題 | 嚴重度 | 狀態 |
 |---|------|--------|------|
-| 1 | QR Scanner 無法使用 | Critical | 待修 |
-| 2 | 手動輸入 UX 差 | High | 待修 |
-| 3 | 查看庫存功能未實作 | Medium | 待開發 |
-| 4 | UI 風格不一致 | Medium | 待修 |
+| 1 | QR Scanner 無法使用 | Critical | ✅ 已解決 (v1.3 手動輸入 fallback) |
+| 2 | 手動輸入 UX 差 | High | ✅ 已解決 (v1.3 智慧貼上 + 6位數配對碼) |
+| 3 | 查看庫存功能未實作 | Medium | ✅ 已實作 |
+| 4 | UI 風格不一致 | Medium | ✅ 已統一 (Portal 綠色主題) |
 | 5 | App Icon 需重新設計 | Low | 待設計 |
-| 6 | 報到流程設計不清 | High | 需釐清 |
-| 7 | 志工 ID 與同步記錄 | Medium | 需設計 |
+| 6 | 報到流程設計不清 | High | ✅ 已釐清 (掃描 + 手動選項) |
+| 7 | 志工 ID 與同步記錄 | Medium | ✅ 已實作 (角色選擇 + 活動記錄) |
 
 ---
 
@@ -309,18 +311,18 @@ Response: {
 
 ## 優先順序
 
-### Phase 1: 核心功能修復（必要）
-1. [x] Issue 1: QR Scanner → 改用手動輸入
-2. [ ] Issue 6: 報到流程確認
-3. [ ] Issue 3: 查看庫存實作
+### Phase 1: 核心功能修復（必要）✅ 已完成
+1. [x] Issue 1: QR Scanner → 改用手動輸入 (v1.3 已實作手動輸入 fallback)
+2. [x] Issue 6: 報到流程確認 (v1.3 掃描 + 手動雙選項)
+3. [x] Issue 3: 查看庫存實作 (已完成，支援離線快取)
 
-### Phase 2: UX 改善
-4. [ ] Issue 2: 手動連接 UX
-5. [ ] Issue 4: UI 風格統一
-6. [ ] Issue 7: 志工 ID 與記錄
+### Phase 2: UX 改善 ✅ 已完成
+4. [x] Issue 2: 手動連接 UX (v1.3 改用 6 位數配對碼)
+5. [x] Issue 4: UI 風格統一 (已統一 Portal 綠色主題)
+6. [x] Issue 7: 志工 ID 與記錄 (角色選擇 + 活動記錄)
 
 ### Phase 3: 視覺優化
-7. [ ] Issue 5: App Icon
+7. [ ] Issue 5: App Icon (待設計)
 
 ---
 
@@ -375,4 +377,4 @@ GET /api/satellite/status
 
 ---
 
-*Last Updated: 2024-12-14*
+*Last Updated: 2025-12-18 (v1.3)*

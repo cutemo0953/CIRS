@@ -38,6 +38,17 @@
     </style>
 </head>
 <body class="bg-gray-50" x-data="cirsApp()" x-init="init()">
+    <!-- Redirect to Satellite PWA if pairing_code present -->
+    <script>
+        (function() {
+            const params = new URLSearchParams(window.location.search);
+            const pairingCode = params.get('pairing_code');
+            if (pairingCode && window.location.pathname === '/') {
+                // Redirect to Satellite PWA with the pairing code
+                window.location.href = '/mobile/' + window.location.search;
+            }
+        })();
+    </script>
     <!-- Demo Mode Banner -->
     <div id="demo-banner" x-show="false" style="display:none;" class="bg-amber-500 text-white text-center px-4 py-2 text-sm font-bold sticky top-0 z-50">
         🚧 <span x-text="t('demo.banner')">線上展示版 (Demo Mode) | 資料將在頁面重整後重置</span> |
@@ -1765,9 +1776,9 @@
         </div>
     </div>
 
-    <!-- Satellite QR Modal (志工配對) -->
+    <!-- Satellite QR Modal v1.3 (志工配對 - GitHub Device Flow 風格) -->
     <div x-show="showSatelliteQRModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showSatelliteQRModal = false">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md">
             <h3 class="text-lg font-semibold mb-4 flex items-center">
                 <svg class="w-6 h-6 text-primary-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/>
@@ -1783,41 +1794,121 @@
                 <p class="text-gray-500 mt-2" x-text="t('modal.satellite.loading')">載入中...</p>
             </div>
 
-            <!-- QR Code display -->
+            <!-- v1.3 Two-Step Pairing Display -->
             <div x-show="satelliteQRUrl" class="space-y-4">
-                <div class="bg-gray-50 rounded-xl p-4 flex justify-center">
-                    <img :src="satelliteQRUrl" alt="Satellite Pairing QR" class="w-48 h-48">
+                <!-- WiFi Warning -->
+                <div class="bg-amber-50 border border-amber-200 rounded-xl p-3">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-amber-600 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.14 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/>
+                        </svg>
+                        <p class="text-sm font-medium text-amber-800">手機必須與此電腦在同一個 WiFi 網路</p>
+                    </div>
                 </div>
 
-                <div class="bg-primary-50 rounded-xl p-4">
-                    <p class="text-sm font-medium text-primary-800 mb-2" x-text="t('modal.satellite.instructions')">使用說明</p>
-                    <ol class="text-sm text-primary-700 space-y-1 list-decimal list-inside">
-                        <li x-text="t('modal.satellite.step1')">志工用手機開啟相機</li>
-                        <li x-text="t('modal.satellite.step2')">掃描此 QR Code</li>
-                        <li x-text="t('modal.satellite.step3')">依照提示安裝 PWA</li>
-                        <li x-text="t('modal.satellite.step4')">即可開始報到/發放作業</li>
+                <!-- v1.3.1: Role Selection -->
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-medium text-gray-700">允許角色</span>
+                        <select x-model="satelliteAllowedRoles"
+                                @change="refreshPairingCode()"
+                                class="text-sm border-gray-200 rounded-lg py-1 px-2 focus:ring-primary-500 focus:border-primary-500">
+                            <option value="volunteer">僅志工</option>
+                            <option value="admin">僅管理員</option>
+                            <option value="volunteer,admin">志工 + 管理員</option>
+                        </select>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-1">選擇此配對碼允許使用的身分</p>
+                </div>
+
+                <!-- Two columns: QR Code + Pairing Code -->
+                <div class="grid grid-cols-2 gap-4">
+                    <!-- Step 1: QR Code (Static) -->
+                    <div class="bg-gray-50 rounded-xl p-3">
+                        <div class="text-center mb-2">
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-600 text-white text-sm font-bold">1</span>
+                            <span class="text-sm font-medium text-gray-700 ml-1">掃描開啟</span>
+                        </div>
+                        <div class="flex justify-center">
+                            <img :src="satelliteQRUrl" alt="PWA QR" class="w-32 h-32">
+                        </div>
+                        <p class="text-xs text-gray-500 text-center mt-2">QR Code 永久有效</p>
+                    </div>
+
+                    <!-- Step 2: Pairing Code (6-digit) -->
+                    <div class="bg-primary-50 rounded-xl p-3">
+                        <div class="text-center mb-2">
+                            <span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-primary-600 text-white text-sm font-bold">2</span>
+                            <span class="text-sm font-medium text-gray-700 ml-1">輸入配對碼</span>
+                        </div>
+                        <div class="flex justify-center">
+                            <div class="bg-white rounded-lg px-4 py-3 shadow-inner">
+                                <span class="text-3xl font-mono font-bold tracking-[0.3em] text-primary-700"
+                                      x-text="satellitePairingInfo?.pairing_code || '------'"></span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-center mt-2 text-xs text-gray-500">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span>5 分鐘內有效</span>
+                        </div>
+                        <button @click="refreshPairingCode()"
+                                class="w-full mt-2 px-3 py-1.5 bg-primary-600 text-white text-xs rounded-lg hover:bg-primary-700 flex items-center justify-center">
+                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            重新產生
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Hub IP Info -->
+                <div class="bg-gray-100 rounded-xl p-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs text-gray-500">Hub IP 位址</span>
+                        <span class="text-sm font-mono font-medium text-gray-800" x-text="satellitePairingInfo?.hub_ip || window.location.hostname"></span>
+                    </div>
+                </div>
+
+                <!-- Quick Steps -->
+                <div class="bg-gray-50 rounded-xl p-3">
+                    <ol class="text-sm text-gray-700 space-y-1">
+                        <li class="flex items-start">
+                            <span class="font-bold text-primary-600 mr-2">1.</span>
+                            <span>用手機相機掃描 QR Code，開啟 Satellite 網頁</span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="font-bold text-primary-600 mr-2">2.</span>
+                            <span>在手機上輸入上方 <strong>6 位數配對碼</strong></span>
+                        </li>
+                        <li class="flex items-start">
+                            <span class="font-bold text-primary-600 mr-2">3.</span>
+                            <span>選擇角色（志工/管理員），完成配對</span>
+                        </li>
                     </ol>
                 </div>
 
-                <!-- Pairing Info (for manual connection) -->
-                <div x-show="satellitePairingInfo" class="bg-gray-100 rounded-xl p-3">
-                    <p class="text-xs text-gray-500 mb-1" x-text="t('modal.satellite.manualConnect')">手動連接資訊</p>
-                    <p class="text-xs font-mono text-gray-700 break-all" x-text="satellitePairingInfo?.pairing_url"></p>
-                </div>
-
-                <p class="text-xs text-gray-500 text-center">
-                    <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
-                    </svg>
-                    <span x-text="t('modal.satellite.expiry')">配對連結有效期限：72 小時</span>
-                </p>
+                <!-- Troubleshooting (collapsible) -->
+                <details class="bg-gray-50 rounded-xl">
+                    <summary class="px-3 py-2 text-sm text-gray-600 cursor-pointer hover:bg-gray-100 rounded-xl flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>連線失敗？</span>
+                    </summary>
+                    <div class="px-3 pb-3 text-xs text-gray-600 space-y-1">
+                        <p>• 確認手機沒有使用行動數據</p>
+                        <p>• 確認手機 WiFi 連接正確的網路</p>
+                        <p>• 試著在手機瀏覽器輸入 Hub IP 位址</p>
+                        <p>• 配對碼輸入錯誤會有次數限制（每分鐘 5 次）</p>
+                    </div>
+                </details>
             </div>
 
             <div class="flex space-x-3 mt-4">
                 <button @click="showSatelliteQRModal = false; satelliteQRUrl = ''; satellitePairingInfo = null"
                         class="flex-1 px-4 py-2 border border-gray-200 rounded-lg" x-text="t('actions.close')">關閉</button>
-                <button @click="generateSatelliteQR()"
-                        class="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg" x-text="t('modal.satellite.regenerate')">重新產生</button>
             </div>
         </div>
     </div>
@@ -2803,6 +2894,7 @@
                 showSatelliteQRModal: false,
                 satelliteQRUrl: '',
                 satellitePairingInfo: null,
+                satelliteAllowedRoles: 'volunteer,admin', // v1.3.1: Role control
                 showStaffJoinModal: false,
                 showStaffPendingModal: false,
                 editingEquipmentTemplate: null,
@@ -3956,15 +4048,7 @@
                     this.showSatelliteQRModal = true;
 
                     try {
-                        // Fetch pairing info (includes token and URL)
-                        const infoRes = await this.apiCall('/api/auth/pairing-info');
-                        if (infoRes.ok) {
-                            this.satellitePairingInfo = await infoRes.json();
-                        } else {
-                            throw new Error('Failed to get pairing info');
-                        }
-
-                        // Fetch QR code image
+                        // v1.3: Fetch QR code (static URL, no pairing code)
                         const qrRes = await this.apiCall('/api/auth/pairing-qr');
                         if (qrRes.ok) {
                             const blob = await qrRes.blob();
@@ -3972,10 +4056,47 @@
                         } else {
                             throw new Error('Failed to generate QR code');
                         }
+
+                        // Fetch pairing info (includes 6-digit code)
+                        const infoRes = await this.apiCall('/api/auth/pairing-info');
+                        if (infoRes.ok) {
+                            this.satellitePairingInfo = await infoRes.json();
+                        } else {
+                            throw new Error('Failed to get pairing info');
+                        }
                     } catch (e) {
                         console.error('Satellite QR error:', e);
                         this.showToast(this.t('modal.satellite.error') || 'QR Code 產生失敗', 'error');
                         this.showSatelliteQRModal = false;
+                    }
+                },
+
+                // v1.3.1: Refresh pairing code with role control
+                async refreshPairingCode() {
+                    try {
+                        // Use POST to specify allowed_roles
+                        const infoRes = await this.apiCall('/api/auth/pairing-code', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ allowed_roles: this.satelliteAllowedRoles })
+                        });
+                        if (infoRes.ok) {
+                            const data = await infoRes.json();
+                            // Merge new code with existing pairing info
+                            this.satellitePairingInfo = {
+                                ...this.satellitePairingInfo,
+                                pairing_code: data.code,
+                                allowed_roles: data.allowed_roles,
+                                code_expires_at: data.expires_at,
+                                code_expires_in: data.expires_in
+                            };
+                            this.showToast('配對碼已更新', 'success');
+                        } else {
+                            throw new Error('Failed to refresh pairing code');
+                        }
+                    } catch (e) {
+                        console.error('Pairing code refresh error:', e);
+                        this.showToast('配對碼更新失敗', 'error');
                     }
                 },
 

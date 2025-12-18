@@ -1,6 +1,26 @@
-# Satellite PWA 開發規格書 v1.1
+# Satellite PWA 開發規格書 v1.3.1
 
 > Hub & Spoke 架構：讓志工手機成為「傳令兵」
+
+**v1.3.1 更新 (2025-12-18):**
+- 角色控制：Hub 可指定配對碼允許的角色（僅志工/僅管理員/兩者）
+- 新人登記：支援檢傷分類（輕傷/延遲/立即/死亡）+ 區域選單
+- 直接 API 呼叫：線上時直接呼叫 API，不經過 Service Worker 佇列
+- Safari 空白頁修復：新增 CDN 載入偵測與 fallback loading 畫面
+- 區域 API：新增 `/api/satellite/zones` 取得 Hub 預設區域
+
+**v1.3 更新 (2025-12):**
+- 配對流程簡化：QR Code 僅開啟 PWA，配對碼改為手動輸入 6 位數字
+- 報到/退場：新增手動輸入 ID 選項（解決相機問題）
+- 物資發放：新增手動選擇領取人+物資選項
+- 新增 API 限速防護（防暴力破解）
+- 參考 GitHub Device Flow 設計理念
+
+**v1.2 更新 (2025-12):**
+- 相機錯誤處理：iOS Safari 權限引導 + 手動輸入 fallback
+- 智慧貼上：自動解析 pairing_code URL、分離 Hub URL 與配對碼
+- 配對後角色選擇：志工/管理員 選項
+- 設定頁角色顯示與切換功能
 
 **v1.1 更新 (2025-12):**
 - 認證流程改為 Pairing Code Pattern（5分鐘有效 + device_id 綁定）
@@ -76,44 +96,78 @@
 
 | 功能 | 說明 | 優先級 |
 |------|------|--------|
-| QR 配對連接 | 掃描 Hub QR Code 自動連接 | ✅ Done |
-| URL Token 連接 | 從 URL 解析 token 自動登入 | ✅ Done |
-| 人員報到 | 掃描災民 QR/手動輸入 | P1 |
-| 人員退場 | 掃描災民 QR/手動輸入 | P1 |
-| 物資發放 | 掃描發放 QR 確認領取 | P1 |
+| QR Code 開啟 PWA | 掃描 QR Code 開啟 Satellite 網頁（靜態網址） | ✅ Done |
+| 6 位數配對碼 | 手動輸入配對碼完成認證 | ✅ v1.3 |
+| 人員報到 | 掃描災民 QR 或手動輸入 ID | ✅ v1.3 |
+| 人員退場 | 掃描災民 QR 或手動輸入 ID | ✅ v1.3 |
+| 物資發放 | 掃描 QR 或手動選擇（領取人+物資+數量） | ✅ v1.3 |
 | 離線暫存 | 斷網時暫存操作 | ✅ Done |
 | 自動同步 | 恢復連線自動上傳 | ✅ Done |
-| 庫存查詢 | 查看目前物資庫存（唯讀） | P2 |
+| 庫存查詢 | 查看目前物資庫存（唯讀） | ✅ Done |
 | 人員查詢 | 查看在場人員名單（唯讀） | P2 |
 
 ### API Endpoints
 
-#### 認證 (Pairing Code Pattern) - v1.1
+#### 認證 (6 位數配對碼) - v1.3.1
 
 ```
-# Hub 端 (Admin)
-GET  /api/auth/pairing-qr         # 產生配對 QR Code (5分鐘有效)
-GET  /api/auth/pairing-info       # 取得配對資訊 JSON
+# Hub 端 (Admin Portal)
+GET  /api/auth/pairing-code       # 產生 6 位數配對碼 (5分鐘有效，預設僅志工)
+     Response: { "code": "847291", "allowed_roles": "volunteer", "expires_at": "..." }
+
+POST /api/auth/pairing-code       # 產生配對碼並指定允許角色 (v1.3.1)
+     Body: { "allowed_roles": "volunteer,admin" }
+     Response: { "code": "847291", "allowed_roles": "volunteer,admin", "expires_at": "..." }
+
+GET  /api/auth/pairing-qr         # 產生 QR Code（僅含 PWA 網址，不含配對碼）
+     Response: PNG image of QR code pointing to /mobile/
 
 # Satellite 端
-POST /api/auth/satellite/exchange # 交換 pairing_code 取得 JWT
-     Body: { "pairing_code": "XYZ123", "device_id": "client-uuid" }
-     Response: { "access_token": "JWT...", "expires_in": 43200 }
+POST /api/auth/satellite/exchange # 交換配對碼取得 JWT
+     Body: { "pairing_code": "847291", "device_id": "client-uuid" }
+     Response: {
+       "access_token": "JWT...",
+       "expires_in": 43200,
+       "hub_name": "...",
+       "allowed_roles": "volunteer,admin"  // v1.3.1: 角色控制
+     }
+
+     Rate Limit: 5 次/分鐘/IP（防暴力破解）
+     Error 429: { "detail": "Too many attempts. Please wait 60 seconds." }
 ```
+
+#### 配對碼規格 (v1.3)
+
+| 項目 | 規格 |
+|------|------|
+| 格式 | 6 位純數字 (000000-999999) |
+| 有效期 | 5 分鐘 |
+| 使用次數 | 單次使用，成功後立即失效 |
+| 組合數 | 1,000,000 種 |
+| 防護 | API 限速 5 次/分鐘/IP |
 
 #### 操作 API
 
 ```
-# 人員操作
-POST /api/satellite/checkin     # 人員報到
-POST /api/satellite/checkout    # 人員退場
+# 人員操作 (v1.3.1: 直接 API + 新人登記)
+POST /api/satellite/checkin     # 人員報到/退場/新人登記
+     Body: {
+       "person_id": "P0001",
+       "name": "王小明",              // 新人登記用
+       "action": "register",          // register | checkin | checkout
+       "triage_status": "green",      // green | yellow | red | black
+       "zone_id": "zone_1",           // 區域 ID
+       "card_number": "A123456"       // 卡片號碼（可選）
+     }
 GET  /api/satellite/persons     # 查詢在場人員
+GET  /api/satellite/zones       # 查詢 Hub 預設區域 (v1.3.1)
 
 # 物資操作
-POST /api/satellite/dispense    # 確認領取物資
+POST /api/satellite/supply      # 確認領取物資 (v1.3.1: 直接 API)
+     Body: { "person_id": "P0001", "item_id": 1, "quantity": 2 }
 GET  /api/satellite/inventory   # 查詢庫存摘要
 
-# 同步 (Action Envelope Pattern)
+# 同步 (Action Envelope Pattern - 離線時使用)
 POST /api/satellite/sync        # 批次同步離線操作 (見下方 Sync Protocol)
 GET  /api/satellite/status      # 取得 Hub 狀態
 ```
@@ -230,17 +284,150 @@ function updatePendingIndicator(count) {
 }
 ```
 
-### 安全設計 v1.1
+### v1.3 配對流程（GitHub Device Flow 風格）
+
+#### 設計理念
+
+參考 GitHub 的 Device Flow 設計，將 QR Code 與配對碼**分離**：
+- **QR Code**：僅用於開啟 PWA 網頁（靜態網址，可印出貼在牆上）
+- **配對碼**：6 位數字，口述或螢幕顯示，手動輸入
+
+#### 流程圖
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           v1.3 配對流程                                  │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   ┌──────────────────────┐         ┌──────────────────────┐            │
+│   │   CIRS Portal        │         │   Satellite PWA      │            │
+│   │   (管理員電腦)         │         │   (志工手機)          │            │
+│   └──────────┬───────────┘         └──────────┬───────────┘            │
+│              │                                 │                        │
+│   ┌──────────▼───────────┐                    │                        │
+│   │ 1. 顯示 QR Code       │                    │                        │
+│   │    (僅含 /mobile/ URL) │  ──── 掃描 ────▶  │                        │
+│   │                       │                    │                        │
+│   │    ┌─────────────┐   │         ┌──────────▼───────────┐            │
+│   │    │ ▓▓▓▓▓▓▓▓▓▓▓ │   │         │ 2. 開啟 PWA          │            │
+│   │    │ ▓▓▓▓▓▓▓▓▓▓▓ │   │         │    顯示配對碼輸入畫面  │            │
+│   │    │ ▓▓▓▓▓▓▓▓▓▓▓ │   │         │                      │            │
+│   │    └─────────────┘   │         │    請輸入配對碼：      │            │
+│   │                       │         │    ┌─┬─┬─┬─┬─┬─┐     │            │
+│   │    配對碼：            │         │    │ │ │ │ │ │ │     │            │
+│   │    ┌───────────────┐ │         │    └─┴─┴─┴─┴─┴─┘     │            │
+│   │    │   847291      │ │ 口述/   │                      │            │
+│   │    │               │ │ 顯示 ─▶ │                      │            │
+│   │    └───────────────┘ │         └──────────┬───────────┘            │
+│   │    (5 分鐘有效)       │                    │                        │
+│   └──────────────────────┘                    │                        │
+│                                    ┌──────────▼───────────┐            │
+│                                    │ 3. 輸入配對碼         │            │
+│                                    │    [8][4][7][2][9][1] │            │
+│                                    │                      │            │
+│                                    │    → POST /exchange  │            │
+│                                    │    → 取得 JWT Token  │            │
+│                                    └──────────┬───────────┘            │
+│                                               │                        │
+│                                    ┌──────────▼───────────┐            │
+│                                    │ 4. 配對成功！         │            │
+│                                    │    選擇角色：         │            │
+│                                    │    [志工] [管理員]    │            │
+│                                    └──────────────────────┘            │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+#### 優點對比
+
+| 項目 | v1.2 (QR 含 Token) | v1.3 (分離式) |
+|------|-------------------|---------------|
+| QR Code 有效期 | 5 分鐘 | **永久**（可印出貼牆） |
+| 網路時機依賴 | 掃描時需連網 | 輸入配對碼時才需連網 |
+| 失敗處理 | 需重新掃描 | 重新輸入即可 |
+| 口述傳達 | 無法（URL 太長） | **可以**（6 位數字） |
+| 相機問題影響 | 直接導致失敗 | 不影響（只需開一次） |
+| 安全性 | URL 可被截取 | 配對碼短期有效 + 限速 |
+
+### v1.3 報到/退場 & 物資發放 手動模式
+
+為解決 iOS Safari 相機權限問題，v1.3 新增「手動輸入」選項作為 Fallback：
+
+#### 報到/退場 Modal
+
+```
+┌─────────────────────────────────┐
+│  報到 / 退場                 ✕  │
+├─────────────────────────────────┤
+│  ┌──────────┐  ┌──────────┐    │
+│  │   報到   │  │   退場   │    │
+│  └──────────┘  └──────────┘    │
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │  📷  掃描 QR Code           ▸││
+│  │      使用相機掃描人員 QR     ││
+│  └─────────────────────────────┘│
+│                                 │
+│            ── 或 ──             │
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │  手動輸入 ID                ││
+│  │  ┌───────────────────────┐  ││
+│  │  │ 輸入人員 ID 或姓名     │  ││
+│  │  └───────────────────────┘  ││
+│  │  [        確認報到        ] ││
+│  └─────────────────────────────┘│
+└─────────────────────────────────┘
+```
+
+#### 物資發放 Modal
+
+```
+┌─────────────────────────────────┐
+│  物資發放                    ✕  │
+├─────────────────────────────────┤
+│  ┌─────────────────────────────┐│
+│  │  📷  掃描 QR Code           ▸││
+│  │      掃描人員或物資 QR Code  ││
+│  └─────────────────────────────┘│
+│                                 │
+│            ── 或 ──             │
+│                                 │
+│  ┌─────────────────────────────┐│
+│  │  手動輸入發放資訊            ││
+│  │                             ││
+│  │  領取人 ID                  ││
+│  │  ┌───────────────────────┐  ││
+│  │  │ 輸入人員 ID 或姓名     │  ││
+│  │  └───────────────────────┘  ││
+│  │                             ││
+│  │  發放物資                   ││
+│  │  ┌───────────────────────┐  ││
+│  │  │ 選擇物資...      ▼    │  ││
+│  │  └───────────────────────┘  ││
+│  │  (物資清單從庫存快取載入)    ││
+│  │                             ││
+│  │  數量                       ││
+│  │  ┌───┐  ┌─────────┐  ┌───┐ ││
+│  │  │ - │  │    1    │  │ + │ ││
+│  │  └───┘  └─────────┘  └───┘ ││
+│  │                             ││
+│  │  [        確認發放        ] ││
+│  └─────────────────────────────┘│
+└─────────────────────────────────┘
+```
+
+### 安全設計 v1.3
 
 | 項目 | 設計 |
 |------|------|
-| **認證流程** | Pairing Code (5分鐘有效) → JWT Exchange |
+| **認證流程** | 6 位數配對碼 (5分鐘有效) → JWT Exchange |
+| **暴力破解防護** | API 限速 5 次/分鐘/IP |
 | **Token 綁定** | JWT 綁定 `device_id`，防止 Token 盜用 |
 | **Token 儲存** | `sessionStorage`（關閉分頁即清除） |
 | **Token 有效期** | 12 小時 (43200 秒) |
 | **Device ID** | Client 產生的 UUID，首次配對時生成 |
 | **連接狀態** | `localStorage`（持久化 hub_url） |
-| **URL 處理** | 解析 `?pairing_code=` 後立即清除 |
 | **權限範圍** | 僅限 `/api/satellite/*` API |
 | **冪等性** | `action_id` 確保重複提交不會重複處理 |
 
@@ -480,6 +667,45 @@ xIRS 生態系統有兩種資料同步機制，服務不同場景：
   - [x] Portal 綠色主題配色同步 (#4c826b)
   - [x] iOS Fallback (Pending 指示器 + Sync Now 按鈕)
 
+- [x] Task 7.1: v1.2 UX 改進
+  - [x] 相機錯誤處理 (iOS Safari 權限引導 + 手動輸入 fallback)
+  - [x] 智慧貼上 (自動解析 pairing_code URL)
+  - [x] 配對後角色選擇 Modal (志工/管理員)
+  - [x] 設定頁角色顯示與切換功能
+  - [x] Hub 配對 Modal WiFi 警告與疑難排解
+  - [x] 複製配對連結按鈕
+
+- [x] Task 7.2: v1.3 配對流程簡化 (GitHub Device Flow)
+  - [x] Backend: 改產生 6 位純數字配對碼
+  - [x] Backend: 新增 API 限速 (5 次/分鐘/IP)
+  - [x] Portal: QR Code 改為僅含 /mobile/ 網址
+  - [x] Portal: 大字顯示 6 位數配對碼 + 刷新按鈕
+  - [x] Satellite PWA: 新增 6 格數字輸入介面
+  - [x] Satellite PWA: 輸入完成自動提交
+
+- [x] Task 7.3: v1.3 手動輸入 Fallback
+  - [x] 報到/退場 Modal：可選擇掃描 QR 或手動輸入 ID
+  - [x] 物資發放 Modal：可選擇掃描 QR 或手動選擇（領取人+物資+數量）
+  - [x] 解決相機權限問題導致功能無法使用的情況
+
+- [x] Task 7.4: v1.3.1 角色控制與新人登記
+  - [x] Backend: 配對碼加入 allowed_roles 欄位
+  - [x] Backend: POST /api/auth/pairing-code 可指定允許角色
+  - [x] Backend: JWT Token 包含 allowed_roles
+  - [x] Portal: 配對 Modal 新增角色選擇下拉選單
+  - [x] Satellite PWA: 角色選擇按鈕根據 allowed_roles 禁用
+  - [x] Satellite PWA: 新人登記支援檢傷分類（綠/黃/紅/黑）
+  - [x] Satellite PWA: 新人登記支援區域選單
+  - [x] Backend: 新增 /api/satellite/zones API
+  - [x] Backend: 新增 /api/satellite/checkin 直接 API
+  - [x] Backend: 新增 /api/satellite/supply 直接 API
+
+- [x] Task 7.5: v1.3.1 Safari 相容性修復
+  - [x] 新增初始 Loading 畫面（CDN 載入前顯示）
+  - [x] CDN 載入失敗偵測與重試按鈕
+  - [x] iOS Safari 外部 app 開啟空白頁修復
+  - [x] 10 秒逾時保護機制
+
 #### 🔲 待開發
 
 - [ ] Task 8: i18n 支援
@@ -491,6 +717,76 @@ xIRS 生態系統有兩種資料同步機制，服務不同場景：
 - [ ] 複製 CIRS Satellite 架構
 - [ ] 調整 API endpoints
 - [ ] 實作醫療專用功能
+
+---
+
+## 🐛 已知問題與除錯紀錄
+
+### Issue #1: 掃描 QR Code 後無法再使用相機
+
+**問題描述**：
+- 使用者從 CIRS Portal 掃描 QR Code 後開啟 Satellite PWA
+- 預期：自動解析 URL 中的 `pairing_code` 並完成配對
+- 實際：需要再次掃描 QR Code，但相機功能可能無法使用
+
+**根本原因**：
+1. URL 自動配對邏輯存在但可能因網路問題失敗
+2. iOS Safari 相機權限可能被拒絕
+3. 用戶可能誤開啟了錯誤的路徑（`/` 而非 `/mobile/`）
+
+**狀態**：修復中
+
+**解決方案**：
+- [x] 加入 `isPairing` 全螢幕 loading 狀態
+- [x] 加入詳細 console.log 除錯資訊
+- [x] 相機失敗時提供「手動輸入連結」fallback
+- [x] 主頁面偵測 `pairing_code` 參數並重導向到 `/mobile/`
+
+### Issue #2: 手動連接按鈕沒反應
+
+**問題描述**：
+- 使用者貼上配對連結後，解析成功顯示綠色確認區塊
+- 點擊「連接」按鈕後沒有任何反應
+- Backend log 沒有收到 POST 請求
+
+**除錯步驟**：
+1. 開啟瀏覽器 DevTools Console
+2. 查看是否有 `[Satellite] connectWithParsedUrl called` 訊息
+3. 查看是否有 `[Satellite] exchangePairingCode called` 訊息
+4. 查看是否有網路錯誤（CORS、連線失敗等）
+
+**可能原因**：
+1. JavaScript 執行錯誤（語法問題）
+2. Alpine.js 綁定問題
+3. 網路連線問題（手機與 Hub 不在同一網路）
+4. CORS 設定問題
+
+**狀態**：除錯中
+
+**已加入的除錯程式碼**：
+```javascript
+// checkUrlToken()
+console.log('[Satellite] checkUrlToken called', { pairingCode, hubUrl, pathname });
+
+// exchangePairingCode()
+console.log('[Satellite] exchangePairingCode called', { hubUrl, pairingCode });
+console.log('[Satellite] Using device_id:', deviceId);
+console.log('[Satellite] Fetching:', apiUrl);
+console.log('[Satellite] Response status:', response.status);
+
+// connectWithParsedUrl()
+console.log('[Satellite] connectWithParsedUrl called', { parsedHubUrl, parsedPairingCode });
+console.log('[Satellite] Starting connection...');
+console.log('[Satellite] Exchange result:', success);
+```
+
+### Issue #3: 角色選擇功能
+
+**問題描述**：
+- 配對成功後應該顯示角色選擇 Modal（志工/管理員）
+- 設定頁面應該顯示目前角色並可切換
+
+**狀態**：已實作，待驗證
 
 ---
 
@@ -537,4 +833,4 @@ xIRS 生態系統有兩種資料同步機制，服務不同場景：
 
 ---
 
-*Last Updated: 2025-12*
+*Last Updated: 2025-12-18 (v1.3.1)*

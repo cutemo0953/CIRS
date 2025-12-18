@@ -1,6 +1,6 @@
 # CIRS - Community Inventory Resilience System
 
-> 社區韌性物資管理系統 v1.7
+> 社區韌性物資管理系統 v1.7.1
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
@@ -493,6 +493,27 @@ curl http://localhost:8090/api/person/P0001/audit-log
 - 開發任務清單
 
 ## 更新日誌
+
+### v1.7.1 (2025-12-18) - Satellite PWA v1.3.1
+- **新增**：角色控制功能
+  - Hub 可指定配對碼允許的角色（僅志工/僅管理員/兩者）
+  - 配對 Modal 新增角色選擇下拉選單
+  - PWA 角色選擇按鈕根據權限顯示禁用狀態
+- **新增**：新人登記功能
+  - 支援檢傷分類（輕傷/延遲/立即/死亡）
+  - 區域選單從 Hub 載入
+  - 卡片號碼與備註欄位
+- **改進**：直接 API 呼叫
+  - 線上時直接呼叫 `/api/satellite/checkin` 與 `/api/satellite/supply`
+  - 不經過 Service Worker 佇列，回應更即時
+- **修復**：Safari 外部 app 開啟空白頁問題
+  - 新增 CDN 載入偵測與 fallback loading 畫面
+  - 10 秒逾時保護機制
+- **新增 API**：
+  - `POST /api/auth/pairing-code` - 指定允許角色
+  - `GET /api/satellite/zones` - 取得 Hub 預設區域
+  - `POST /api/satellite/checkin` - 直接報到/退場/新人登記
+  - `POST /api/satellite/supply` - 直接物資發放
 
 ### v1.6 (2024-12) - Satellite PWA
 - **新增**：志工行動 App (Satellite PWA)
