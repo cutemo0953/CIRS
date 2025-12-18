@@ -1,6 +1,12 @@
-# Satellite PWA 開發規格書
+# Satellite PWA 開發規格書 v1.1
 
 > Hub & Spoke 架構：讓志工手機成為「傳令兵」
+
+**v1.1 更新 (2025-12):**
+- 認證流程改為 Pairing Code Pattern（5分鐘有效 + device_id 綁定）
+- 同步協議改為 Action Envelope Pattern（action_id 確保冪等性）
+- 新增 iOS Fallback Strategy（Pending Actions UI 指示器）
+- 新增 action_logs 資料表 schema
 
 ---
 
@@ -82,15 +88,20 @@
 
 ### API Endpoints
 
-#### 已實作
+#### 認證 (Pairing Code Pattern) - v1.1
 
 ```
-GET  /api/auth/pairing-qr      # 產生配對 QR Code (Admin)
-GET  /api/auth/pairing-info    # 取得配對資訊 JSON (Admin)
-POST /api/auth/satellite/verify # 驗證 Satellite Token
+# Hub 端 (Admin)
+GET  /api/auth/pairing-qr         # 產生配對 QR Code (5分鐘有效)
+GET  /api/auth/pairing-info       # 取得配對資訊 JSON
+
+# Satellite 端
+POST /api/auth/satellite/exchange # 交換 pairing_code 取得 JWT
+     Body: { "pairing_code": "XYZ123", "device_id": "client-uuid" }
+     Response: { "access_token": "JWT...", "expires_in": 43200 }
 ```
 
-#### 待實作
+#### 操作 API
 
 ```
 # 人員操作
@@ -102,12 +113,58 @@ GET  /api/satellite/persons     # 查詢在場人員
 POST /api/satellite/dispense    # 確認領取物資
 GET  /api/satellite/inventory   # 查詢庫存摘要
 
-# 同步
-POST /api/satellite/sync        # 批次同步離線操作
+# 同步 (Action Envelope Pattern)
+POST /api/satellite/sync        # 批次同步離線操作 (見下方 Sync Protocol)
 GET  /api/satellite/status      # 取得 Hub 狀態
 ```
 
-### 離線同步策略
+### Sync Protocol v1.1 (Action Envelope Pattern)
+
+所有變更操作 (Check-in, Dispense) 必須使用 Action Envelope 格式，通過 `POST /api/satellite/sync` 發送。
+
+#### Request Schema
+
+```json
+{
+  "batch_id": "uuid-v4",
+  "actions": [
+    {
+      "action_id": "uuid-v4",    // 關鍵：用於冪等性檢查
+      "type": "DISPENSE",        // DISPENSE | CHECK_IN | CHECK_OUT
+      "timestamp": 1700000000,   // Unix timestamp
+      "payload": {
+        "item_id": 101,
+        "quantity": 1
+      }
+    }
+  ]
+}
+```
+
+#### Hub 處理邏輯 (Server-Side)
+
+```
+對於每個 action:
+1. 檢查: action_id 是否已存在於 action_logs 表？
+   - 是: 跳過處理 (冪等)，回傳成功
+   - 否: 執行業務邏輯 (如 Inventory - 1)
+2. 記錄: 將 action_id 存入 action_logs
+3. 回應: 回傳已處理的 action_id 列表
+```
+
+#### Response Schema
+
+```json
+{
+  "processed": ["action-id-1", "action-id-2"],
+  "failed": [],
+  "server_time": 1700000100
+}
+```
+
+Client 收到回應後，從 IndexedDB 移除已處理的 actions。
+
+#### 離線同步流程圖
 
 ```
 ┌──────────────────────────────────────────────────────────┐
@@ -116,40 +173,95 @@ GET  /api/satellite/status      # 取得 Hub 狀態
 │  User Action                                              │
 │       │                                                   │
 │       ▼                                                   │
-│  ┌─────────┐    Online?    ┌─────────────┐               │
-│  │ Action  │──── Yes ─────▶│ POST to Hub │               │
-│  │ Created │               │ immediately │               │
-│  └────┬────┘               └─────────────┘               │
-│       │                                                   │
-│       No (Offline)                                        │
-│       │                                                   │
-│       ▼                                                   │
 │  ┌─────────────┐                                         │
-│  │ IndexedDB   │  ◀── Service Worker                     │
-│  │ Sync Queue  │      manages queue                      │
+│  │ Create      │  action_id = uuid()                     │
+│  │ Action      │  timestamp = Date.now()                 │
+│  │ Envelope    │                                         │
 │  └──────┬──────┘                                         │
 │         │                                                 │
-│         │  Network restored                               │
 │         ▼                                                 │
-│  ┌─────────────┐                                         │
-│  │ Background  │  ── POST /api/satellite/sync ──▶ Hub   │
-│  │ Sync        │     (batch upload)                      │
-│  └─────────────┘                                         │
-│                                                           │
-│  iOS Safari: Manual trigger via postMessage               │
-│  Android Chrome: Background Sync API                      │
+│  ┌─────────────┐    Online?    ┌─────────────┐          │
+│  │ Save to     │──── Yes ─────▶│ POST to Hub │          │
+│  │ IndexedDB   │               │ /sync       │          │
+│  └──────┬──────┘               └──────┬──────┘          │
+│         │                             │                  │
+│         │ No (Offline)                │ Response         │
+│         │                             ▼                  │
+│         │                      ┌─────────────┐          │
+│         │                      │ Clear from  │          │
+│         │                      │ IndexedDB   │          │
+│         │                      └─────────────┘          │
+│         ▼                                                │
+│  ┌─────────────┐                                        │
+│  │ Queue for   │  Navbar: "Pending: N"                  │
+│  │ Later Sync  │                                        │
+│  └─────────────┘                                        │
+│                                                          │
+│  Network Restored:                                       │
+│  ├─ Android: Background Sync API auto-triggers          │
+│  └─ iOS: window.online → flush() or manual "Sync Now"   │
 └──────────────────────────────────────────────────────────┘
 ```
 
-### 安全設計
+### iOS Fallback Strategy
+
+iOS Safari 不支援 Background Sync API，需要特殊處理：
+
+| 策略 | 實作 |
+|------|------|
+| **UI 指示器** | Navbar 必須顯示 "Pending Actions: N" |
+| **自動嘗試** | 優先嘗試 Background Sync |
+| **偵測失敗** | 若 iOS 或 sync 失敗，顯示 "Sync Now" 按鈕 |
+| **Online 事件** | 監聽 `window.online`，立即觸發 flush |
+
+```javascript
+// iOS 偵測與 fallback
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
+window.addEventListener('online', async () => {
+  if (isIOS || !('serviceWorker' in navigator)) {
+    await flushPendingActions();
+  }
+});
+
+function updatePendingIndicator(count) {
+  document.getElementById('pending-badge').textContent =
+    count > 0 ? `Pending: ${count}` : '';
+}
+```
+
+### 安全設計 v1.1
 
 | 項目 | 設計 |
 |------|------|
-| Token 儲存 | `sessionStorage`（關閉分頁即清除） |
-| Token 有效期 | 72 小時 |
-| 連接狀態 | `localStorage`（持久化） |
-| URL 處理 | 解析後立即清除 `?token=` 參數 |
-| 權限範圍 | 僅限 satellite 相關 API |
+| **認證流程** | Pairing Code (5分鐘有效) → JWT Exchange |
+| **Token 綁定** | JWT 綁定 `device_id`，防止 Token 盜用 |
+| **Token 儲存** | `sessionStorage`（關閉分頁即清除） |
+| **Token 有效期** | 12 小時 (43200 秒) |
+| **Device ID** | Client 產生的 UUID，首次配對時生成 |
+| **連接狀態** | `localStorage`（持久化 hub_url） |
+| **URL 處理** | 解析 `?pairing_code=` 後立即清除 |
+| **權限範圍** | 僅限 `/api/satellite/*` API |
+| **冪等性** | `action_id` 確保重複提交不會重複處理 |
+
+### Database Schema (Hub 端新增)
+
+```sql
+-- 儲存已處理的 action_id，確保冪等性
+CREATE TABLE action_logs (
+    action_id TEXT PRIMARY KEY,
+    batch_id TEXT,
+    action_type TEXT NOT NULL,
+    device_id TEXT,
+    processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_action_logs_batch ON action_logs(batch_id);
+CREATE INDEX idx_action_logs_device ON action_logs(device_id);
+
+-- 定期清理 (保留 7 天)
+-- DELETE FROM action_logs WHERE processed_at < datetime('now', '-7 days');
+```
 
 ### 檔案結構
 
