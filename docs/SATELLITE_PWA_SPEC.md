@@ -178,6 +178,7 @@ frontend/mobile/
 - 醫護人員
 - 藥師
 - 醫療志工
+- 設備管理人員
 
 ### 核心功能
 
@@ -187,8 +188,12 @@ frontend/mobile/
 | 檢傷分類 | 更新傷患 Triage 狀態 | P1 |
 | 給藥記錄 | 掃描藥品 QR 記錄給藥 | P1 |
 | 生命徵象 | 記錄 BP/HR/SpO2/Temp | P1 |
+| **設備狀態更新** | 掃描設備 QR，更新運作狀態 | P1 |
+| **設備巡檢** | 記錄巡檢結果、回報故障 | P1 |
 | 傷患查詢 | 查看傷患清單與狀態 | P2 |
 | 藥品庫存 | 查看藥品庫存（唯讀） | P2 |
+| **血庫查詢** | 查看血液庫存（唯讀） | P2 |
+| **設備清單** | 查看設備狀態總覽（唯讀） | P2 |
 | 離線暫存 | 斷網時暫存操作 | P1 |
 
 ### API Endpoints（建議）
@@ -207,6 +212,15 @@ POST /api/mirs-satellite/vitals        # 記錄生命徵象
 POST /api/mirs-satellite/medication    # 記錄給藥
 GET  /api/mirs-satellite/med-inventory # 藥品庫存
 
+# 設備操作 (新增)
+GET  /api/mirs-satellite/equipment           # 設備清單
+POST /api/mirs-satellite/equipment/:id/status # 更新設備狀態
+POST /api/mirs-satellite/equipment/:id/check  # 記錄巡檢
+GET  /api/mirs-satellite/equipment/:id/qr     # 取得設備 QR (供掃描)
+
+# 血庫查詢 (新增)
+GET  /api/mirs-satellite/blood-inventory     # 血液庫存
+
 # 同步
 POST /api/mirs-satellite/sync          # 批次同步
 ```
@@ -223,16 +237,84 @@ MIRS/
         └── icons/
 ```
 
-### MIRS Satellite 是否需要？
+### MIRS Satellite 使用場景
 
-**建議：Phase 2 再實作**
+**狀態：Phase 2 - 架構設計完成，待實作**
+
+| 場景 | 說明 |
+|------|------|
+| **設備巡檢** | 技術人員手持手機巡檢發電機、氧氣系統，掃描 QR 更新狀態 |
+| **藥品盤點** | 藥師在藥庫掃描藥品 QR，確認庫存與效期 |
+| **血庫管理** | 檢驗師在血庫掃描血袋，更新狀態 |
+| **病房巡房** | 醫護人員在病房記錄生命徵象、給藥紀錄 |
 
 | 考量 | 說明 |
 |------|------|
-| 現況 | MIRS 目前主要在固定醫療站使用 |
-| 需求 | 醫護人員通常在定點，不像志工需要到處跑 |
-| 優先級 | 先完成 CIRS Satellite，驗證架構後再複製到 MIRS |
-| 共用性 | 可共用 Service Worker、離線同步邏輯 |
+| 現況 | MIRS v2.0 已有完整設備管理、韌性儀表板 |
+| 需求 | 設備巡檢、藥品盤點需要行動支援 |
+| 優先級 | CIRS Satellite 架構驗證後，複製到 MIRS |
+| 共用性 | 可共用 Service Worker、離線同步、配對機制 |
+
+---
+
+## 🔐 xIRS Secure Exchange 與 Satellite 架構關係
+
+### 兩種同步機制對比
+
+xIRS 生態系統有兩種資料同步機制，服務不同場景：
+
+| 機制 | Satellite Sync | xIRS Secure Exchange |
+|------|----------------|----------------------|
+| **用途** | Hub ↔ Satellite（手機） | Hub ↔ Hub（站點間） |
+| **連線方式** | WiFi Intranet（即時） | USB 離線傳輸（批次） |
+| **資料流向** | 雙向即時同步 | 單向加密封包 |
+| **安全性** | JWT Token | Ed25519 簽章 + NaCl 加密 |
+| **使用者** | 志工、醫護人員 | 站點管理員 |
+| **典型延遲** | < 1 秒 | 手動觸發（分鐘級） |
+
+### 架構圖
+
+```
+                          xIRS Secure Exchange (USB)
+    ┌─────────────────┐  ←──────────────────────────→  ┌─────────────────┐
+    │   CIRS Hub A    │      .xirs encrypted file      │   CIRS Hub B    │
+    │  (避難所 A)      │                                │  (避難所 B)      │
+    └────────┬────────┘                                └────────┬────────┘
+             │ WiFi                                             │ WiFi
+             │ (Satellite Sync)                                 │ (Satellite Sync)
+    ┌────────┴────────┐                                ┌────────┴────────┐
+    │   📱 📱 📱      │                                │   📱 📱 📱      │
+    │  Satellites     │                                │  Satellites     │
+    │  (志工手機)      │                                │  (志工手機)      │
+    └─────────────────┘                                └─────────────────┘
+```
+
+### 使用時機
+
+| 場景 | 使用機制 |
+|------|----------|
+| 志工在現場報到人員、發放物資 | **Satellite Sync** (WiFi) |
+| 醫護在病房巡檢設備、記錄生命徵象 | **Satellite Sync** (WiFi) |
+| 避難所 A 將人員名單傳給避難所 B | **xIRS Secure Exchange** (USB) |
+| CIRS 社區站將傷患轉送 MIRS 醫療站 | **xIRS Secure Exchange** (USB) |
+| 定期備份站點資料到另一站點 | **xIRS Secure Exchange** (USB) |
+
+### 未來整合：Satellite 觸發 xIRS Export（Phase 3）
+
+未來可讓 Admin 透過 Satellite 遠端觸發 Hub 的 xIRS Export：
+
+```
+📱 Admin Satellite
+    │
+    │ POST /api/exchange/export (via WiFi)
+    ▼
+┌─────────────────┐
+│   CIRS Hub      │ → 產生 .xirs 檔案
+│                 │ → 顯示「請插入 USB」
+└─────────────────┘
+```
+
+詳細規格請參考：[xIRS Secure Exchange Spec v2.0](./xIRS_SECURE_EXCHANGE_SPEC_v2.md)
 
 ---
 
@@ -327,8 +409,10 @@ MIRS/
 
 - [志工 PWA 安裝指南](./volunteer-pwa-guide.md)
 - [CIRS 開發規格書](../CIRS_DEV_SPEC.md)
+- [xIRS Secure Exchange Spec v2.0](./xIRS_SECURE_EXCHANGE_SPEC_v2.md)
+- [MIRS README](../../MIRS-v2.0-single-station/README.md)
 - [README](../README.md)
 
 ---
 
-*Last Updated: 2024-12*
+*Last Updated: 2025-12*

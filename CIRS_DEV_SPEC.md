@@ -1,9 +1,16 @@
-# CIRS (Community Inventory Resilience System) v1.0 Development Specification
+# CIRS (Community Inventory Resilience System) v1.7 Development Specification
 
-**Version:** 1.0
+**Version:** 1.7
 **Target Environment:** Raspberry Pi (Backend) + Mobile PWA (Frontend)
 **Network Topology:** Raspberry Pi as Appliance (Ethernet to Mesh Router or WiFi Hotspot)
 **Core Philosophy:** Offline-First, Community-Scale, High Resilience
+
+> **What's New in v1.7:**
+> - Staff Management v1.1 (clock-in/out, status toggle)
+> - Equipment Management with templates
+> - Resilience Dashboard (survival days calculation)
+> - xIRS Secure Data Exchange Protocol v2.0
+> - Satellite PWA architecture (Hub & Spoke)
 
 ---
 
@@ -1852,62 +1859,282 @@ curl http://localhost:8091/api/stats
 
 ---
 
-## 16. 更新的 Implementation Checklist
+## 16. Implementation Checklist (v1.7)
 
-### Phase 1: Foundation
-- [ ] 建立 GitHub repo `cutemo0953/CIRS`
-- [ ] 建立目錄結構
-- [ ] SQLite schema 建立
-- [ ] FastAPI 基礎 CRUD
-- [ ] 基礎認證 (PIN + JWT)
+### Phase 1: Foundation ✅
+- [x] 建立 GitHub repo `cutemo0953/CIRS`
+- [x] 建立目錄結構
+- [x] SQLite schema 建立
+- [x] FastAPI 基礎 CRUD
+- [x] 基礎認證 (PIN + JWT)
 
-### Phase 2: Core Features
-- [ ] Inventory CRUD + 發放紀錄
-- [ ] Person CRUD + 報到/檢傷
-- [ ] EventLog 完整實作
-- [ ] 前端 Alpine.js shell
+### Phase 2: Core Features ✅
+- [x] Inventory CRUD + 發放紀錄
+- [x] Person CRUD + 報到/檢傷
+- [x] EventLog 完整實作
+- [x] 前端 Alpine.js shell
 
-### Phase 3: Communication
-- [ ] Message board API
-- [ ] 前端留言板 UI
-- [ ] Polling 機制
-- [ ] 圖片上傳壓縮
+### Phase 3: Communication ✅
+- [x] Message board API
+- [x] 前端留言板 UI
+- [x] Polling 機制
+- [x] 圖片上傳壓縮
 
-### Phase 4: Portal & Files
-- [ ] Portal 入口頁面
-- [ ] File Server 模組
-- [ ] Nginx 統一路由
+### Phase 4: Portal & Files ✅
+- [x] Portal 入口頁面
+- [x] File Server 模組
+- [x] Nginx 統一路由
 
-### Phase 5: HIRS Integration
+### Phase 5: Staff Management ✅ (v1.1)
+- [x] Staff CRUD API
+- [x] Clock-in/Clock-out 機制
+- [x] ACTIVE/STANDBY 狀態切換
+- [x] 前端 Staff Tab
+
+### Phase 6: Equipment Management ✅
+- [x] Equipment CRUD API
+- [x] Equipment templates
+- [x] 設備狀態追蹤
+- [x] 前端 Equipment Tab
+
+### Phase 7: Resilience Dashboard ✅
+- [x] 物資可維持天數計算
+- [x] 人員狀態統計
+- [x] 前端 Dashboard 整合
+
+### Phase 8: Satellite PWA (In Progress)
+- [x] QR Code 配對機制
+- [x] URL Token 連接
+- [x] 離線暫存 (IndexedDB)
+- [x] 自動同步
+- [ ] 人員操作 API (checkin/checkout)
+- [ ] 物資操作 API (dispense)
+- [ ] MIRS Satellite 支援
+
+### Phase 9: xIRS Secure Exchange ✅ (v2.0)
+- [x] Crypto Engine (PyNaCl)
+- [x] Ed25519 簽章
+- [x] NaCl Box 加密
+- [x] 防重放保護
+- [x] Exchange API routes
+- [ ] 前端 UI 整合
+
+### Phase 10: HIRS Integration
 - [ ] 發放封包 QR 產生
 - [ ] HIRS v1.2 升級 (identity + received_log)
 - [ ] 掃描匯入功能
 - [ ] 自動入庫邏輯
 
-### Phase 6: Backup & Maintenance
+### Phase 11: Backup & Maintenance
 - [ ] 備份腳本
 - [ ] 清理腳本
 - [ ] Cron 排程
 - [ ] 管理介面 UI
 
-### Phase 7: Offline & Sync
-- [ ] IndexedDB wrapper
-- [ ] Sync queue 實作
-- [ ] Service Worker
-- [ ] 衝突解決
+---
 
-### Phase 8: Polish
-- [ ] PWA manifest + icons
-- [ ] 離線狀態 UI
-- [ ] Error handling
-- [ ] 效能優化
+## 17. Staff Management v1.1
+
+### 17.1 概述
+
+Staff Management 讓管理員追蹤志工和工作人員的出勤狀態。
+
+### 17.2 資料結構
+
+```sql
+CREATE TABLE staff (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    role TEXT DEFAULT 'volunteer',    -- 'admin', 'medic', 'volunteer'
+    status TEXT DEFAULT 'OFF_DUTY',   -- 'ACTIVE', 'STANDBY', 'OFF_DUTY'
+    phone TEXT,
+    skills TEXT,                       -- JSON array: ["CPR", "護理"]
+    clock_in_at DATETIME,
+    clock_out_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### 17.3 API Endpoints
+
+```
+GET    /api/staff                     # 列出所有人員
+POST   /api/staff                     # 新增人員
+PUT    /api/staff/:id                 # 更新人員資料
+DELETE /api/staff/:id                 # 刪除人員
+
+POST   /api/staff/:id/clock-in        # 簽到
+POST   /api/staff/:id/clock-out       # 簽退
+POST   /api/staff/:id/toggle-status   # 切換 ACTIVE/STANDBY
+```
+
+### 17.4 狀態說明
+
+| 狀態 | 說明 | 顏色 |
+|------|------|------|
+| `ACTIVE` | 值勤中 | 綠色 |
+| `STANDBY` | 待命中 | 黃色 |
+| `OFF_DUTY` | 離線 | 灰色 |
 
 ---
 
-## 18. 更新的 Prompt for Claude Code
+## 18. Equipment Management
+
+### 18.1 概述
+
+設備管理用於追蹤避難所的關鍵設備狀態，如發電機、照明、通訊設備等。
+
+### 18.2 設備範本系統
+
+支援預設範本快速建立設備清單：
+
+| 範本 | 包含設備 |
+|------|----------|
+| 避難所基本 | 發電機、照明、飲水設備、通訊設備 |
+| 醫療站 | 醫療設備、氧氣系統、冷藏設備 |
+| 自訂 | 使用者自定義 |
+
+### 18.3 API Endpoints
 
 ```
-我要開發 CIRS v1.0 (Community Inventory Resilience System)。
+GET    /api/equipment                 # 設備清單
+POST   /api/equipment                 # 新增設備
+PUT    /api/equipment/:id             # 更新設備
+DELETE /api/equipment/:id             # 刪除設備
+
+POST   /api/equipment/:id/status      # 更新運作狀態
+GET    /api/equipment/templates       # 取得設備範本
+POST   /api/equipment/from-template   # 從範本建立設備
+```
+
+---
+
+## 19. Resilience Dashboard
+
+### 19.1 概述
+
+韌性估算儀表板顯示避難所的自給自足能力，包括：
+- 物資可維持天數（水、食物）
+- 電力可維持時數
+- 人員配置狀態
+
+### 19.2 計算邏輯
+
+```javascript
+// 物資可維持天數
+waterDays = totalWaterLiters / (headcount * 3)  // 每人每天 3 公升
+foodDays = totalFoodCalories / (headcount * 2100)  // 每人每天 2100 大卡
+
+// 電力可維持時數 (需設備追蹤)
+powerHours = fuelLiters * generatorEfficiency / totalPowerConsumption
+```
+
+### 19.3 API Endpoints
+
+```
+GET /api/resilience/stats            # 韌性統計
+Response: {
+    "headcount": 150,
+    "survival_days": {
+        "water": 5.2,
+        "food": 4.8
+    },
+    "power_hours": 48,
+    "staff": {
+        "active": 5,
+        "standby": 3,
+        "off_duty": 2
+    },
+    "alerts": [
+        {"type": "LOW_WATER", "message": "飲用水剩餘不足 3 天"}
+    ]
+}
+```
+
+---
+
+## 20. Satellite PWA (Hub & Spoke Architecture)
+
+### 20.1 概述
+
+Satellite PWA 讓志工手機成為「傳令兵」，透過 WiFi 連接 Hub（Raspberry Pi）進行即時操作。
+
+### 20.2 架構
+
+```
+┌─────────────────────────────────────────────────┐
+│  Raspberry Pi (Hub)                             │
+│  ┌───────────┬───────────────┐                  │
+│  │ CIRS:8090 │ MIRS:8000     │                  │
+│  └───────────┴───────────────┘                  │
+└───────────────────┬─────────────────────────────┘
+                    │ WiFi
+        ┌───────────┼───────────┐
+        │           │           │
+   ┌────▼────┐ ┌────▼────┐ ┌────▼────┐
+   │Satellite│ │Satellite│ │Satellite│
+   │ (志工A)  │ │ (志工B)  │ │ (醫護C)  │
+   └─────────┘ └─────────┘ └─────────┘
+```
+
+### 20.3 已實作功能
+
+- [x] QR Code 配對
+- [x] URL Token 連接
+- [x] 離線暫存
+- [x] 自動同步
+
+### 20.4 相關文件
+
+詳細規格請參考：[Satellite PWA Spec](./docs/SATELLITE_PWA_SPEC.md)
+
+---
+
+## 21. xIRS Secure Data Exchange v2.0
+
+### 21.1 概述
+
+國防級離線 USB 資料傳輸協議，用於站點間（Hub-to-Hub）的安全資料交換。
+
+### 21.2 安全特性
+
+| 特性 | 技術 |
+|------|------|
+| **加密** | Curve25519 + XSalsa20-Poly1305 (NaCl Box) |
+| **簽章** | Ed25519 數位簽章 |
+| **防重放** | UUID + 時間戳 + SQLite 帳本 |
+| **信任模型** | 預共享公鑰註冊表 |
+
+### 21.3 API Endpoints
+
+```
+POST /api/exchange/init              # 初始化站點金鑰
+GET  /api/exchange/keys              # 取得公鑰（供分享）
+POST /api/exchange/trust             # 新增信任站點
+POST /api/exchange/export            # 建立加密 .xirs 檔案
+POST /api/exchange/import            # 驗證並匯入資料
+GET  /api/exchange/stats             # 交換統計
+```
+
+### 21.4 使用場景
+
+| 場景 | 說明 |
+|------|------|
+| 人員轉移 | 避難所 A 將人員名單傳給避難所 B |
+| 傷患轉診 | CIRS 社區站將傷患轉送 MIRS 醫療站 |
+| 資料備份 | 定期備份站點資料到另一站點 |
+
+### 21.5 相關文件
+
+詳細規格請參考：[xIRS Secure Exchange Spec v2.0](./docs/xIRS_SECURE_EXCHANGE_SPEC_v2.md)
+
+---
+
+## 22. Prompt for Claude Code
+
+```
+我要開發 CIRS v1.7 (Community Inventory Resilience System)。
 請嚴格依照 CIRS_DEV_SPEC.md 規格書。
 
 關鍵約束：
@@ -1920,6 +2147,8 @@ curl http://localhost:8091/api/stats
 7. Portal: 統一入口頁面在 port 80
 8. HIRS 整合: 物資發放需產生 QR 封包供個人 HIRS 掃描同步
 9. 備份機制: 支援外接硬碟每日備份，資料庫保留 90 天 EventLog
+10. Satellite PWA: Hub & Spoke 架構，志工手機透過 WiFi 連接 Hub
+11. xIRS Secure Exchange: 站點間資料交換使用 Ed25519 + NaCl Box 加密
 
 Additional Instructions:
 - SQLite 必須設定 PRAGMA journal_mode=WAL 以處理並發請求
@@ -1927,12 +2156,16 @@ Additional Instructions:
 - 提供 /api/system/time endpoint 讓前端同步時間 (Pi 可能沒有 RTC)
 - 圖片上傳前端必須壓縮至 1024x1024 / 500KB 以下
 - Nginx 設定需包含 try_files fallback 以支援 SPA 路由
+- xIRS Secure Exchange 使用 PyNaCl 實作 (pynacl>=1.5.0)
 
-請先建立 Python 後端的 SQLite models 和基礎 API 結構。
+相關文件：
+- SATELLITE_PWA_SPEC.md: Satellite PWA 架構規格
+- xIRS_SECURE_EXCHANGE_SPEC_v2.md: 安全資料交換協議
+- CIRS_STAFF_MANAGEMENT_SPEC.md: 人員管理規格
 ```
 
 ---
 
-**Version:** 1.0
-**Last Updated:** 2024-12
+**Version:** 1.7
+**Last Updated:** 2025-12
 **Author:** De Novo Orthopedics Inc. / 谷盺生物科技股份有限公司
