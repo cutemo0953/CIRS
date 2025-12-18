@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#0ea5e9">
+    <meta name="theme-color" content="#4c826b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CIRS Satellite">
@@ -29,17 +29,22 @@
             theme: {
                 extend: {
                     colors: {
+                        // Match portal green theme
                         primary: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            200: '#bae6fd',
-                            300: '#7dd3fc',
-                            400: '#38bdf8',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            800: '#075985',
-                            900: '#0c4a6e',
+                            50: '#f0fdf4',
+                            100: '#eaf3d7',
+                            200: '#d1fae5',
+                            300: '#a6c3ac',
+                            400: '#4ade80',
+                            500: '#4c826b',
+                            600: '#4c826b',
+                            700: '#3d6a58',
+                            800: '#166534',
+                            900: '#14532d',
+                        },
+                        neutral: {
+                            200: '#eee2d3',
+                            600: '#8f7e61',
                         }
                     }
                 }
@@ -193,7 +198,7 @@
         </template>
 
         <!-- Connected State - Main Actions -->
-        <template x-if="isConnected">
+        <template x-if="isConnected && currentView === 'home'">
             <div class="flex-1 p-4">
                 <!-- User Info Card -->
                 <div class="bg-white rounded-2xl p-4 shadow-sm mb-4">
@@ -239,7 +244,7 @@
                     </button>
 
                     <!-- View Inventory -->
-                    <button @click="currentView = 'inventory'"
+                    <button @click="currentView = 'inventory'; if (cachedInventory.length === 0 && isOnline) fetchInventory();"
                             class="bg-white rounded-2xl p-6 shadow-sm active:bg-gray-50 transition-colors">
                         <div class="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-3 mx-auto">
                             <svg class="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -300,6 +305,124 @@
                         <p x-show="recentActivities.length === 0" class="px-4 py-8 text-center text-gray-400 text-sm">
                             尚無活動記錄
                         </p>
+                    </div>
+                </div>
+            </div>
+        </template>
+
+        <!-- Inventory View -->
+        <template x-if="isConnected && currentView === 'inventory'">
+            <div class="flex-1 flex flex-col">
+                <!-- Inventory Header -->
+                <div class="bg-white border-b border-gray-100 px-4 py-3 flex items-center">
+                    <button @click="currentView = 'home'" class="p-2 -ml-2 mr-2">
+                        <svg class="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                        </svg>
+                    </button>
+                    <h2 class="text-lg font-semibold">庫存查詢</h2>
+                    <button @click="fetchInventory()"
+                            :disabled="!isOnline || isLoadingInventory"
+                            class="ml-auto p-2 text-primary-600 disabled:opacity-50">
+                        <svg class="w-5 h-5" :class="{ 'spinner': isLoadingInventory }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Last Updated -->
+                <div class="px-4 py-2 bg-gray-50 text-xs text-gray-500 flex justify-between">
+                    <span>最後更新: <span x-text="inventoryLastUpdated || '從未'"></span></span>
+                    <span x-show="!isOnline" class="text-amber-600">離線模式 - 顯示快取資料</span>
+                </div>
+
+                <!-- Category Filter -->
+                <div class="px-4 py-3 flex space-x-2 overflow-x-auto">
+                    <button @click="inventoryFilter = 'all'"
+                            :class="inventoryFilter === 'all' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                            class="px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap">
+                        全部
+                    </button>
+                    <button @click="inventoryFilter = 'water'"
+                            :class="inventoryFilter === 'water' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                            class="px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap">
+                        飲用水
+                    </button>
+                    <button @click="inventoryFilter = 'food'"
+                            :class="inventoryFilter === 'food' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                            class="px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap">
+                        食品
+                    </button>
+                    <button @click="inventoryFilter = 'medical'"
+                            :class="inventoryFilter === 'medical' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                            class="px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap">
+                        醫療
+                    </button>
+                    <button @click="inventoryFilter = 'daily'"
+                            :class="inventoryFilter === 'daily' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 border border-gray-200'"
+                            class="px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap">
+                        日用品
+                    </button>
+                </div>
+
+                <!-- Inventory List -->
+                <div class="flex-1 overflow-y-auto px-4 pb-4">
+                    <template x-if="filteredInventory.length === 0 && !isLoadingInventory">
+                        <div class="py-12 text-center">
+                            <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/>
+                                </svg>
+                            </div>
+                            <p class="text-gray-500" x-text="cachedInventory.length === 0 ? '尚無庫存資料' : '此分類無物資'"></p>
+                            <button x-show="cachedInventory.length === 0 && isOnline"
+                                    @click="fetchInventory()"
+                                    class="mt-4 text-primary-600 font-medium">
+                                點擊載入
+                            </button>
+                        </div>
+                    </template>
+
+                    <!-- Loading State -->
+                    <template x-if="isLoadingInventory">
+                        <div class="py-12 text-center">
+                            <svg class="w-8 h-8 text-primary-600 spinner mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            <p class="text-gray-500">載入中...</p>
+                        </div>
+                    </template>
+
+                    <!-- Inventory Items -->
+                    <div class="space-y-2">
+                        <template x-for="item in filteredInventory" :key="item.id">
+                            <div class="bg-white rounded-xl p-4 shadow-sm">
+                                <div class="flex items-start justify-between">
+                                    <div class="flex-1">
+                                        <h4 class="font-medium text-gray-800" x-text="item.name"></h4>
+                                        <p class="text-xs text-gray-500 mt-0.5" x-text="getCategoryName(item.category)"></p>
+                                    </div>
+                                    <div class="text-right">
+                                        <p class="text-lg font-bold"
+                                           :class="item.quantity <= (item.min_quantity || 0) ? 'text-red-600' : 'text-gray-800'">
+                                            <span x-text="item.quantity"></span>
+                                            <span class="text-sm font-normal text-gray-500" x-text="item.unit || '個'"></span>
+                                        </p>
+                                        <p x-show="item.quantity <= (item.min_quantity || 0)"
+                                           class="text-xs text-red-500 mt-0.5">
+                                            庫存不足
+                                        </p>
+                                    </div>
+                                </div>
+                                <!-- Progress bar for stock level -->
+                                <div class="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                    <div class="h-full rounded-full transition-all"
+                                         :class="getStockLevelClass(item)"
+                                         :style="{ width: getStockLevelPercent(item) + '%' }">
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
                     </div>
                 </div>
             </div>
@@ -460,6 +583,11 @@
                 recentActivities: [],
                 cachedInventory: [],
 
+                // Inventory view state
+                isLoadingInventory: false,
+                inventoryFilter: 'all',
+                inventoryLastUpdated: null,
+
                 // Toast
                 toast: { show: false, message: '', type: 'info' },
 
@@ -478,6 +606,9 @@
                     if (!this.isConnected) {
                         this.loadState();
                     }
+
+                    // Load cached inventory for offline use
+                    this.loadCachedInventory();
 
                     // Register service worker
                     if ('serviceWorker' in navigator) {
@@ -513,19 +644,85 @@
                 },
 
                 async checkUrlToken() {
-                    // Check for token in URL parameters
+                    // Check for pairing_code or legacy token in URL parameters
                     const urlParams = new URLSearchParams(window.location.search);
-                    const token = urlParams.get('token');
-
-                    if (!token) return;
-
-                    console.log('[Satellite] Found token in URL, verifying...');
+                    const pairingCode = urlParams.get('pairing_code');
+                    const legacyToken = urlParams.get('token');
 
                     // Get hub URL from current location (same origin)
                     const hubUrl = `${window.location.protocol}//${window.location.host}`;
 
+                    // v1.1: Handle pairing_code pattern
+                    if (pairingCode) {
+                        console.log('[Satellite] Found pairing_code in URL, exchanging...');
+                        await this.exchangePairingCode(hubUrl, pairingCode);
+                        return;
+                    }
+
+                    // Legacy: Handle direct token
+                    if (legacyToken) {
+                        console.log('[Satellite] Found legacy token in URL, verifying...');
+                        await this.verifyAndConnectToken(hubUrl, legacyToken);
+                        return;
+                    }
+                },
+
+                async exchangePairingCode(hubUrl, pairingCode) {
+                    // Generate or retrieve device_id
+                    let deviceId = localStorage.getItem('cirs-device-id');
+                    if (!deviceId) {
+                        deviceId = 'DEV-' + crypto.randomUUID();
+                        localStorage.setItem('cirs-device-id', deviceId);
+                    }
+
                     try {
-                        // Verify token with backend
+                        const response = await fetch(`${hubUrl}/api/auth/satellite/exchange`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                pairing_code: pairingCode,
+                                device_id: deviceId
+                            })
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+
+                            // Save token
+                            sessionStorage.setItem('cirs-satellite-token', data.access_token);
+
+                            // Connect to hub
+                            this.hubUrl = hubUrl;
+                            this.hubToken = data.access_token;
+                            this.hubName = data.hub_name || 'CIRS Hub';
+                            this.deviceId = deviceId;
+                            this.volunteerId = 'V-' + Date.now().toString(36).toUpperCase();
+                            this.volunteerName = '志工';
+                            this.isConnected = true;
+
+                            this.saveState();
+
+                            // Clean URL
+                            window.history.replaceState({}, document.title, window.location.pathname);
+
+                            this.showToast(`已連接到 ${this.hubName}`, 'success');
+                            console.log('[Satellite] Connected via pairing code');
+                        } else {
+                            const err = await response.json().catch(() => ({}));
+                            console.error('[Satellite] Pairing code exchange failed:', err);
+                            this.showToast(err.detail || '配對碼無效或已過期', 'error');
+
+                            // Clean URL anyway
+                            window.history.replaceState({}, document.title, window.location.pathname);
+                        }
+                    } catch (error) {
+                        console.error('[Satellite] Pairing code exchange error:', error);
+                        this.showToast('無法連接到 Hub，請確認在同一個 WiFi 網路', 'error');
+                    }
+                },
+
+                async verifyAndConnectToken(hubUrl, token) {
+                    try {
                         const response = await fetch(`${hubUrl}/api/auth/satellite/verify`, {
                             method: 'POST',
                             headers: {
@@ -537,10 +734,8 @@
                         if (response.ok) {
                             const data = await response.json();
 
-                            // Save token to sessionStorage (more secure, cleared on tab close)
                             sessionStorage.setItem('cirs-satellite-token', token);
 
-                            // Connect to hub
                             this.hubUrl = hubUrl;
                             this.hubToken = token;
                             this.hubName = data.hub_name || 'CIRS Hub';
@@ -548,22 +743,16 @@
                             this.volunteerName = '志工';
                             this.isConnected = true;
 
-                            // Save to localStorage for persistence
                             this.saveState();
 
-                            // Clean URL (remove token parameter)
-                            const cleanUrl = window.location.pathname;
-                            window.history.replaceState({}, document.title, cleanUrl);
+                            window.history.replaceState({}, document.title, window.location.pathname);
 
                             this.showToast(`已連接到 ${this.hubName}`, 'success');
-                            console.log('[Satellite] Connected to hub:', this.hubName);
                         } else {
-                            console.error('[Satellite] Token verification failed:', response.status);
                             this.showToast('連接 Token 無效或已過期', 'error');
                         }
                     } catch (error) {
                         console.error('[Satellite] Token verification error:', error);
-                        // Don't show error toast - might be offline, will try loadState instead
                     }
                 },
 
@@ -630,19 +819,64 @@
 
                 onQRScanned(data) {
                     this.stopQRScan();
+                    console.log('[Satellite] QR scanned:', data);
 
-                    try {
-                        const parsed = JSON.parse(data);
+                    if (this.scanMode === 'hub') {
+                        // Handle hub pairing QR - could be URL with pairing_code or JSON
+                        if (data.includes('pairing_code=')) {
+                            // URL format: http://host/mobile/?pairing_code=XYZ123
+                            try {
+                                const url = new URL(data);
+                                const pairingCode = url.searchParams.get('pairing_code');
+                                const hubUrl = `${url.protocol}//${url.host}`;
 
-                        if (this.scanMode === 'hub') {
-                            this.connectToHub(parsed);
-                        } else if (this.scanMode === 'checkin') {
-                            this.processCheckin(parsed);
-                        } else if (this.scanMode === 'supply') {
-                            this.processSupply(parsed);
+                                if (pairingCode) {
+                                    this.exchangePairingCode(hubUrl, pairingCode);
+                                } else {
+                                    this.showToast('QR Code 中沒有配對碼', 'error');
+                                }
+                            } catch (e) {
+                                this.showToast('無效的 QR Code URL', 'error');
+                            }
+                        } else if (data.includes('token=')) {
+                            // Legacy URL format with direct token
+                            try {
+                                const url = new URL(data);
+                                const token = url.searchParams.get('token');
+                                const hubUrl = `${url.protocol}//${url.host}`;
+
+                                if (token) {
+                                    this.verifyAndConnectToken(hubUrl, token);
+                                }
+                            } catch (e) {
+                                this.showToast('無效的 QR Code', 'error');
+                            }
+                        } else {
+                            // Try JSON format (legacy)
+                            try {
+                                const parsed = JSON.parse(data);
+                                this.connectToHub(parsed);
+                            } catch (e) {
+                                this.showToast('無效的 Hub QR Code', 'error');
+                            }
                         }
-                    } catch (e) {
-                        this.showToast('無效的 QR Code', 'error');
+                    } else if (this.scanMode === 'checkin') {
+                        // Person QR - expect JSON
+                        try {
+                            const parsed = JSON.parse(data);
+                            this.processCheckin(parsed);
+                        } catch (e) {
+                            // Could be just a person ID string
+                            this.processCheckin({ person_id: data, name: data });
+                        }
+                    } else if (this.scanMode === 'supply') {
+                        // Supply QR - expect JSON
+                        try {
+                            const parsed = JSON.parse(data);
+                            this.processSupply(parsed);
+                        } catch (e) {
+                            this.showToast('無效的物資 QR Code', 'error');
+                        }
                     }
                 },
 
@@ -843,6 +1077,99 @@
                     setTimeout(() => {
                         this.toast.show = false;
                     }, 3000);
+                },
+
+                // ============================================================================
+                // Inventory Functions
+                // ============================================================================
+
+                get filteredInventory() {
+                    if (this.inventoryFilter === 'all') {
+                        return this.cachedInventory;
+                    }
+                    return this.cachedInventory.filter(item => item.category === this.inventoryFilter);
+                },
+
+                async fetchInventory() {
+                    if (!this.isOnline || !this.hubToken) {
+                        this.showToast('無法載入：請確認網路連線', 'error');
+                        return;
+                    }
+
+                    this.isLoadingInventory = true;
+
+                    try {
+                        const response = await fetch(`${this.hubUrl}/api/satellite/inventory`, {
+                            headers: {
+                                'Authorization': `Bearer ${this.hubToken}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            const data = await response.json();
+                            this.cachedInventory = data.items || [];
+                            this.inventoryLastUpdated = this.formatTime(Date.now());
+
+                            // Cache for offline use
+                            localStorage.setItem('cirs-inventory-cache', JSON.stringify({
+                                items: this.cachedInventory,
+                                updatedAt: Date.now()
+                            }));
+
+                            this.showToast('庫存資料已更新', 'success');
+                        } else if (response.status === 401) {
+                            this.showToast('Token 已過期，請重新配對', 'error');
+                            this.disconnectHub();
+                        } else {
+                            this.showToast('載入失敗，請稍後再試', 'error');
+                        }
+                    } catch (error) {
+                        console.error('[Satellite] Fetch inventory error:', error);
+                        this.showToast('網路錯誤', 'error');
+                    } finally {
+                        this.isLoadingInventory = false;
+                    }
+                },
+
+                loadCachedInventory() {
+                    const cached = localStorage.getItem('cirs-inventory-cache');
+                    if (cached) {
+                        try {
+                            const data = JSON.parse(cached);
+                            this.cachedInventory = data.items || [];
+                            this.inventoryLastUpdated = this.formatTime(data.updatedAt);
+                        } catch (e) {
+                            console.error('[Satellite] Failed to load cached inventory:', e);
+                        }
+                    }
+                },
+
+                getCategoryName(category) {
+                    const names = {
+                        'water': '飲用水',
+                        'food': '食品',
+                        'medical': '醫療用品',
+                        'daily': '日用品',
+                        'equipment': '設備',
+                        'other': '其他'
+                    };
+                    return names[category] || category || '其他';
+                },
+
+                getStockLevelClass(item) {
+                    const ratio = item.min_quantity > 0 ? item.quantity / item.min_quantity : 1;
+                    if (ratio <= 0.5) return 'bg-red-500';
+                    if (ratio <= 1) return 'bg-amber-500';
+                    return 'bg-green-500';
+                },
+
+                getStockLevelPercent(item) {
+                    if (!item.min_quantity || item.min_quantity <= 0) {
+                        return Math.min(100, item.quantity > 0 ? 100 : 0);
+                    }
+                    // Show percentage relative to 2x min_quantity (100% = healthy stock)
+                    const ratio = item.quantity / (item.min_quantity * 2);
+                    return Math.min(100, Math.max(5, ratio * 100));
                 }
             };
         }

@@ -456,24 +456,34 @@ xIRS 生態系統有兩種資料同步機制，服務不同場景：
   - [x] 顯示連接說明與步驟
   - [x] 多語言支援 (zh-TW, ja)
 
+- [x] Task 4: Pairing Code Pattern v1.1
+  - [x] POST /api/auth/satellite/exchange (pairing_code + device_id)
+  - [x] satellite_pairing_codes 資料表
+  - [x] 5 分鐘有效期
+  - [x] device_id 綁定
+
+- [x] Task 5: Action Envelope Sync v1.1
+  - [x] POST /api/satellite/sync (Action Envelope Pattern)
+  - [x] action_logs 資料表 (冪等性追蹤)
+  - [x] DISPENSE, CHECK_IN, CHECK_OUT 處理
+  - [x] 批次同步回應
+
+- [x] Task 6: Satellite API
+  - [x] GET /api/satellite/status (Hub 狀態)
+  - [x] GET /api/satellite/inventory (庫存查詢)
+  - [x] GET /api/satellite/persons (在場人員)
+  - [x] GET /api/satellite/action-logs (操作紀錄)
+
+- [x] Task 7: Satellite PWA 前端
+  - [x] QR 掃描配對 (URL pairing_code 處理)
+  - [x] 庫存查詢介面 (分類篩選、快取、離線支援)
+  - [x] Portal 綠色主題配色同步 (#4c826b)
+  - [x] iOS Fallback (Pending 指示器 + Sync Now 按鈕)
+
 #### 🔲 待開發
 
-- [ ] Task 4: 人員操作 API
-  - [ ] POST /api/satellite/checkin
-  - [ ] POST /api/satellite/checkout
-  - [ ] GET /api/satellite/persons
-
-- [ ] Task 5: 物資操作 API
-  - [ ] POST /api/satellite/dispense
-  - [ ] GET /api/satellite/inventory
-
-- [ ] Task 6: 同步機制
-  - [ ] POST /api/satellite/sync
-  - [ ] 衝突解決策略
-  - [ ] 同步狀態回報
-
-- [ ] Task 7: i18n 支援
-  - [ ] 繁體中文
+- [ ] Task 8: i18n 支援
+  - [ ] 繁體中文 (目前預設)
   - [ ] 日本語
 
 ### MIRS Satellite PWA（Phase 2）

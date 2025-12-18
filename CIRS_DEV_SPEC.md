@@ -1902,13 +1902,19 @@ curl http://localhost:8091/api/stats
 - [x] 人員狀態統計
 - [x] 前端 Dashboard 整合
 
-### Phase 8: Satellite PWA (In Progress)
+### Phase 8: Satellite PWA ✅ (v1.1)
 - [x] QR Code 配對機制
 - [x] URL Token 連接
 - [x] 離線暫存 (IndexedDB)
 - [x] 自動同步
-- [ ] 人員操作 API (checkin/checkout)
-- [ ] 物資操作 API (dispense)
+- [x] Pairing Code Pattern (5分鐘有效 + device_id 綁定)
+- [x] Action Envelope Sync (action_id 冪等性)
+- [x] satellite_pairing_codes 資料表
+- [x] action_logs 資料表
+- [x] /api/satellite/* API 實作 (sync, status, inventory, persons)
+- [x] 庫存查詢介面 (分類篩選、離線快取)
+- [x] Portal 綠色主題配色同步 (#4c826b)
+- [x] iOS Fallback (Pending 指示器 + Sync Now)
 - [ ] MIRS Satellite 支援
 
 ### Phase 9: xIRS Secure Exchange ✅ (v2.0)
@@ -2080,10 +2086,21 @@ Satellite PWA 讓志工手機成為「傳令兵」，透過 WiFi 連接 Hub（Ra
 
 ### 20.3 已實作功能
 
+**v1.0 基礎功能**
 - [x] QR Code 配對
 - [x] URL Token 連接
 - [x] 離線暫存
 - [x] 自動同步
+
+**v1.1 新增功能 (2025-12)**
+- [x] Pairing Code Pattern (5分鐘有效，device_id 綁定)
+- [x] Action Envelope Sync (action_id 冪等性)
+- [x] satellite_pairing_codes 資料表
+- [x] action_logs 資料表
+- [x] /api/satellite/* API 實作
+- [x] 庫存查詢介面 (分類篩選、離線快取)
+- [x] Portal 綠色主題配色 (#4c826b)
+- [x] iOS Fallback (Pending 指示器 + Sync Now)
 
 ### 20.4 相關文件
 
