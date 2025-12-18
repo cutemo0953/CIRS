@@ -24,3 +24,8 @@ Pillow>=10.1.0  # Use >= for Python 3.13 compatibility
 
 # CORS
 # (included in FastAPI)
+
+# xIRS Secure Data Exchange Protocol v2.0
+# Encryption: Curve25519 + XSalsa20-Poly1305
+# Signing: Ed25519
+pynacl>=1.5.0

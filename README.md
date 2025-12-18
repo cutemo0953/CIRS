@@ -1,6 +1,6 @@
 # CIRS - Community Inventory Resilience System
 
-> 社區韌性物資管理系統 v1.6
+> 社區韌性物資管理系統 v1.7
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
@@ -22,6 +22,18 @@ CIRS 是社區級災難韌性管理系統，整合物資管理、人員報到、
 | **HIRS 同步** | 發放物資 QR Code 同步到個人 HIRS |
 | **MIRS 連結** | RED/YELLOW 傷患可連結至 MIRS 處置記錄 |
 | **Satellite PWA** | 志工行動 App，支援離線報到/物資領取 |
+| **xIRS 安全交換** | 國防級端對端加密 USB 資料傳輸 (v2.0) |
+
+### v1.7 新功能：xIRS 安全資料交換
+
+xIRS (Cross-IRS) 是專為離線 USB 傳輸設計的安全通訊協議：
+
+- **端對端加密** - Curve25519 + XSalsa20-Poly1305
+- **數位簽章** - Ed25519 防竄改驗證
+- **防重放攻擊** - UUID + 時間戳 + 已處理清單
+- **信任名冊** - 只接收已驗證站點的資料
+
+詳見 [xIRS 技術規格](docs/xIRS_SECURE_EXCHANGE_SPEC_v2.md)
 
 ### 系統架構
 
