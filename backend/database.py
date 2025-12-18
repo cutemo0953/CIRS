@@ -340,6 +340,40 @@ def apply_migrations(conn):
             ]
         )
 
+    # Satellite Pairing Codes table migration (v1.1)
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='satellite_pairing_codes'")
+    if not cursor.fetchone():
+        print("Migration: Creating satellite_pairing_codes table")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS satellite_pairing_codes (
+                code TEXT PRIMARY KEY,
+                hub_name TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                expires_at DATETIME NOT NULL,
+                used_at DATETIME,
+                used_by_device_id TEXT
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_pairing_code_expires ON satellite_pairing_codes(expires_at)")
+
+    # Action Logs table migration (v1.1)
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='action_logs'")
+    if not cursor.fetchone():
+        print("Migration: Creating action_logs table")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS action_logs (
+                action_id TEXT PRIMARY KEY,
+                batch_id TEXT,
+                action_type TEXT NOT NULL,
+                device_id TEXT,
+                payload TEXT,
+                processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_action_logs_batch ON action_logs(batch_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_action_logs_device ON action_logs(device_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_action_logs_time ON action_logs(processed_at)")
+
     conn.commit()
     print("Migrations applied successfully")
 

@@ -420,7 +420,37 @@ CREATE TABLE IF NOT EXISTS staff_role_config (
 );
 
 -- ============================================
--- 17. 預設資料
+-- 17. Satellite Pairing Codes (配對碼 v1.1)
+-- ============================================
+CREATE TABLE IF NOT EXISTS satellite_pairing_codes (
+    code TEXT PRIMARY KEY,               -- 6 位大寫字母數字: 'XYZ123'
+    hub_name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    expires_at DATETIME NOT NULL,        -- 5 分鐘後過期
+    used_at DATETIME,                    -- 使用時間
+    used_by_device_id TEXT               -- 使用的 device_id
+);
+
+CREATE INDEX IF NOT EXISTS idx_pairing_code_expires ON satellite_pairing_codes(expires_at);
+
+-- ============================================
+-- 18. Action Logs (冪等性日誌 v1.1)
+-- ============================================
+CREATE TABLE IF NOT EXISTS action_logs (
+    action_id TEXT PRIMARY KEY,          -- UUID，確保冪等性
+    batch_id TEXT,                       -- 批次 ID
+    action_type TEXT NOT NULL,           -- 'DISPENSE', 'CHECK_IN', 'CHECK_OUT'
+    device_id TEXT,                      -- 執行裝置 ID
+    payload TEXT,                        -- JSON payload
+    processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_action_logs_batch ON action_logs(batch_id);
+CREATE INDEX IF NOT EXISTS idx_action_logs_device ON action_logs(device_id);
+CREATE INDEX IF NOT EXISTS idx_action_logs_time ON action_logs(processed_at);
+
+-- ============================================
+-- 19. 預設資料
 -- ============================================
 
 -- 預設設定

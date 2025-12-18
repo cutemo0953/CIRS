@@ -21,7 +21,7 @@ PORTAL_DIR = BASE_DIR / 'portal'
 FILES_DIR = BASE_DIR / 'files'
 
 # Import routes
-from routes import auth, inventory, person, events, messages, system, backup, zone, resilience, staff
+from routes import auth, inventory, person, events, messages, system, backup, zone, resilience, staff, satellite
 
 
 @asynccontextmanager
@@ -72,6 +72,7 @@ app.include_router(backup.router, prefix="/api/backup", tags=["Backup"])
 app.include_router(zone.router, prefix="/api/zone", tags=["Zone"])
 app.include_router(resilience.router, prefix="/api/resilience", tags=["Resilience"])
 app.include_router(staff.router, prefix="/api/staff", tags=["Staff"])
+app.include_router(satellite.router, prefix="/api/satellite", tags=["Satellite"])
 
 
 @app.get("/")

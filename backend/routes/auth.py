@@ -1,6 +1,7 @@
 """
 CIRS Authentication Routes
 PIN-based authentication with JWT tokens
+Satellite PWA Pairing v1.1 (Pairing Code Pattern)
 """
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -13,6 +14,9 @@ import os
 import sys
 import io
 import socket
+import secrets
+import string
+import json
 import qrcode
 from qrcode.image.styledpil import StyledPilImage
 
@@ -49,6 +53,11 @@ class TokenResponse(BaseModel):
 class ChangePinRequest(BaseModel):
     old_pin: str
     new_pin: str
+
+
+class SatelliteExchangeRequest(BaseModel):
+    pairing_code: str
+    device_id: str
 
 
 def hash_pin(pin: str) -> str:
@@ -207,8 +216,84 @@ async def get_me(credentials: HTTPAuthorizationCredentials = Depends(security)):
     return user
 
 
-# Satellite pairing token expiry (shorter for security)
-SATELLITE_TOKEN_EXPIRE_HOURS = 72
+# Satellite pairing v1.1 settings
+SATELLITE_TOKEN_EXPIRE_HOURS = 12  # JWT valid for 12 hours (was 72)
+PAIRING_CODE_EXPIRE_MINUTES = 5    # Pairing code valid for 5 minutes
+PAIRING_CODE_LENGTH = 6            # 6 character code
+
+
+def generate_pairing_code() -> str:
+    """Generate a 6-character alphanumeric pairing code (uppercase)"""
+    alphabet = string.ascii_uppercase + string.digits
+    # Remove ambiguous characters (0, O, I, 1, L)
+    alphabet = alphabet.replace('0', '').replace('O', '').replace('I', '').replace('1', '').replace('L', '')
+    return ''.join(secrets.choice(alphabet) for _ in range(PAIRING_CODE_LENGTH))
+
+
+def create_pairing_code(hub_name: str) -> dict:
+    """Create and store a new pairing code in the database"""
+    code = generate_pairing_code()
+    expires_at = datetime.utcnow() + timedelta(minutes=PAIRING_CODE_EXPIRE_MINUTES)
+
+    with write_db() as conn:
+        # Clean up expired codes first
+        conn.execute(
+            "DELETE FROM satellite_pairing_codes WHERE expires_at < ?",
+            (datetime.utcnow().isoformat(),)
+        )
+
+        # Insert new code
+        conn.execute(
+            """INSERT INTO satellite_pairing_codes (code, hub_name, expires_at)
+               VALUES (?, ?, ?)""",
+            (code, hub_name, expires_at.isoformat())
+        )
+
+    return {
+        "code": code,
+        "hub_name": hub_name,
+        "expires_at": expires_at.isoformat(),
+        "expires_in": PAIRING_CODE_EXPIRE_MINUTES * 60
+    }
+
+
+def validate_pairing_code(code: str, device_id: str) -> dict:
+    """Validate a pairing code and mark it as used"""
+    with write_db() as conn:
+        cursor = conn.execute(
+            """SELECT code, hub_name, expires_at, used_at
+               FROM satellite_pairing_codes
+               WHERE code = ?""",
+            (code.upper(),)
+        )
+        row = cursor.fetchone()
+
+        if row is None:
+            return {"valid": False, "error": "Invalid pairing code"}
+
+        pairing = dict_from_row(row)
+
+        # Check if already used
+        if pairing['used_at'] is not None:
+            return {"valid": False, "error": "Pairing code already used"}
+
+        # Check expiry
+        expires_at = datetime.fromisoformat(pairing['expires_at'])
+        if datetime.utcnow() > expires_at:
+            return {"valid": False, "error": "Pairing code expired"}
+
+        # Mark as used
+        conn.execute(
+            """UPDATE satellite_pairing_codes
+               SET used_at = ?, used_by_device_id = ?
+               WHERE code = ?""",
+            (datetime.utcnow().isoformat(), device_id, code.upper())
+        )
+
+        return {
+            "valid": True,
+            "hub_name": pairing['hub_name']
+        }
 
 
 def get_host_ip() -> str:
@@ -224,13 +309,14 @@ def get_host_ip() -> str:
         return "127.0.0.1"
 
 
-def create_satellite_token(hub_name: str = "CIRS Hub") -> str:
-    """Create a JWT token for satellite pairing"""
+def create_satellite_token(hub_name: str = "CIRS Hub", device_id: str = None) -> str:
+    """Create a JWT token for satellite pairing (v1.1: bound to device_id)"""
     data = {
         "sub": "satellite",
         "type": "satellite_pairing",
         "hub_name": hub_name,
-        "issued_at": datetime.utcnow().isoformat()  # Custom field for display, not 'iat'
+        "device_id": device_id,  # v1.1: Token is bound to this device
+        "issued_at": datetime.utcnow().isoformat()
     }
     return create_access_token(data, timedelta(hours=SATELLITE_TOKEN_EXPIRE_HOURS))
 
@@ -238,8 +324,9 @@ def create_satellite_token(hub_name: str = "CIRS Hub") -> str:
 @router.get("/pairing-qr")
 async def get_pairing_qr(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
-    Generate a QR code for Satellite PWA pairing.
+    Generate a QR code for Satellite PWA pairing (v1.1: Pairing Code Pattern).
     Returns a PNG image containing QR code with pairing URL.
+    The pairing code is valid for 5 minutes.
     Requires admin authentication.
     """
     # Require admin role
@@ -253,7 +340,7 @@ async def get_pairing_qr(request: Request, credentials: HTTPAuthorizationCredent
     hub_name = "CIRS Hub"
     try:
         with get_db() as conn:
-            cursor = conn.execute("SELECT value FROM system_config WHERE key = 'site_name'")
+            cursor = conn.execute("SELECT value FROM config WHERE key = 'site_name'")
             row = cursor.fetchone()
             if row:
                 hub_name = row['value']
@@ -268,12 +355,12 @@ async def get_pairing_qr(request: Request, credentials: HTTPAuthorizationCredent
     if forwarded_host:
         host_ip = forwarded_host.split(":")[0]
 
-    # Create pairing token
-    token = create_satellite_token(hub_name)
+    # Create pairing code (v1.1)
+    pairing = create_pairing_code(hub_name)
 
-    # Build pairing URL
+    # Build pairing URL with pairing_code (not direct token)
     # Note: Use the same port as CIRS API (8090)
-    pairing_url = f"http://{host_ip}:8090/mobile/?token={token}"
+    pairing_url = f"http://{host_ip}:8090/mobile/?pairing_code={pairing['code']}"
 
     # Generate QR code
     qr = qrcode.QRCode(
@@ -298,7 +385,9 @@ async def get_pairing_qr(request: Request, credentials: HTTPAuthorizationCredent
         media_type="image/png",
         headers={
             "Content-Disposition": "inline; filename=pairing-qr.png",
-            "Cache-Control": "no-cache, no-store, must-revalidate"
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "X-Pairing-Code": pairing['code'],  # Include code in header for debugging
+            "X-Pairing-Expires": pairing['expires_at']
         }
     )
 
@@ -306,7 +395,7 @@ async def get_pairing_qr(request: Request, credentials: HTTPAuthorizationCredent
 @router.get("/pairing-info")
 async def get_pairing_info(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
-    Get pairing information as JSON (for manual connection).
+    Get pairing information as JSON (v1.1: returns pairing code).
     Requires admin authentication.
     """
     # Require admin role
@@ -320,7 +409,7 @@ async def get_pairing_info(request: Request, credentials: HTTPAuthorizationCrede
     hub_name = "CIRS Hub"
     try:
         with get_db() as conn:
-            cursor = conn.execute("SELECT value FROM system_config WHERE key = 'site_name'")
+            cursor = conn.execute("SELECT value FROM config WHERE key = 'site_name'")
             row = cursor.fetchone()
             if row:
                 hub_name = row['value']
@@ -333,22 +422,54 @@ async def get_pairing_info(request: Request, credentials: HTTPAuthorizationCrede
     if forwarded_host:
         host_ip = forwarded_host.split(":")[0]
 
-    # Create token
-    token = create_satellite_token(hub_name)
+    # Create pairing code (v1.1)
+    pairing = create_pairing_code(hub_name)
 
     return {
         "hub_name": hub_name,
         "hub_url": f"http://{host_ip}:8090",
-        "token": token,
-        "pairing_url": f"http://{host_ip}:8090/mobile/?token={token}",
-        "expires_in": SATELLITE_TOKEN_EXPIRE_HOURS * 3600
+        "pairing_code": pairing['code'],
+        "pairing_url": f"http://{host_ip}:8090/mobile/?pairing_code={pairing['code']}",
+        "code_expires_at": pairing['expires_at'],
+        "code_expires_in": pairing['expires_in'],  # 5 minutes
+        "token_expires_in": SATELLITE_TOKEN_EXPIRE_HOURS * 3600  # 12 hours (after exchange)
+    }
+
+
+@router.post("/satellite/exchange")
+async def exchange_pairing_code(request: SatelliteExchangeRequest):
+    """
+    Exchange a pairing code for a JWT token (v1.1: Pairing Code Pattern).
+
+    Flow:
+    1. Satellite scans QR containing pairing_code
+    2. Satellite POSTs pairing_code + device_id to this endpoint
+    3. Hub validates code and returns JWT bound to device_id
+
+    The JWT is valid for 12 hours and bound to the device_id.
+    """
+    # Validate pairing code
+    result = validate_pairing_code(request.pairing_code, request.device_id)
+
+    if not result['valid']:
+        raise HTTPException(status_code=401, detail=result['error'])
+
+    # Create JWT token bound to this device
+    token = create_satellite_token(result['hub_name'], request.device_id)
+
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "expires_in": SATELLITE_TOKEN_EXPIRE_HOURS * 3600,  # 12 hours in seconds
+        "hub_name": result['hub_name'],
+        "device_id": request.device_id
     }
 
 
 @router.post("/satellite/verify")
 async def verify_satellite_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
-    Verify a satellite pairing token.
+    Verify a satellite pairing token (v1.1: includes device_id).
     Returns hub info if valid.
     """
     if credentials is None:
@@ -364,5 +485,6 @@ async def verify_satellite_token(credentials: HTTPAuthorizationCredentials = Dep
     return {
         "valid": True,
         "hub_name": payload.get("hub_name", "CIRS Hub"),
+        "device_id": payload.get("device_id"),  # v1.1: bound device
         "issued_at": payload.get("issued_at")
     }
