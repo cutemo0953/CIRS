@@ -1,0 +1,820 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="xIRS Pharmacy">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+
+    <title>xIRS Pharmacy - 藥局站</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-152x152.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-96x96.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Pharmacy Station - Indigo (v2.3)
+                        pharmacy: {
+                            50: '#eef2ff',
+                            100: '#e0e7ff',
+                            200: '#c7d2fe',
+                            300: '#a5b4fc',
+                            400: '#818cf8',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                            800: '#3730a3',
+                            900: '#312e81',
+                        },
+                        // Deep Blue accent
+                        accent: {
+                            500: '#3b82f6',
+                            600: '#1e3a5f',
+                            700: '#0d2840',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- TweetNaCl.js for crypto -->
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl-fast.min.js"></script>
+
+    <!-- QR Code Generator -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
+    <!-- QR Scanner -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <!-- xIRS Libraries -->
+    <script src="../../shared/js/xirs-crypto.js"></script>
+    <script src="../../shared/js/xirs-protocol.js"></script>
+    <script src="../../shared/js/xirs-storage.js"></script>
+    <script src="../../shared/js/xirs-pairing.js"></script>
+    <script src="../../shared/js/xirs-pharmacy-db.js"></script>
+    <script src="../../shared/js/xirs-rx.js"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+
+        .safe-top { padding-top: env(safe-area-inset-top, 0); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
+
+        .qr-container canvas {
+            max-width: 100%;
+            height: auto !important;
+        }
+
+        .offline-banner {
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+        }
+
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+
+        .task-card {
+            transition: all 0.2s ease;
+        }
+        .task-card:active {
+            transform: scale(0.98);
+        }
+
+        .onboarding-bg {
+            background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);
+        }
+
+        /* Privacy mode mask */
+        .privacy-mask {
+            filter: blur(3px);
+            user-select: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen safe-top safe-bottom" x-data="pharmacyApp()" x-init="init()">
+
+    <!-- ==================== ONBOARDING SCREENS ==================== -->
+    <template x-if="!isPaired">
+        <div class="min-h-screen flex flex-col">
+            <!-- Step 1: Welcome -->
+            <template x-if="onboardingStep === 1">
+                <div class="flex-1 onboarding-bg text-white flex flex-col items-center justify-center p-8">
+                    <div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center mb-8">
+                        <!-- Heroicon: beaker -->
+                        <svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                        </svg>
+                    </div>
+
+                    <h1 class="text-3xl font-bold mb-4 text-center">xIRS 藥局站</h1>
+                    <p class="text-lg text-white/80 text-center mb-2">Pharmacy Station</p>
+
+                    <p class="text-center text-white/70 mt-8 max-w-sm leading-relaxed">
+                        專為災難時期藥師設計的離線處方驗證與發藥系統，支援臨床紀錄加密儲存。
+                    </p>
+
+                    <button @click="onboardingStep = 2"
+                            class="mt-12 bg-white text-pharmacy-700 px-8 py-4 rounded-xl font-bold text-lg shadow-lg">
+                        開始設定
+                    </button>
+
+                    <p class="mt-8 text-sm text-white/50">v2.3</p>
+                </div>
+            </template>
+
+            <!-- Step 2: Pairing -->
+            <template x-if="onboardingStep === 2">
+                <div class="flex-1 bg-white flex flex-col">
+                    <div class="bg-pharmacy-700 text-white px-4 py-6">
+                        <button @click="onboardingStep = 1" class="mb-4 flex items-center gap-2 text-white/80">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                            返回
+                        </button>
+                        <h2 class="text-2xl font-bold">配對 Hub</h2>
+                        <p class="text-white/70 mt-1">掃描管理員提供的藥局站 QR Code</p>
+                    </div>
+
+                    <div class="flex-1 p-6 space-y-6">
+                        <div class="bg-gray-900 rounded-2xl overflow-hidden aspect-square relative">
+                            <div id="pairing-scanner" class="w-full h-full"></div>
+                            <div x-show="pairingStatus === 'connecting'" class="absolute inset-0 bg-black/80 flex items-center justify-center">
+                                <div class="text-center text-white">
+                                    <svg class="w-12 h-12 mx-auto animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <p class="mt-4" x-text="pairingMessage"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div x-show="pairingStatus === 'error'" class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+                            <p class="font-medium">配對失敗</p>
+                            <p class="text-sm mt-1" x-text="pairingMessage"></p>
+                            <button @click="resetPairing()" class="mt-3 text-sm underline">重試</button>
+                        </div>
+
+                        <div class="flex items-center gap-4">
+                            <div class="flex-1 h-px bg-gray-200"></div>
+                            <span class="text-sm text-gray-400">或</span>
+                            <div class="flex-1 h-px bg-gray-200"></div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Hub URL</label>
+                                <input type="url" x-model="manualPairing.hubUrl"
+                                       placeholder="https://hub.example.com"
+                                       class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-pharmacy-500 focus:border-pharmacy-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">配對碼 (6 碼)</label>
+                                <input type="text" x-model="manualPairing.code"
+                                       placeholder="A3X9K2" maxlength="6"
+                                       class="w-full border border-gray-300 rounded-lg px-4 py-3 text-center text-2xl tracking-widest font-mono uppercase focus:ring-2 focus:ring-pharmacy-500 focus:border-pharmacy-500">
+                            </div>
+                            <button @click="pairManually()"
+                                    :disabled="!manualPairing.hubUrl || manualPairing.code.length < 6"
+                                    class="w-full bg-pharmacy-600 text-white py-4 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                                手動配對
+                            </button>
+                        </div>
+
+                        <div class="pt-4 border-t">
+                            <p class="text-sm text-gray-500 mb-3 text-center">完全離線？</p>
+                            <label class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-pharmacy-500 transition-colors">
+                                <svg class="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                </svg>
+                                <span class="text-gray-600">匯入離線設定檔 (.json)</span>
+                                <input type="file" accept=".json" @change="importOfflineConfig($event)" class="hidden">
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </template>
+
+            <!-- Step 3: Success -->
+            <template x-if="onboardingStep === 3">
+                <div class="flex-1 bg-white flex flex-col items-center justify-center p-8">
+                    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">配對成功</h2>
+
+                    <div class="bg-gray-50 rounded-xl p-6 mt-6 w-full max-w-sm">
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">站點 ID</span>
+                                <span class="font-medium" x-text="config?.stationId"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">名稱</span>
+                                <span class="font-medium" x-text="config?.displayName || '-'"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">類型</span>
+                                <span class="font-medium text-pharmacy-600">藥局站</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">醫師憑證</span>
+                                <span class="font-medium" x-text="(config?.prescriberCerts?.length || 0) + ' 張'"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button @click="finishOnboarding()"
+                            class="mt-8 bg-pharmacy-600 text-white px-8 py-4 rounded-xl font-bold text-lg w-full max-w-sm">
+                        開始使用
+                    </button>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <!-- ==================== MAIN APP ==================== -->
+    <template x-if="isPaired">
+        <div class="min-h-screen flex flex-col">
+            <!-- Offline Banner -->
+            <div x-show="!isOnline" x-cloak class="offline-banner text-white text-center py-2 text-sm font-medium flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"></path>
+                </svg>
+                離線模式 - 資料將於連線後同步
+            </div>
+
+            <!-- Header -->
+            <header class="bg-pharmacy-700 text-white px-4 py-4 sticky top-0 z-40">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-pharmacy-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="font-bold text-lg" x-text="config?.displayName || config?.stationId || 'xIRS Pharmacy'"></h1>
+                            <p class="text-pharmacy-300 text-xs">藥局站</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <!-- Queue badge -->
+                        <div x-show="rxQueue.length > 0" class="bg-amber-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                            <span x-text="rxQueue.length"></span>
+                            <span>待發藥</span>
+                        </div>
+                        <!-- Privacy toggle -->
+                        <button @click="privacyMode = !privacyMode"
+                                class="p-2 rounded-lg transition-colors"
+                                :class="privacyMode ? 'bg-pharmacy-600' : 'hover:bg-pharmacy-600'">
+                            <svg x-show="!privacyMode" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                            <svg x-show="privacyMode" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"></path>
+                            </svg>
+                        </button>
+                        <!-- Settings -->
+                        <button @click="showSettings = true" class="p-2 hover:bg-pharmacy-600 rounded-lg transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="flex-1 p-4 pb-24">
+                <!-- Task Cards Grid -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <!-- Scan Rx -->
+                    <button @click="openScanRx()" class="task-card bg-white rounded-2xl p-5 shadow-sm border-2 border-transparent hover:border-pharmacy-300 text-left">
+                        <div class="w-14 h-14 bg-pharmacy-100 rounded-xl flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7 text-pharmacy-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-gray-800 text-lg">掃描處方</h3>
+                        <p class="text-sm text-gray-500 mt-1">掃描醫師開立的處方 QR</p>
+                    </button>
+
+                    <!-- Dispense Queue -->
+                    <button @click="openQueue()" class="task-card bg-white rounded-2xl p-5 shadow-sm border-2 border-transparent hover:border-green-300 text-left relative">
+                        <div x-show="rxQueue.length > 0" class="absolute top-3 right-3 w-6 h-6 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center font-bold" x-text="rxQueue.length"></div>
+                        <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-gray-800 text-lg">發藥佇列</h3>
+                        <p class="text-sm text-gray-500 mt-1">待發藥處方清單</p>
+                    </button>
+
+                    <!-- Stock -->
+                    <button @click="openStock()" class="task-card bg-white rounded-2xl p-5 shadow-sm border-2 border-transparent hover:border-blue-300 text-left">
+                        <div class="w-14 h-14 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-gray-800 text-lg">進藥</h3>
+                        <p class="text-sm text-gray-500 mt-1">掃描藥品補給清單</p>
+                    </button>
+
+                    <!-- Report -->
+                    <button @click="openReport()" class="task-card bg-white rounded-2xl p-5 shadow-sm border-2 border-transparent hover:border-amber-300 text-left relative">
+                        <div x-show="stats.pendingReports > 0" class="absolute top-3 right-3 w-6 h-6 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center font-bold" x-text="stats.pendingReports"></div>
+                        <div class="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-gray-800 text-lg">回報</h3>
+                        <p class="text-sm text-gray-500 mt-1">同步發藥紀錄至 Hub</p>
+                    </button>
+                </div>
+
+                <!-- Stats Bar -->
+                <div class="bg-white rounded-xl p-4 mb-6 shadow-sm">
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div class="text-2xl font-bold text-pharmacy-600" x-text="stats.medicationCount"></div>
+                            <div class="text-xs text-gray-500">藥品品項</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-green-600" x-text="rxQueue.length"></div>
+                            <div class="text-xs text-gray-500">待發藥</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold" :class="stats.pendingReports > 0 ? 'text-amber-600' : 'text-gray-400'" x-text="stats.pendingReports"></div>
+                            <div class="text-xs text-gray-500">待回報</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Rx Queue Preview -->
+                <div class="bg-white rounded-xl shadow-sm mb-6">
+                    <div class="px-4 py-3 border-b flex items-center justify-between">
+                        <h2 class="font-bold text-gray-800">發藥佇列</h2>
+                        <button @click="openQueue()" class="text-pharmacy-600 text-sm font-medium">查看全部</button>
+                    </div>
+                    <div class="divide-y">
+                        <template x-for="rx in rxQueue.slice(0, 3)" :key="rx.rx_id">
+                            <div class="px-4 py-3 flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-pharmacy-100 flex items-center justify-center text-pharmacy-600 font-bold" x-text="rx.items?.length || 0"></div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium text-gray-800" :class="privacyMode ? 'privacy-mask' : ''" x-text="'***' + (rx.patient_ref?.slice(-4) || '----')"></div>
+                                    <div class="text-xs text-gray-400" x-text="formatTime(rx.issued_at)"></div>
+                                </div>
+                                <div class="text-right">
+                                    <span class="text-xs px-2 py-1 rounded-full" :class="rx.controlled ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'" x-text="rx.controlled ? '管制藥' : '一般'"></span>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="rxQueue.length === 0" class="px-4 py-8 text-center text-gray-400">
+                            <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                            </svg>
+                            目前無待發藥處方
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Medication Inventory -->
+                <div class="bg-white rounded-xl shadow-sm">
+                    <div class="px-4 py-3 border-b flex items-center justify-between">
+                        <h2 class="font-bold text-gray-800">藥品庫存</h2>
+                        <button @click="currentTab = 'inventory'" class="text-pharmacy-600 text-sm font-medium">查看全部</button>
+                    </div>
+                    <div class="divide-y">
+                        <template x-for="med in medications.slice(0, 5)" :key="med.code">
+                            <div class="px-4 py-3 flex items-center justify-between">
+                                <div>
+                                    <div class="font-medium text-gray-800" x-text="med.name || med.code"></div>
+                                    <div class="text-xs text-gray-400" x-text="med.code"></div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-bold text-lg" :class="med.quantity < 10 ? 'text-red-600' : 'text-gray-800'" x-text="med.quantity"></div>
+                                    <div class="text-xs text-gray-400" x-text="med.unit || '單位'"></div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="medications.length === 0" class="px-4 py-8 text-center text-gray-400">
+                            <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                            </svg>
+                            尚無藥品庫存
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="fixed bottom-0 left-0 right-0 bg-white border-t safe-bottom z-40">
+                <div class="grid grid-cols-4 py-2">
+                    <button @click="currentTab = 'home'" class="flex flex-col items-center py-2" :class="currentTab === 'home' ? 'text-pharmacy-600' : 'text-gray-400'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                        </svg>
+                        <span class="text-xs mt-1">首頁</span>
+                    </button>
+                    <button @click="currentTab = 'inventory'" class="flex flex-col items-center py-2" :class="currentTab === 'inventory' ? 'text-pharmacy-600' : 'text-gray-400'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                        </svg>
+                        <span class="text-xs mt-1">藥品</span>
+                    </button>
+                    <button @click="currentTab = 'audit'" class="flex flex-col items-center py-2" :class="currentTab === 'audit' ? 'text-pharmacy-600' : 'text-gray-400'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                        </svg>
+                        <span class="text-xs mt-1">稽核</span>
+                    </button>
+                    <button @click="showSettings = true" class="flex flex-col items-center py-2" :class="showSettings ? 'text-pharmacy-600' : 'text-gray-400'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        <span class="text-xs mt-1">設定</span>
+                    </button>
+                </div>
+            </nav>
+        </div>
+    </template>
+
+    <!-- Settings Modal -->
+    <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="showSettings = false">
+            <div class="px-4 py-4 border-b flex items-center justify-between bg-gray-800 text-white sticky top-0">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <h3 class="font-bold text-lg">設定</h3>
+                </div>
+                <button @click="showSettings = false" class="p-1 hover:bg-gray-700 rounded">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
+                <!-- Station Info -->
+                <div class="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Pharmacy ID</span>
+                        <span class="font-medium font-mono" x-text="config?.stationId || '-'"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">顯示名稱</span>
+                        <span class="font-medium" x-text="config?.displayName || '-'"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">類型</span>
+                        <span class="font-medium text-pharmacy-600">藥局站</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">醫師憑證</span>
+                        <span class="font-medium" x-text="(prescriberCerts?.length || 0) + ' 張'"></span>
+                    </div>
+                </div>
+
+                <!-- Privacy Mode -->
+                <div class="bg-pharmacy-50 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <div class="font-medium text-pharmacy-800">隱私模式</div>
+                        <div class="text-sm text-pharmacy-600">隱藏病患識別資訊</div>
+                    </div>
+                    <button @click="privacyMode = !privacyMode"
+                            class="relative w-14 h-8 rounded-full transition-colors"
+                            :class="privacyMode ? 'bg-pharmacy-600' : 'bg-gray-300'">
+                        <div class="absolute top-1 w-6 h-6 bg-white rounded-full shadow transition-transform"
+                             :class="privacyMode ? 'translate-x-7' : 'translate-x-1'"></div>
+                    </button>
+                </div>
+
+                <!-- Actions -->
+                <div class="space-y-3">
+                    <button @click="scanCertUpdate()" class="w-full border-2 border-pharmacy-300 py-3 rounded-xl text-pharmacy-700 font-medium flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                        更新醫師憑證
+                    </button>
+
+                    <button @click="exportData()" class="w-full border-2 border-gray-300 py-3 rounded-xl text-gray-700 font-medium flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
+                        匯出資料備份
+                    </button>
+
+                    <button @click="resetPharmacy()" class="w-full border-2 border-red-300 py-3 rounded-xl text-red-600 font-medium flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        重置藥局站
+                    </button>
+                </div>
+
+                <p class="text-center text-xs text-gray-400 pt-4">xIRS Pharmacy v2.3.0</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div x-show="toast.show" x-cloak
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed bottom-24 left-4 right-4 z-50">
+        <div class="rounded-xl px-4 py-3 shadow-lg text-white text-center font-medium"
+             :class="{
+                 'bg-green-600': toast.type === 'success',
+                 'bg-red-600': toast.type === 'error',
+                 'bg-amber-500': toast.type === 'warning',
+                 'bg-pharmacy-600': toast.type === 'info'
+             }"
+             x-text="toast.message">
+        </div>
+    </div>
+
+    <script>
+        function pharmacyApp() {
+            return {
+                // Pairing State
+                isPaired: false,
+                onboardingStep: 1,
+                pairingStatus: 'idle',
+                pairingMessage: '',
+                pairingScanner: null,
+                manualPairing: { hubUrl: '', code: '' },
+
+                // App State
+                isOnline: navigator.onLine,
+                currentTab: 'home',
+                config: null,
+                medications: [],
+                rxQueue: [],
+                prescriberCerts: [],
+                privacyMode: true, // Privacy mode ON by default
+                stats: {
+                    medicationCount: 0,
+                    pendingReports: 0
+                },
+
+                // Modals
+                showSettings: false,
+
+                // Toast
+                toast: { show: false, message: '', type: 'info' },
+
+                // Initialize
+                async init() {
+                    window.addEventListener('online', () => this.isOnline = true);
+                    window.addEventListener('offline', () => this.isOnline = false);
+
+                    this.config = xIRS.StationConfig.load();
+                    this.isPaired = xIRS.StationConfig.isPaired() &&
+                                    xIRS.StationConfig.getType() === 'PHARMACY';
+
+                    if (this.isPaired) {
+                        this.prescriberCerts = this.config?.prescriberCerts || [];
+                        await this.refreshData();
+                    } else {
+                        this.$watch('onboardingStep', (step) => {
+                            if (step === 2) {
+                                this.$nextTick(() => this.startPairingScanner());
+                            } else {
+                                this.stopPairingScanner();
+                            }
+                        });
+                    }
+
+                    console.log('[Pharmacy] v2.3 Initialized');
+                },
+
+                // Pairing Flow
+                startPairingScanner() {
+                    const element = document.getElementById('pairing-scanner');
+                    if (!element) return;
+
+                    this.pairingScanner = new Html5Qrcode("pairing-scanner");
+                    this.pairingScanner.start(
+                        { facingMode: "environment" },
+                        { fps: 10, qrbox: { width: 250, height: 250 } },
+                        (decodedText) => this.onPairingQRScanned(decodedText),
+                        () => {}
+                    ).catch(err => console.error('[Pairing Scanner] Error:', err));
+                },
+
+                stopPairingScanner() {
+                    if (this.pairingScanner) {
+                        this.pairingScanner.stop().catch(() => {});
+                        this.pairingScanner = null;
+                    }
+                },
+
+                async onPairingQRScanned(qrData) {
+                    this.stopPairingScanner();
+                    this.pairingStatus = 'connecting';
+                    this.pairingMessage = '解析 QR Code...';
+
+                    const parsed = xIRS.PairingQR.parse(qrData);
+                    if (!parsed.valid) {
+                        this.pairingStatus = 'error';
+                        this.pairingMessage = parsed.error;
+                        return;
+                    }
+
+                    const { invite } = parsed;
+
+                    if (invite.stationType !== 'PHARMACY') {
+                        this.pairingStatus = 'error';
+                        this.pairingMessage = '此 QR Code 是物資站配對碼，請使用 /station/';
+                        return;
+                    }
+
+                    this.pairingMessage = `連線至 ${invite.hubUrl}...`;
+                    const result = await xIRS.PairingAPI.pair(invite.hubUrl, invite.pairingCode);
+
+                    if (!result.success) {
+                        this.pairingStatus = 'error';
+                        this.pairingMessage = result.error;
+                        return;
+                    }
+
+                    xIRS.StationConfig.save(result.config);
+                    this.config = result.config;
+                    this.prescriberCerts = result.config.prescriberCerts || [];
+                    this.onboardingStep = 3;
+                    this.pairingStatus = 'idle';
+                },
+
+                async pairManually() {
+                    const { hubUrl, code } = this.manualPairing;
+                    if (!hubUrl || code.length < 6) return;
+
+                    this.pairingStatus = 'connecting';
+                    this.pairingMessage = `連線至 ${hubUrl}...`;
+
+                    const result = await xIRS.PairingAPI.pair(hubUrl, code);
+
+                    if (!result.success) {
+                        this.pairingStatus = 'error';
+                        this.pairingMessage = result.error;
+                        return;
+                    }
+
+                    xIRS.StationConfig.save(result.config);
+                    this.config = result.config;
+                    this.prescriberCerts = result.config.prescriberCerts || [];
+                    this.onboardingStep = 3;
+                    this.pairingStatus = 'idle';
+                },
+
+                async importOfflineConfig(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    try {
+                        const content = await file.text();
+                        const result = xIRS.OfflineConfig.parse(content);
+
+                        if (!result.valid) {
+                            this.showToast(result.error, 'error');
+                            return;
+                        }
+
+                        xIRS.StationConfig.save(result.config);
+                        this.config = result.config;
+                        this.onboardingStep = 3;
+                    } catch (e) {
+                        this.showToast('無法讀取檔案', 'error');
+                    }
+                },
+
+                resetPairing() {
+                    this.pairingStatus = 'idle';
+                    this.pairingMessage = '';
+                    this.$nextTick(() => this.startPairingScanner());
+                },
+
+                async finishOnboarding() {
+                    this.isPaired = true;
+                    await this.refreshData();
+                },
+
+                // Data Loading
+                async refreshData() {
+                    // Placeholder - integrate with xirs-pharmacy-db.js
+                    this.medications = [];
+                    this.rxQueue = [];
+                    this.stats = {
+                        medicationCount: this.medications.length,
+                        pendingReports: 0
+                    };
+                },
+
+                // Task Functions (placeholders)
+                openScanRx() {
+                    this.showToast('處方掃描功能開發中', 'info');
+                },
+
+                openQueue() {
+                    this.showToast('發藥佇列功能開發中', 'info');
+                },
+
+                openStock() {
+                    this.showToast('進藥功能開發中', 'info');
+                },
+
+                openReport() {
+                    this.showToast('回報功能開發中', 'info');
+                },
+
+                scanCertUpdate() {
+                    this.showToast('憑證更新功能開發中', 'info');
+                },
+
+                async exportData() {
+                    const data = {
+                        config: this.config,
+                        medications: this.medications,
+                        rxQueue: this.rxQueue,
+                        prescriberCerts: this.prescriberCerts,
+                        exportedAt: new Date().toISOString()
+                    };
+                    const json = JSON.stringify(data, null, 2);
+                    const blob = new Blob([json], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `pharmacy-backup-${new Date().toISOString().slice(0,10)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    this.showToast('資料已匯出', 'success');
+                },
+
+                async resetPharmacy() {
+                    if (!confirm('確定要重置藥局站嗎？所有資料將被清除。')) return;
+                    if (!confirm('此操作無法復原，確定要繼續？')) return;
+
+                    xIRS.StationConfig.clear();
+                    this.config = null;
+                    this.isPaired = false;
+                    this.onboardingStep = 1;
+                    this.showSettings = false;
+                    this.showToast('藥局站已重置', 'info');
+                },
+
+                // Helpers
+                formatTime(ts) {
+                    if (!ts) return '';
+                    const date = new Date(ts * 1000);
+                    return date.toLocaleString('zh-TW', {
+                        month: 'numeric',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                },
+
+                showToast(message, type = 'info') {
+                    this.toast = { show: true, message, type };
+                    setTimeout(() => this.toast.show = false, 3000);
+                }
+            };
+        }
+    </script>
+</body>
+</html>

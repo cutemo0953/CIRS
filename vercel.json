@@ -8,27 +8,43 @@
         "maxLambdaSize": "50mb"
       }
     },
-    {
-      "src": "frontend/**",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "portal/**",
-      "use": "@vercel/static"
-    },
-    {
-      "src": "files/**",
-      "use": "@vercel/static"
-    }
+    { "src": "frontend/**", "use": "@vercel/static" },
+    { "src": "portal/**", "use": "@vercel/static" },
+    { "src": "files/**", "use": "@vercel/static" },
+    { "src": "shared/**", "use": "@vercel/static" }
   ],
   "routes": [
     { "src": "/api/(.*)", "dest": "/api/index.py" },
+
+    { "src": "/admin/(.*)", "dest": "/frontend/admin/$1" },
+    { "src": "/admin", "dest": "/frontend/admin/index.html" },
+
+    { "src": "/station/(.*)", "dest": "/frontend/station/$1" },
+    { "src": "/station", "dest": "/frontend/station/index.html" },
+
+    { "src": "/pharmacy/(.*)", "dest": "/frontend/pharmacy/$1" },
+    { "src": "/pharmacy", "dest": "/frontend/pharmacy/index.html" },
+
+    { "src": "/mobile/(.*)", "dest": "/frontend/mobile/$1" },
+    { "src": "/mobile", "dest": "/frontend/mobile/index.html" },
+
+    { "src": "/runner/(.*)", "dest": "/frontend/runner/$1" },
+    { "src": "/runner", "dest": "/frontend/runner/index.html" },
+
+    { "src": "/doctor/(.*)", "dest": "/frontend/doctor/$1" },
+    { "src": "/doctor", "dest": "/frontend/doctor/index.html" },
+
+    { "src": "/shared/(.*)", "dest": "/shared/$1" },
+
     { "src": "/portal/(.*)", "dest": "/portal/$1" },
     { "src": "/portal", "dest": "/portal/index.html" },
+
     { "src": "/frontend/(.*)", "dest": "/frontend/$1" },
-    { "src": "/frontend", "dest": "/frontend/index.html" },
+    { "src": "/frontend", "dest": "/frontend/admin/index.html" },
+
     { "src": "/files/(.*)", "dest": "/files/$1" },
     { "src": "/files", "dest": "/files/index.html" },
+
     { "src": "/(.*)", "dest": "/portal/$1" }
   ]
 }

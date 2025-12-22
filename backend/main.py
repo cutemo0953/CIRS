@@ -19,6 +19,7 @@ FRONTEND_DIR = BASE_DIR / 'frontend'
 ADMIN_DIR = BASE_DIR / 'frontend' / 'admin'  # xIRS v2.0: Admin console at /admin/
 MOBILE_DIR = BASE_DIR / 'frontend' / 'mobile'
 STATION_DIR = BASE_DIR / 'frontend' / 'station'
+PHARMACY_DIR = BASE_DIR / 'frontend' / 'pharmacy'  # xIRS v2.3: Pharmacy PWA at /pharmacy/
 RUNNER_DIR = BASE_DIR / 'frontend' / 'runner'
 DOCTOR_DIR = BASE_DIR / 'frontend' / 'doctor'
 PORTAL_DIR = BASE_DIR / 'portal'
@@ -393,6 +394,10 @@ if not IS_VERCEL:
     # Mount Station PWA for xIRS Distributed Logistics
     if STATION_DIR.exists():
         app.mount("/station", StaticFiles(directory=str(STATION_DIR), html=True), name="station")
+
+    # Mount Pharmacy PWA for xIRS Clinical (v2.3)
+    if PHARMACY_DIR.exists():
+        app.mount("/pharmacy", StaticFiles(directory=str(PHARMACY_DIR), html=True), name="pharmacy")
 
     # Mount Runner PWA for xIRS Blind Carrier
     if RUNNER_DIR.exists():

@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" content="#1e40af">
+    <meta name="theme-color" content="#0d9488">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="xIRS Station">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="format-detection" content="telephone=no">
 
-    <title>xIRS Station</title>
+    <title>xIRS Station - 物資站</title>
 
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -24,17 +24,24 @@
             theme: {
                 extend: {
                     colors: {
+                        // Supply Station - Teal (v2.3)
                         station: {
-                            50: '#eff6ff',
-                            100: '#dbeafe',
-                            200: '#bfdbfe',
-                            300: '#93c5fd',
-                            400: '#60a5fa',
+                            50: '#f0fdfa',
+                            100: '#ccfbf1',
+                            200: '#99f6e4',
+                            300: '#5eead4',
+                            400: '#2dd4bf',
+                            500: '#14b8a6',
+                            600: '#0d9488',
+                            700: '#0f766e',
+                            800: '#115e59',
+                            900: '#134e4a',
+                        },
+                        // Deep Blue accent
+                        accent: {
                             500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            800: '#1e40af',
-                            900: '#1e3a8a',
+                            600: '#1e3a5f',
+                            700: '#0d2840',
                         }
                     }
                 }
@@ -58,6 +65,7 @@
     <script src="../../shared/js/xirs-crypto.js"></script>
     <script src="../../shared/js/xirs-protocol.js"></script>
     <script src="../../shared/js/xirs-storage.js"></script>
+    <script src="../../shared/js/xirs-pairing.js"></script>
 
     <style>
         [x-cloak] { display: none !important; }
@@ -82,247 +90,473 @@
             background: rgba(0, 0, 0, 0.5);
             backdrop-filter: blur(4px);
         }
+
+        /* Task card hover effect */
+        .task-card {
+            transition: all 0.2s ease;
+        }
+        .task-card:active {
+            transform: scale(0.98);
+        }
+
+        /* Onboarding gradient */
+        .onboarding-bg {
+            background: linear-gradient(135deg, #0d9488 0%, #115e59 100%);
+        }
     </style>
 </head>
-<body class="bg-gray-100 min-h-screen safe-top safe-bottom" x-data="stationApp()" x-init="init()">
+<body class="bg-gray-50 min-h-screen safe-top safe-bottom" x-data="stationApp()" x-init="init()">
 
-    <!-- Offline Banner -->
-    <div x-show="!isOnline" x-cloak class="offline-banner text-white text-center py-2 text-sm font-medium">
-        <span class="mr-2">&#9888;</span> 離線模式 - 資料將於連線後同步
-    </div>
+    <!-- ==================== ONBOARDING SCREENS ==================== -->
+    <template x-if="!isPaired">
+        <div class="min-h-screen flex flex-col">
+            <!-- Step 1: Welcome -->
+            <template x-if="onboardingStep === 1">
+                <div class="flex-1 onboarding-bg text-white flex flex-col items-center justify-center p-8">
+                    <div class="w-24 h-24 bg-white/20 rounded-2xl flex items-center justify-center mb-8">
+                        <!-- Heroicon: cube -->
+                        <svg class="w-14 h-14 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                        </svg>
+                    </div>
 
-    <!-- Header -->
-    <header class="bg-station-800 text-white px-4 py-3 sticky top-0 z-40">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-station-600 rounded-lg flex items-center justify-center font-bold text-lg">
-                    S
+                    <h1 class="text-3xl font-bold mb-4 text-center">xIRS 物資站</h1>
+                    <p class="text-lg text-white/80 text-center mb-2">Supply Station</p>
+
+                    <p class="text-center text-white/70 mt-8 max-w-sm leading-relaxed">
+                        這是一個離線優先的物資管理工具，用於災難時期的分站物資收發與人員登記。
+                    </p>
+
+                    <button @click="onboardingStep = 2"
+                            class="mt-12 bg-white text-station-700 px-8 py-4 rounded-xl font-bold text-lg shadow-lg">
+                        開始設定
+                    </button>
+
+                    <p class="mt-8 text-sm text-white/50">v2.3</p>
                 </div>
-                <div>
-                    <h1 class="font-bold text-lg" x-text="config?.stationId || 'xIRS Station'"></h1>
-                    <p class="text-station-300 text-xs" x-text="config?.displayName || '未設定'"></p>
+            </template>
+
+            <!-- Step 2: Pairing -->
+            <template x-if="onboardingStep === 2">
+                <div class="flex-1 bg-white flex flex-col">
+                    <!-- Header -->
+                    <div class="bg-station-700 text-white px-4 py-6">
+                        <button @click="onboardingStep = 1" class="mb-4 flex items-center gap-2 text-white/80">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                            </svg>
+                            返回
+                        </button>
+                        <h2 class="text-2xl font-bold">配對 Hub</h2>
+                        <p class="text-white/70 mt-1">掃描管理員提供的 QR Code</p>
+                    </div>
+
+                    <!-- Content -->
+                    <div class="flex-1 p-6 space-y-6">
+                        <!-- QR Scanner -->
+                        <div class="bg-gray-900 rounded-2xl overflow-hidden aspect-square relative">
+                            <div id="pairing-scanner" class="w-full h-full"></div>
+                            <div x-show="pairingStatus === 'connecting'" class="absolute inset-0 bg-black/80 flex items-center justify-center">
+                                <div class="text-center text-white">
+                                    <svg class="w-12 h-12 mx-auto animate-spin" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <p class="mt-4" x-text="pairingMessage"></p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Error message -->
+                        <div x-show="pairingStatus === 'error'" class="bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+                            <p class="font-medium">配對失敗</p>
+                            <p class="text-sm mt-1" x-text="pairingMessage"></p>
+                            <button @click="resetPairing()" class="mt-3 text-sm underline">重試</button>
+                        </div>
+
+                        <!-- Divider -->
+                        <div class="flex items-center gap-4">
+                            <div class="flex-1 h-px bg-gray-200"></div>
+                            <span class="text-sm text-gray-400">或</span>
+                            <div class="flex-1 h-px bg-gray-200"></div>
+                        </div>
+
+                        <!-- Manual Entry -->
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Hub URL</label>
+                                <input type="url" x-model="manualPairing.hubUrl"
+                                       placeholder="https://hub.example.com"
+                                       class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-station-500 focus:border-station-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">配對碼 (6 碼)</label>
+                                <input type="text" x-model="manualPairing.code"
+                                       placeholder="A3X9K2" maxlength="6"
+                                       class="w-full border border-gray-300 rounded-lg px-4 py-3 text-center text-2xl tracking-widest font-mono uppercase focus:ring-2 focus:ring-station-500 focus:border-station-500">
+                            </div>
+                            <button @click="pairManually()"
+                                    :disabled="!manualPairing.hubUrl || manualPairing.code.length < 6"
+                                    class="w-full bg-station-600 text-white py-4 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed">
+                                手動配對
+                            </button>
+                        </div>
+
+                        <!-- Offline Import -->
+                        <div class="pt-4 border-t">
+                            <p class="text-sm text-gray-500 mb-3 text-center">完全離線？</p>
+                            <label class="block w-full border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:border-station-500 transition-colors">
+                                <svg class="w-8 h-8 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                                </svg>
+                                <span class="text-gray-600">匯入離線設定檔 (.json)</span>
+                                <input type="file" accept=".json" @change="importOfflineConfig($event)" class="hidden">
+                            </label>
+                        </div>
+                    </div>
                 </div>
+            </template>
+
+            <!-- Step 3: Success -->
+            <template x-if="onboardingStep === 3">
+                <div class="flex-1 bg-white flex flex-col items-center justify-center p-8">
+                    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mb-6">
+                        <svg class="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </div>
+
+                    <h2 class="text-2xl font-bold text-gray-800 mb-2">配對成功</h2>
+
+                    <div class="bg-gray-50 rounded-xl p-6 mt-6 w-full max-w-sm">
+                        <div class="space-y-3">
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">站點 ID</span>
+                                <span class="font-medium" x-text="config?.stationId"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">名稱</span>
+                                <span class="font-medium" x-text="config?.displayName || '-'"></span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-gray-500">類型</span>
+                                <span class="font-medium text-station-600">物資站</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button @click="finishOnboarding()"
+                            class="mt-8 bg-station-600 text-white px-8 py-4 rounded-xl font-bold text-lg w-full max-w-sm">
+                        開始使用
+                    </button>
+                </div>
+            </template>
+        </div>
+    </template>
+
+    <!-- ==================== MAIN APP ==================== -->
+    <template x-if="isPaired">
+        <div class="min-h-screen flex flex-col">
+            <!-- Offline Banner -->
+            <div x-show="!isOnline" x-cloak class="offline-banner text-white text-center py-2 text-sm font-medium flex items-center justify-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 5.636a9 9 0 010 12.728m0 0l-2.829-2.829m2.829 2.829L21 21M15.536 8.464a5 5 0 010 7.072m0 0l-2.829-2.829m-4.243 2.829a4.978 4.978 0 01-1.414-2.83m-1.414 5.658a9 9 0 01-2.167-9.238m7.824 2.167a1 1 0 111.414 1.414m-1.414-1.414L3 3m8.293 8.293l1.414 1.414"></path>
+                </svg>
+                離線模式 - 資料將於連線後同步
             </div>
-            <div class="flex items-center gap-2">
-                <button @click="showSettings = true" class="p-2 hover:bg-station-700 rounded-lg">
+
+            <!-- Header -->
+            <header class="bg-station-700 text-white px-4 py-4 sticky top-0 z-40">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <div class="w-10 h-10 bg-station-600 rounded-lg flex items-center justify-center">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h1 class="font-bold text-lg" x-text="config?.displayName || config?.stationId || 'xIRS Station'"></h1>
+                            <p class="text-station-300 text-xs">物資站</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <!-- Sync indicator -->
+                        <div x-show="stats.pendingActions > 0" class="bg-amber-500 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1">
+                            <span x-text="stats.pendingActions"></span>
+                            <span>待同步</span>
+                        </div>
+                        <!-- Settings -->
+                        <button @click="showSettings = true" class="p-2 hover:bg-station-600 rounded-lg transition-colors">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="flex-1 p-4 pb-24">
+                <!-- Task Cards Grid (v2.3 Dashboard) -->
+                <div class="grid grid-cols-2 gap-4 mb-6">
+                    <!-- Receive -->
+                    <button @click="openReceive()" class="task-card bg-white rounded-2xl p-5 shadow-sm border-2 border-transparent hover:border-station-300 text-left">
+                        <div class="w-14 h-14 bg-station-100 rounded-xl flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7 text-station-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-gray-800 text-lg">收貨</h3>
+                        <p class="text-sm text-gray-500 mt-1">掃描 Runner 帶來的補給清單</p>
+                    </button>
+
+                    <!-- Dispense -->
+                    <button @click="openDispense()" class="task-card bg-white rounded-2xl p-5 shadow-sm border-2 border-transparent hover:border-green-300 text-left">
+                        <div class="w-14 h-14 bg-green-100 rounded-xl flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-gray-800 text-lg">發放</h3>
+                        <p class="text-sm text-gray-500 mt-1">發放物資給避難者</p>
+                    </button>
+
+                    <!-- Report -->
+                    <button @click="openReport()" class="task-card bg-white rounded-2xl p-5 shadow-sm border-2 border-transparent hover:border-amber-300 text-left relative">
+                        <div x-show="stats.pendingActions > 0" class="absolute top-3 right-3 w-6 h-6 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center font-bold" x-text="stats.pendingActions"></div>
+                        <div class="w-14 h-14 bg-amber-100 rounded-xl flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-gray-800 text-lg">回報</h3>
+                        <p class="text-sm text-gray-500 mt-1">產生報告給 Runner 帶回 Hub</p>
+                    </button>
+
+                    <!-- Register -->
+                    <button @click="openRegister()" class="task-card bg-white rounded-2xl p-5 shadow-sm border-2 border-transparent hover:border-purple-300 text-left">
+                        <div class="w-14 h-14 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
+                            <svg class="w-7 h-7 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                            </svg>
+                        </div>
+                        <h3 class="font-bold text-gray-800 text-lg">登記</h3>
+                        <p class="text-sm text-gray-500 mt-1">登記新抵達的避難者</p>
+                    </button>
+                </div>
+
+                <!-- Stats Bar -->
+                <div class="bg-white rounded-xl p-4 mb-6 shadow-sm">
+                    <div class="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                            <div class="text-2xl font-bold text-station-600" x-text="stats.inventoryCount"></div>
+                            <div class="text-xs text-gray-500">物資品項</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold text-green-600" x-text="stats.personsCount"></div>
+                            <div class="text-xs text-gray-500">登記人數</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-bold" :class="stats.pendingActions > 0 ? 'text-amber-600' : 'text-gray-400'" x-text="stats.pendingActions"></div>
+                            <div class="text-xs text-gray-500">待回報</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventory Preview -->
+                <div class="bg-white rounded-xl shadow-sm mb-6">
+                    <div class="px-4 py-3 border-b flex items-center justify-between">
+                        <h2 class="font-bold text-gray-800">庫存總覽</h2>
+                        <button @click="currentTab = 'inventory'" class="text-station-600 text-sm font-medium">查看全部</button>
+                    </div>
+                    <div class="divide-y">
+                        <template x-for="item in inventory.slice(0, 5)" :key="item.code">
+                            <div class="px-4 py-3 flex items-center justify-between">
+                                <div>
+                                    <div class="font-medium text-gray-800" x-text="item.name || item.code"></div>
+                                    <div class="text-xs text-gray-400" x-text="item.code"></div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-bold text-lg" :class="item.quantity < 10 ? 'text-red-600' : 'text-gray-800'" x-text="item.quantity"></div>
+                                    <div class="text-xs text-gray-400" x-text="item.unit || '單位'"></div>
+                                </div>
+                            </div>
+                        </template>
+                        <div x-show="inventory.length === 0" class="px-4 py-8 text-center text-gray-400">
+                            <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                            </svg>
+                            尚無庫存資料
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Actions -->
+                <div class="bg-white rounded-xl shadow-sm">
+                    <div class="px-4 py-3 border-b flex items-center justify-between">
+                        <h2 class="font-bold text-gray-800">最近動作</h2>
+                        <button @click="currentTab = 'history'" class="text-station-600 text-sm font-medium">查看全部</button>
+                    </div>
+                    <div class="divide-y">
+                        <template x-for="action in recentActions.slice(0, 5)" :key="action.id">
+                            <div class="px-4 py-3 flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full flex items-center justify-center"
+                                     :class="{
+                                         'bg-station-100 text-station-600': action.type === 'RECEIVE',
+                                         'bg-green-100 text-green-600': action.type === 'DISPENSE',
+                                         'bg-purple-100 text-purple-600': action.type === 'REGISTER'
+                                     }">
+                                    <template x-if="action.type === 'RECEIVE'">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                                        </svg>
+                                    </template>
+                                    <template x-if="action.type === 'DISPENSE'">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                                        </svg>
+                                    </template>
+                                    <template x-if="action.type === 'REGISTER'">
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                                        </svg>
+                                    </template>
+                                </div>
+                                <div class="flex-1 min-w-0">
+                                    <div class="font-medium text-gray-800 truncate" x-text="action.item_code || action.person_id || action.type"></div>
+                                    <div class="text-xs text-gray-400" x-text="formatTime(action.ts)"></div>
+                                </div>
+                                <div x-show="action.qty" class="text-right">
+                                    <div class="font-bold" x-text="action.qty"></div>
+                                </div>
+                                <div x-show="!action.synced" class="w-2 h-2 bg-amber-400 rounded-full flex-shrink-0" title="待同步"></div>
+                            </div>
+                        </template>
+                        <div x-show="recentActions.length === 0" class="px-4 py-8 text-center text-gray-400">
+                            <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            尚無動作記錄
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Bottom Navigation -->
+            <nav class="fixed bottom-0 left-0 right-0 bg-white border-t safe-bottom z-40">
+                <div class="grid grid-cols-4 py-2">
+                    <button @click="currentTab = 'home'" class="flex flex-col items-center py-2" :class="currentTab === 'home' ? 'text-station-600' : 'text-gray-400'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                        </svg>
+                        <span class="text-xs mt-1">首頁</span>
+                    </button>
+                    <button @click="currentTab = 'inventory'" class="flex flex-col items-center py-2" :class="currentTab === 'inventory' ? 'text-station-600' : 'text-gray-400'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                        </svg>
+                        <span class="text-xs mt-1">庫存</span>
+                    </button>
+                    <button @click="currentTab = 'persons'" class="flex flex-col items-center py-2" :class="currentTab === 'persons' ? 'text-station-600' : 'text-gray-400'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                        </svg>
+                        <span class="text-xs mt-1">人員</span>
+                    </button>
+                    <button @click="currentTab = 'history'" class="flex flex-col items-center py-2 relative" :class="currentTab === 'history' ? 'text-station-600' : 'text-gray-400'">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span class="text-xs mt-1">歷史</span>
+                        <span x-show="stats.pendingActions > 0" class="absolute -top-1 right-3 w-5 h-5 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center" x-text="stats.pendingActions > 9 ? '9+' : stats.pendingActions"></span>
+                    </button>
+                </div>
+            </nav>
+        </div>
+    </template>
+
+    <!-- ==================== MODALS ==================== -->
+
+    <!-- Receive Modal -->
+    <div x-show="showReceive" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="closeReceive()">
+            <div class="px-4 py-4 border-b flex items-center justify-between bg-station-700 text-white">
+                <div class="flex items-center gap-3">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"></path>
+                    </svg>
+                    <h3 class="font-bold text-lg">收貨</h3>
+                </div>
+                <button @click="closeReceive()" class="p-1 hover:bg-station-600 rounded">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                     </svg>
                 </button>
             </div>
-        </div>
-    </header>
-
-    <!-- Stats Bar -->
-    <div class="bg-white border-b px-4 py-3 grid grid-cols-3 gap-4 text-center">
-        <div>
-            <div class="text-2xl font-bold text-station-600" x-text="stats.inventoryCount"></div>
-            <div class="text-xs text-gray-500">物資品項</div>
-        </div>
-        <div>
-            <div class="text-2xl font-bold text-amber-600" x-text="stats.pendingActions"></div>
-            <div class="text-xs text-gray-500">待同步動作</div>
-        </div>
-        <div>
-            <div class="text-2xl font-bold text-green-600" x-text="stats.personsCount"></div>
-            <div class="text-xs text-gray-500">登記人員</div>
-        </div>
-    </div>
-
-    <!-- Main Content -->
-    <main class="p-4 pb-24">
-        <!-- Quick Actions -->
-        <div class="grid grid-cols-2 gap-4 mb-6">
-            <button @click="openScanManifest()" class="bg-white rounded-xl p-4 shadow-sm border-2 border-station-200 hover:border-station-400 transition-colors">
-                <div class="w-12 h-12 bg-station-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                    <svg class="w-6 h-6 text-station-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
-                    </svg>
-                </div>
-                <div class="font-medium text-gray-800">掃描清單</div>
-                <div class="text-xs text-gray-500">接收補給物資</div>
-            </button>
-
-            <button @click="openDispense()" class="bg-white rounded-xl p-4 shadow-sm border-2 border-green-200 hover:border-green-400 transition-colors">
-                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                    </svg>
-                </div>
-                <div class="font-medium text-gray-800">物資發放</div>
-                <div class="text-xs text-gray-500">記錄發放動作</div>
-            </button>
-
-            <button @click="openRegister()" class="bg-white rounded-xl p-4 shadow-sm border-2 border-purple-200 hover:border-purple-400 transition-colors">
-                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
-                    </svg>
-                </div>
-                <div class="font-medium text-gray-800">人員登記</div>
-                <div class="text-xs text-gray-500">新增避難者</div>
-            </button>
-
-            <button @click="openGenerateReport()" class="bg-white rounded-xl p-4 shadow-sm border-2 border-amber-200 hover:border-amber-400 transition-colors">
-                <div class="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center mx-auto mb-2">
-                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                </div>
-                <div class="font-medium text-gray-800">產生報告</div>
-                <div class="text-xs text-gray-500">給 Runner 帶回</div>
-            </button>
-        </div>
-
-        <!-- Inventory Section -->
-        <div class="bg-white rounded-xl shadow-sm mb-6">
-            <div class="px-4 py-3 border-b flex items-center justify-between">
-                <h2 class="font-bold text-gray-800">庫存清單</h2>
-                <button @click="refreshInventory()" class="text-station-600 text-sm">重新整理</button>
-            </div>
-            <div class="divide-y max-h-64 overflow-y-auto">
-                <template x-for="item in inventory" :key="item.code">
-                    <div class="px-4 py-3 flex items-center justify-between">
-                        <div>
-                            <div class="font-medium" x-text="item.name || item.code"></div>
-                            <div class="text-xs text-gray-500" x-text="item.code"></div>
-                        </div>
-                        <div class="text-right">
-                            <div class="font-bold text-lg" :class="item.quantity < 10 ? 'text-red-600' : 'text-gray-800'" x-text="item.quantity"></div>
-                            <div class="text-xs text-gray-500" x-text="item.unit"></div>
-                        </div>
-                    </div>
-                </template>
-                <div x-show="inventory.length === 0" class="px-4 py-8 text-center text-gray-500">
-                    尚無庫存資料
-                </div>
-            </div>
-        </div>
-
-        <!-- Recent Actions -->
-        <div class="bg-white rounded-xl shadow-sm">
-            <div class="px-4 py-3 border-b flex items-center justify-between">
-                <h2 class="font-bold text-gray-800">最近動作</h2>
-                <span class="text-xs text-gray-500" x-text="`${stats.pendingActions} 待同步`"></span>
-            </div>
-            <div class="divide-y max-h-48 overflow-y-auto">
-                <template x-for="action in recentActions" :key="action.id">
-                    <div class="px-4 py-3 flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                             :class="{
-                                 'bg-green-500': action.type === 'RECEIVE',
-                                 'bg-blue-500': action.type === 'DISPENSE',
-                                 'bg-purple-500': action.type === 'REGISTER'
-                             }">
-                            <span x-text="action.type.charAt(0)"></span>
-                        </div>
-                        <div class="flex-1">
-                            <div class="font-medium text-sm" x-text="action.item_code || action.person_id || action.type"></div>
-                            <div class="text-xs text-gray-500" x-text="formatTime(action.ts)"></div>
-                        </div>
-                        <div x-show="action.qty" class="font-bold" x-text="action.qty"></div>
-                        <div x-show="!action.synced" class="w-2 h-2 bg-amber-400 rounded-full"></div>
-                    </div>
-                </template>
-                <div x-show="recentActions.length === 0" class="px-4 py-8 text-center text-gray-500">
-                    尚無動作記錄
-                </div>
-            </div>
-        </div>
-    </main>
-
-    <!-- Bottom Navigation -->
-    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t safe-bottom z-40">
-        <div class="grid grid-cols-4 py-2">
-            <button @click="currentTab = 'home'" class="flex flex-col items-center py-2" :class="currentTab === 'home' ? 'text-station-600' : 'text-gray-400'">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
-                </svg>
-                <span class="text-xs mt-1">首頁</span>
-            </button>
-            <button @click="currentTab = 'inventory'" class="flex flex-col items-center py-2" :class="currentTab === 'inventory' ? 'text-station-600' : 'text-gray-400'">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
-                </svg>
-                <span class="text-xs mt-1">庫存</span>
-            </button>
-            <button @click="currentTab = 'persons'" class="flex flex-col items-center py-2" :class="currentTab === 'persons' ? 'text-station-600' : 'text-gray-400'">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                </svg>
-                <span class="text-xs mt-1">人員</span>
-            </button>
-            <button @click="currentTab = 'history'" class="flex flex-col items-center py-2 relative" :class="currentTab === 'history' ? 'text-station-600' : 'text-gray-400'">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span class="text-xs mt-1">歷史</span>
-                <span x-show="stats.pendingActions > 0" class="absolute top-1 right-4 w-4 h-4 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center" x-text="stats.pendingActions"></span>
-            </button>
-        </div>
-    </nav>
-
-    <!-- Scan Manifest Modal -->
-    <div x-show="showScanManifest" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="closeScanManifest()">
-            <div class="px-4 py-3 border-b flex items-center justify-between bg-station-800 text-white">
-                <h3 class="font-bold">掃描補給清單</h3>
-                <button @click="closeScanManifest()" class="p-1">&times;</button>
-            </div>
-            <div class="p-4">
+            <div class="p-4 overflow-y-auto max-h-[70vh]">
                 <!-- Scanner View -->
-                <div x-show="!manifestResult" class="space-y-4">
-                    <div id="manifest-scanner" class="w-full aspect-square bg-gray-900 rounded-lg overflow-hidden"></div>
-                    <p class="text-center text-sm text-gray-600">將 QR Code 對準掃描框</p>
+                <div x-show="!receiveResult" class="space-y-4">
+                    <p class="text-sm text-gray-600 text-center">掃描 Runner 帶來的補給清單 QR Code</p>
+                    <div id="receive-scanner" class="w-full aspect-square bg-gray-900 rounded-xl overflow-hidden"></div>
 
-                    <!-- Manual Entry -->
+                    <!-- Manual short code -->
                     <div class="border-t pt-4">
                         <p class="text-sm text-gray-500 mb-2">QR 無法辨識？輸入短碼：</p>
                         <div class="flex gap-2">
                             <input type="text" x-model="manualShortCode" placeholder="4位數短碼"
                                    class="flex-1 border rounded-lg px-3 py-2 text-center text-xl tracking-widest"
-                                   maxlength="4" pattern="[0-9]*">
+                                   maxlength="4">
                             <button @click="submitManualCode()" class="bg-station-600 text-white px-4 py-2 rounded-lg">確認</button>
                         </div>
                     </div>
                 </div>
 
                 <!-- Result View -->
-                <div x-show="manifestResult" class="space-y-4">
+                <div x-show="receiveResult" class="space-y-4">
                     <div class="text-center py-4">
-                        <div x-show="manifestResult?.valid" class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                            </svg>
-                        </div>
-                        <div x-show="!manifestResult?.valid" class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                            </svg>
-                        </div>
-                        <h4 class="font-bold text-lg" x-text="manifestResult?.valid ? '清單驗證成功' : '驗證失敗'"></h4>
-                        <p class="text-sm text-gray-500" x-text="manifestResult?.error || manifestResult?.manifest?.manifest_id"></p>
+                        <template x-if="receiveResult?.valid">
+                            <div>
+                                <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                    </svg>
+                                </div>
+                                <h4 class="font-bold text-lg text-gray-800">清單驗證成功</h4>
+                                <p class="text-sm text-gray-500" x-text="receiveResult?.manifest?.manifest_id"></p>
+                            </div>
+                        </template>
+                        <template x-if="!receiveResult?.valid">
+                            <div>
+                                <div class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                                    <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </div>
+                                <h4 class="font-bold text-lg text-gray-800">驗證失敗</h4>
+                                <p class="text-sm text-red-600" x-text="receiveResult?.error"></p>
+                            </div>
+                        </template>
                     </div>
 
-                    <template x-if="manifestResult?.valid">
+                    <template x-if="receiveResult?.valid && receiveResult?.manifest?.items">
                         <div>
                             <h5 class="font-medium mb-2">物資項目：</h5>
-                            <div class="bg-gray-50 rounded-lg divide-y">
-                                <template x-for="item in manifestResult.manifest.items" :key="item.code">
+                            <div class="bg-gray-50 rounded-lg divide-y max-h-48 overflow-y-auto">
+                                <template x-for="item in receiveResult.manifest.items" :key="item.code">
                                     <div class="px-3 py-2 flex justify-between">
-                                        <span x-text="item.code"></span>
-                                        <span class="font-bold" x-text="`${item.qty} ${item.unit}`"></span>
+                                        <span class="text-gray-700" x-text="item.name || item.code"></span>
+                                        <span class="font-bold" x-text="`${item.qty} ${item.unit || ''}`"></span>
                                     </div>
                                 </template>
                             </div>
-                            <button @click="confirmManifest()" class="w-full mt-4 bg-green-600 text-white py-3 rounded-lg font-bold">
+                            <button @click="confirmReceive()" class="w-full mt-4 bg-green-600 text-white py-3 rounded-xl font-bold">
                                 確認收貨並更新庫存
                             </button>
                         </div>
                     </template>
 
-                    <button @click="manifestResult = null" class="w-full text-gray-500 py-2">
+                    <button @click="receiveResult = null; startReceiveScanner()" class="w-full text-gray-500 py-2">
                         重新掃描
                     </button>
                 </div>
@@ -333,14 +567,23 @@
     <!-- Dispense Modal -->
     <div x-show="showDispense" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="showDispense = false">
-            <div class="px-4 py-3 border-b flex items-center justify-between bg-green-700 text-white">
-                <h3 class="font-bold">物資發放</h3>
-                <button @click="showDispense = false" class="p-1">&times;</button>
+            <div class="px-4 py-4 border-b flex items-center justify-between bg-green-600 text-white">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    </svg>
+                    <h3 class="font-bold text-lg">物資發放</h3>
+                </div>
+                <button @click="showDispense = false" class="p-1 hover:bg-green-500 rounded">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
             </div>
-            <div class="p-4 space-y-4">
+            <div class="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">選擇物資</label>
-                    <select x-model="dispenseForm.itemCode" class="w-full border rounded-lg px-3 py-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">選擇物資</label>
+                    <select x-model="dispenseForm.itemCode" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500 focus:border-green-500">
                         <option value="">請選擇...</option>
                         <template x-for="item in inventory" :key="item.code">
                             <option :value="item.code" x-text="`${item.name || item.code} (剩餘 ${item.quantity})`"></option>
@@ -348,92 +591,77 @@
                     </select>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">發放數量</label>
-                    <input type="number" x-model.number="dispenseForm.qty" min="1" class="w-full border rounded-lg px-3 py-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">發放數量</label>
+                    <div class="flex items-center gap-3">
+                        <button @click="dispenseForm.qty = Math.max(1, dispenseForm.qty - 1)" class="w-12 h-12 rounded-lg border-2 border-gray-300 flex items-center justify-center text-xl font-bold text-gray-600 hover:border-green-500">-</button>
+                        <input type="number" x-model.number="dispenseForm.qty" min="1" class="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-center text-2xl font-bold focus:ring-2 focus:ring-green-500">
+                        <button @click="dispenseForm.qty++" class="w-12 h-12 rounded-lg border-2 border-gray-300 flex items-center justify-center text-xl font-bold text-gray-600 hover:border-green-500">+</button>
+                    </div>
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">領取人 ID (選填)</label>
-                    <input type="text" x-model="dispenseForm.personId" placeholder="例：P0001" class="w-full border rounded-lg px-3 py-2">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">領取人 ID (選填)</label>
+                    <input type="text" x-model="dispenseForm.personId" placeholder="例：P0001" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-green-500">
                 </div>
                 <button @click="submitDispense()" :disabled="!dispenseForm.itemCode || !dispenseForm.qty"
-                        class="w-full bg-green-600 text-white py-3 rounded-lg font-bold disabled:opacity-50">
+                        class="w-full bg-green-600 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed">
                     確認發放
                 </button>
             </div>
         </div>
     </div>
 
-    <!-- Register Person Modal -->
-    <div x-show="showRegister" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="showRegister = false">
-            <div class="px-4 py-3 border-b flex items-center justify-between bg-purple-700 text-white">
-                <h3 class="font-bold">人員登記</h3>
-                <button @click="showRegister = false" class="p-1">&times;</button>
-            </div>
-            <div class="p-4 space-y-4">
-                <div class="bg-purple-50 rounded-lg px-4 py-3 text-center">
-                    <p class="text-sm text-purple-600">將分配 ID</p>
-                    <p class="text-2xl font-bold text-purple-800" x-text="nextPersonId"></p>
+    <!-- Report Modal -->
+    <div x-show="showReport" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="showReport = false">
+            <div class="px-4 py-4 border-b flex items-center justify-between bg-amber-500 text-white">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <h3 class="font-bold text-lg">產生回報</h3>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
-                    <input type="text" x-model="registerForm.name" class="w-full border rounded-lg px-3 py-2">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">備註 (選填)</label>
-                    <textarea x-model="registerForm.notes" rows="2" class="w-full border rounded-lg px-3 py-2"></textarea>
-                </div>
-                <button @click="submitRegister()" :disabled="!registerForm.name"
-                        class="w-full bg-purple-600 text-white py-3 rounded-lg font-bold disabled:opacity-50">
-                    確認登記
+                <button @click="showReport = false" class="p-1 hover:bg-amber-400 rounded">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </button>
             </div>
-        </div>
-    </div>
-
-    <!-- Generate Report Modal -->
-    <div x-show="showGenerateReport" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="showGenerateReport = false">
-            <div class="px-4 py-3 border-b flex items-center justify-between bg-amber-600 text-white">
-                <h3 class="font-bold">產生回報封包</h3>
-                <button @click="showGenerateReport = false" class="p-1">&times;</button>
-            </div>
-            <div class="p-4">
+            <div class="p-4 overflow-y-auto max-h-[70vh]">
                 <div x-show="!reportQRChunks" class="space-y-4">
-                    <div class="bg-amber-50 rounded-lg p-4 text-center">
-                        <p class="text-3xl font-bold text-amber-600" x-text="stats.pendingActions"></p>
-                        <p class="text-sm text-amber-700">待同步動作</p>
+                    <div class="bg-amber-50 rounded-xl p-6 text-center">
+                        <div class="text-4xl font-bold text-amber-600" x-text="stats.pendingActions"></div>
+                        <div class="text-sm text-amber-700 mt-1">待同步動作</div>
                     </div>
-                    <p class="text-sm text-gray-600 text-center">
-                        將待同步的動作打包成加密 QR Code，<br>交由 Runner 帶回 Hub。
+                    <p class="text-sm text-gray-600 text-center leading-relaxed">
+                        將待同步的動作打包成加密 QR Code，交由 Runner 帶回 Hub。
                     </p>
                     <button @click="generateReport()" :disabled="stats.pendingActions === 0"
-                            class="w-full bg-amber-600 text-white py-3 rounded-lg font-bold disabled:opacity-50">
+                            class="w-full bg-amber-500 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed">
                         產生 QR Code
                     </button>
                 </div>
 
                 <div x-show="reportQRChunks" class="space-y-4">
                     <div class="text-center">
-                        <p class="text-sm text-gray-500 mb-2">
-                            <span x-text="currentChunkIndex + 1"></span> / <span x-text="reportQRChunks?.length || 0"></span>
+                        <p class="text-sm text-gray-500 mb-3">
+                            第 <span class="font-bold" x-text="currentChunkIndex + 1"></span> / <span x-text="reportQRChunks?.length || 0"></span> 頁
                         </p>
-                        <div id="report-qr" class="qr-container flex justify-center"></div>
-                        <p class="mt-2 font-mono text-xs text-gray-400" x-text="currentPacketId"></p>
+                        <div id="report-qr" class="qr-container flex justify-center bg-white p-4 rounded-xl border"></div>
+                        <p class="mt-3 font-mono text-xs text-gray-400" x-text="currentPacketId"></p>
                     </div>
 
                     <div x-show="reportQRChunks?.length > 1" class="flex justify-center gap-4">
                         <button @click="prevChunk()" :disabled="currentChunkIndex === 0"
-                                class="px-4 py-2 border rounded-lg disabled:opacity-50">
-                            ← 上一頁
+                                class="px-6 py-2 border-2 border-gray-300 rounded-lg font-medium disabled:opacity-50">
+                            上一頁
                         </button>
                         <button @click="nextChunk()" :disabled="currentChunkIndex >= reportQRChunks.length - 1"
-                                class="px-4 py-2 border rounded-lg disabled:opacity-50">
-                            下一頁 →
+                                class="px-6 py-2 border-2 border-gray-300 rounded-lg font-medium disabled:opacity-50">
+                            下一頁
                         </button>
                     </div>
 
-                    <button @click="markReportDelivered()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold">
+                    <button @click="markReportDelivered()" class="w-full bg-green-600 text-white py-4 rounded-xl font-bold">
                         Runner 已掃描完成
                     </button>
 
@@ -445,49 +673,99 @@
         </div>
     </div>
 
+    <!-- Register Modal -->
+    <div x-show="showRegister" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="showRegister = false">
+            <div class="px-4 py-4 border-b flex items-center justify-between bg-purple-600 text-white">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                    </svg>
+                    <h3 class="font-bold text-lg">人員登記</h3>
+                </div>
+                <button @click="showRegister = false" class="p-1 hover:bg-purple-500 rounded">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
+                <div class="bg-purple-50 rounded-xl px-4 py-4 text-center">
+                    <p class="text-sm text-purple-600 mb-1">將分配 ID</p>
+                    <p class="text-3xl font-bold text-purple-800" x-text="nextPersonId"></p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">姓名</label>
+                    <input type="text" x-model="registerForm.name" placeholder="請輸入姓名" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">備註 (選填)</label>
+                    <textarea x-model="registerForm.notes" rows="2" placeholder="特殊需求、聯絡方式等" class="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-purple-500"></textarea>
+                </div>
+                <button @click="submitRegister()" :disabled="!registerForm.name"
+                        class="w-full bg-purple-600 text-white py-4 rounded-xl font-bold text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                    確認登記
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Settings Modal -->
     <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" @click.away="showSettings = false">
-            <div class="px-4 py-3 border-b flex items-center justify-between bg-gray-800 text-white sticky top-0">
-                <h3 class="font-bold">Station 設定</h3>
-                <button @click="showSettings = false" class="p-1">&times;</button>
-            </div>
-            <div class="p-4 space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Station ID</label>
-                    <input type="text" x-model="settingsForm.stationId" placeholder="例：STATION-PARK" class="w-full border rounded-lg px-3 py-2">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="showSettings = false">
+            <div class="px-4 py-4 border-b flex items-center justify-between bg-gray-800 text-white sticky top-0">
+                <div class="flex items-center gap-3">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                    <h3 class="font-bold text-lg">設定</h3>
                 </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">顯示名稱</label>
-                    <input type="text" x-model="settingsForm.displayName" placeholder="例：公園站" class="w-full border rounded-lg px-3 py-2">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Station Secret (HMAC)</label>
-                    <textarea x-model="settingsForm.stationSecret" rows="2" placeholder="Base64 encoded" class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Hub 簽章公鑰 (Ed25519)</label>
-                    <textarea x-model="settingsForm.hubPublicKey" rows="2" placeholder="Base64 encoded" class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">Hub 加密公鑰 (X25519)</label>
-                    <textarea x-model="settingsForm.hubEncryptionKey" rows="2" placeholder="Base64 encoded" class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
-                </div>
-
-                <button @click="saveSettings()" class="w-full bg-station-600 text-white py-3 rounded-lg font-bold">
-                    儲存設定
+                <button @click="showSettings = false" class="p-1 hover:bg-gray-700 rounded">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
                 </button>
+            </div>
+            <div class="p-4 space-y-4 overflow-y-auto max-h-[70vh]">
+                <!-- Station Info -->
+                <div class="bg-gray-50 rounded-xl p-4 space-y-3">
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Station ID</span>
+                        <span class="font-medium font-mono" x-text="config?.stationId || '-'"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">顯示名稱</span>
+                        <span class="font-medium" x-text="config?.displayName || '-'"></span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">類型</span>
+                        <span class="font-medium text-station-600">物資站</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-500">Hub URL</span>
+                        <span class="font-medium text-sm truncate max-w-[180px]" x-text="config?.hubUrl || '-'"></span>
+                    </div>
+                </div>
 
-                <div class="border-t pt-4 space-y-2">
-                    <button @click="exportData()" class="w-full border border-gray-300 py-2 rounded-lg text-gray-700">
+                <!-- Actions -->
+                <div class="space-y-3">
+                    <button @click="exportData()" class="w-full border-2 border-gray-300 py-3 rounded-xl text-gray-700 font-medium flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                        </svg>
                         匯出資料備份
                     </button>
-                    <button @click="clearAllData()" class="w-full border border-red-300 py-2 rounded-lg text-red-600">
-                        清除所有資料
+
+                    <button @click="resetStation()" class="w-full border-2 border-red-300 py-3 rounded-xl text-red-600 font-medium flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        重置站點
                     </button>
                 </div>
 
-                <p class="text-center text-xs text-gray-400">xIRS Station v1.8.0</p>
+                <p class="text-center text-xs text-gray-400 pt-4">xIRS Station v2.3.0</p>
             </div>
         </div>
     </div>
@@ -501,12 +779,12 @@
          x-transition:leave-start="opacity-100"
          x-transition:leave-end="opacity-0"
          class="fixed bottom-24 left-4 right-4 z-50">
-        <div class="rounded-lg px-4 py-3 shadow-lg text-white text-center"
+        <div class="rounded-xl px-4 py-3 shadow-lg text-white text-center font-medium"
              :class="{
                  'bg-green-600': toast.type === 'success',
                  'bg-red-600': toast.type === 'error',
-                 'bg-amber-600': toast.type === 'warning',
-                 'bg-blue-600': toast.type === 'info'
+                 'bg-amber-500': toast.type === 'warning',
+                 'bg-station-600': toast.type === 'info'
              }"
              x-text="toast.message">
         </div>
@@ -515,7 +793,18 @@
     <script>
         function stationApp() {
             return {
-                // State
+                // Pairing State
+                isPaired: false,
+                onboardingStep: 1,
+                pairingStatus: 'idle',
+                pairingMessage: '',
+                pairingScanner: null,
+                manualPairing: {
+                    hubUrl: '',
+                    code: ''
+                },
+
+                // App State
                 isOnline: navigator.onLine,
                 currentTab: 'home',
                 config: null,
@@ -528,44 +817,35 @@
                 },
 
                 // Modals
-                showScanManifest: false,
+                showReceive: false,
                 showDispense: false,
+                showReport: false,
                 showRegister: false,
-                showGenerateReport: false,
                 showSettings: false,
 
-                // Scan manifest
-                manifestScanner: null,
-                manifestResult: null,
+                // Receive
+                receiveScanner: null,
+                receiveResult: null,
                 manualShortCode: '',
 
-                // Dispense form
+                // Dispense
                 dispenseForm: {
                     itemCode: '',
                     qty: 1,
                     personId: ''
                 },
 
-                // Register form
+                // Register
                 registerForm: {
                     name: '',
                     notes: ''
                 },
                 nextPersonId: 'P0001',
 
-                // Report generation
+                // Report
                 reportQRChunks: null,
                 currentChunkIndex: 0,
                 currentPacketId: '',
-
-                // Settings form
-                settingsForm: {
-                    stationId: '',
-                    displayName: '',
-                    stationSecret: '',
-                    hubPublicKey: '',
-                    hubEncryptionKey: ''
-                },
 
                 // Toast
                 toast: {
@@ -580,21 +860,146 @@
                     window.addEventListener('online', () => this.isOnline = true);
                     window.addEventListener('offline', () => this.isOnline = false);
 
-                    // Load config
+                    // Check if paired
                     this.config = xIRS.StationConfig.load();
-                    if (this.config) {
-                        this.settingsForm = { ...this.config };
+                    this.isPaired = xIRS.StationConfig.isPaired();
+
+                    if (this.isPaired) {
+                        // Initialize database
+                        await xIRS.StationDB.init();
+                        await this.refreshData();
+                    } else {
+                        // Start pairing scanner when step 2 is shown
+                        this.$watch('onboardingStep', (step) => {
+                            if (step === 2) {
+                                this.$nextTick(() => this.startPairingScanner());
+                            } else {
+                                this.stopPairingScanner();
+                            }
+                        });
                     }
 
-                    // Initialize database
-                    await xIRS.StationDB.init();
-
-                    // Load data
-                    await this.refreshData();
-
-                    console.log('[Station] Initialized');
+                    console.log('[Station] v2.3 Initialized');
                 },
 
+                // Pairing Flow
+                startPairingScanner() {
+                    const element = document.getElementById('pairing-scanner');
+                    if (!element) return;
+
+                    this.pairingScanner = new Html5Qrcode("pairing-scanner");
+                    this.pairingScanner.start(
+                        { facingMode: "environment" },
+                        { fps: 10, qrbox: { width: 250, height: 250 } },
+                        (decodedText) => this.onPairingQRScanned(decodedText),
+                        () => {}
+                    ).catch(err => {
+                        console.error('[Pairing Scanner] Error:', err);
+                    });
+                },
+
+                stopPairingScanner() {
+                    if (this.pairingScanner) {
+                        this.pairingScanner.stop().catch(() => {});
+                        this.pairingScanner = null;
+                    }
+                },
+
+                async onPairingQRScanned(qrData) {
+                    this.stopPairingScanner();
+                    this.pairingStatus = 'connecting';
+                    this.pairingMessage = '解析 QR Code...';
+
+                    // Parse QR
+                    const parsed = xIRS.PairingQR.parse(qrData);
+                    if (!parsed.valid) {
+                        this.pairingStatus = 'error';
+                        this.pairingMessage = parsed.error;
+                        return;
+                    }
+
+                    const { invite } = parsed;
+
+                    // Check station type
+                    if (invite.stationType !== 'SUPPLY') {
+                        this.pairingStatus = 'error';
+                        this.pairingMessage = '此 QR Code 是藥局站配對碼，請使用 /pharmacy/';
+                        return;
+                    }
+
+                    this.pairingMessage = `連線至 ${invite.hubUrl}...`;
+
+                    // Call pairing API
+                    const result = await xIRS.PairingAPI.pair(invite.hubUrl, invite.pairingCode);
+
+                    if (!result.success) {
+                        this.pairingStatus = 'error';
+                        this.pairingMessage = result.error;
+                        return;
+                    }
+
+                    // Save config
+                    xIRS.StationConfig.save(result.config);
+                    this.config = result.config;
+                    this.onboardingStep = 3;
+                    this.pairingStatus = 'idle';
+                },
+
+                async pairManually() {
+                    const { hubUrl, code } = this.manualPairing;
+                    if (!hubUrl || code.length < 6) return;
+
+                    this.pairingStatus = 'connecting';
+                    this.pairingMessage = `連線至 ${hubUrl}...`;
+
+                    const result = await xIRS.PairingAPI.pair(hubUrl, code);
+
+                    if (!result.success) {
+                        this.pairingStatus = 'error';
+                        this.pairingMessage = result.error;
+                        return;
+                    }
+
+                    xIRS.StationConfig.save(result.config);
+                    this.config = result.config;
+                    this.onboardingStep = 3;
+                    this.pairingStatus = 'idle';
+                },
+
+                async importOfflineConfig(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+
+                    try {
+                        const content = await file.text();
+                        const result = xIRS.OfflineConfig.parse(content);
+
+                        if (!result.valid) {
+                            this.showToast(result.error, 'error');
+                            return;
+                        }
+
+                        xIRS.StationConfig.save(result.config);
+                        this.config = result.config;
+                        this.onboardingStep = 3;
+                    } catch (e) {
+                        this.showToast('無法讀取檔案', 'error');
+                    }
+                },
+
+                resetPairing() {
+                    this.pairingStatus = 'idle';
+                    this.pairingMessage = '';
+                    this.$nextTick(() => this.startPairingScanner());
+                },
+
+                async finishOnboarding() {
+                    this.isPaired = true;
+                    await xIRS.StationDB.init();
+                    await this.refreshData();
+                },
+
+                // Data Loading
                 async refreshData() {
                     await this.refreshInventory();
                     await this.refreshActions();
@@ -624,60 +1029,57 @@
                     this.nextPersonId = await xIRS.StationDB.generatePersonId();
                 },
 
-                // Scan Manifest
-                openScanManifest() {
-                    this.showScanManifest = true;
-                    this.manifestResult = null;
+                // Receive
+                openReceive() {
+                    this.showReceive = true;
+                    this.receiveResult = null;
                     this.manualShortCode = '';
-
-                    this.$nextTick(() => {
-                        this.startManifestScanner();
-                    });
+                    this.$nextTick(() => this.startReceiveScanner());
                 },
 
-                closeScanManifest() {
-                    this.stopManifestScanner();
-                    this.showScanManifest = false;
+                closeReceive() {
+                    this.stopReceiveScanner();
+                    this.showReceive = false;
                 },
 
-                startManifestScanner() {
-                    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                startReceiveScanner() {
+                    const element = document.getElementById('receive-scanner');
+                    if (!element) return;
 
-                    this.manifestScanner = new Html5Qrcode("manifest-scanner");
-                    this.manifestScanner.start(
+                    this.receiveScanner = new Html5Qrcode("receive-scanner");
+                    this.receiveScanner.start(
                         { facingMode: "environment" },
-                        config,
-                        (decodedText) => this.onManifestScanned(decodedText),
+                        { fps: 10, qrbox: { width: 250, height: 250 } },
+                        (decodedText) => this.onReceiveScanned(decodedText),
                         () => {}
                     ).catch(err => {
-                        console.error('[Scanner] Error:', err);
+                        console.error('[Receive Scanner] Error:', err);
                         this.showToast('無法啟動相機', 'error');
                     });
                 },
 
-                stopManifestScanner() {
-                    if (this.manifestScanner) {
-                        this.manifestScanner.stop().catch(() => {});
-                        this.manifestScanner = null;
+                stopReceiveScanner() {
+                    if (this.receiveScanner) {
+                        this.receiveScanner.stop().catch(() => {});
+                        this.receiveScanner = null;
                     }
                 },
 
-                async onManifestScanned(decodedText) {
-                    this.stopManifestScanner();
+                async onReceiveScanned(decodedText) {
+                    this.stopReceiveScanner();
 
                     if (!this.config?.hubPublicKey) {
-                        this.manifestResult = { valid: false, error: '未設定 Hub 公鑰' };
+                        this.receiveResult = { valid: false, error: '未設定 Hub 公鑰' };
                         return;
                     }
 
                     const result = xIRS.ManifestParser.parseFromQR(decodedText, this.config.hubPublicKey);
-                    this.manifestResult = result;
+                    this.receiveResult = result;
 
                     if (result.valid) {
-                        // Check if already processed
                         const processed = await xIRS.StationDB.isManifestProcessed(result.manifest.manifest_id);
                         if (processed) {
-                            this.manifestResult = { valid: false, error: '此清單已處理過' };
+                            this.receiveResult = { valid: false, error: '此清單已處理過' };
                         }
                     }
                 },
@@ -688,8 +1090,8 @@
                         return;
                     }
 
-                    // Manual codes are treated as unverified claims
-                    this.manifestResult = {
+                    this.stopReceiveScanner();
+                    this.receiveResult = {
                         valid: true,
                         manifest: {
                             manifest_id: `MANUAL-${this.manualShortCode}-${Date.now()}`,
@@ -703,18 +1105,14 @@
                     this.showToast('短碼已輸入，請手動確認物資', 'warning');
                 },
 
-                async confirmManifest() {
-                    if (!this.manifestResult?.valid) return;
+                async confirmReceive() {
+                    if (!this.receiveResult?.valid) return;
 
-                    const manifest = this.manifestResult.manifest;
+                    const manifest = this.receiveResult.manifest;
 
-                    // Update inventory
                     await xIRS.StationDB.bulkUpdateInventory(manifest.items, 'add');
-
-                    // Record manifest
                     await xIRS.StationDB.recordManifest(manifest);
 
-                    // Queue receive actions
                     for (const item of manifest.items) {
                         const action = xIRS.ActionBuilder.receive(
                             item.code, item.qty, item.unit, manifest.manifest_id
@@ -724,7 +1122,7 @@
 
                     await this.refreshData();
                     this.showToast(`已收貨 ${manifest.items.length} 項物資`, 'success');
-                    this.closeScanManifest();
+                    this.closeReceive();
                 },
 
                 // Dispense
@@ -736,7 +1134,6 @@
                 async submitDispense() {
                     const { itemCode, qty, personId } = this.dispenseForm;
 
-                    // Update inventory
                     try {
                         await xIRS.StationDB.adjustQuantity(itemCode, -qty);
                     } catch (e) {
@@ -744,7 +1141,6 @@
                         return;
                     }
 
-                    // Queue action
                     const action = xIRS.ActionBuilder.dispense(itemCode, qty, 'unit', personId);
                     await xIRS.StationDB.queueAction(action);
 
@@ -753,36 +1149,9 @@
                     this.showDispense = false;
                 },
 
-                // Register
-                openRegister() {
-                    this.showRegister = true;
-                    this.registerForm = { name: '', notes: '' };
-                },
-
-                async submitRegister() {
-                    const personId = this.nextPersonId;
-
-                    // Register person
-                    await xIRS.StationDB.registerPerson({
-                        id: personId,
-                        name: this.registerForm.name,
-                        notes: this.registerForm.notes
-                    });
-
-                    // Queue action
-                    const action = xIRS.ActionBuilder.register(personId, {
-                        name: this.registerForm.name
-                    });
-                    await xIRS.StationDB.queueAction(action);
-
-                    await this.refreshData();
-                    this.showToast(`已登記 ${personId}: ${this.registerForm.name}`, 'success');
-                    this.showRegister = false;
-                },
-
-                // Generate Report
-                openGenerateReport() {
-                    this.showGenerateReport = true;
+                // Report
+                openReport() {
+                    this.showReport = true;
                     this.reportQRChunks = null;
                     this.currentChunkIndex = 0;
                 },
@@ -799,7 +1168,6 @@
                         return;
                     }
 
-                    // Build report
                     const builder = new xIRS.ReportBuilder(
                         this.config.stationId,
                         this.config.stationSecret,
@@ -817,18 +1185,12 @@
 
                     const report = await builder.createReport(actions);
                     this.currentPacketId = report.packet_id;
-
-                    // Get encrypted chunks
                     this.reportQRChunks = builder.toEncryptedChunks(report);
 
-                    // Store report
                     const envelope = builder.encryptReport(report);
                     await xIRS.StationDB.storeReport(report.packet_id, envelope, this.reportQRChunks);
 
-                    // Render first QR
-                    this.$nextTick(() => {
-                        this.renderQRCode();
-                    });
+                    this.$nextTick(() => this.renderQRCode());
                 },
 
                 renderQRCode() {
@@ -843,9 +1205,7 @@
                         margin: 2,
                         errorCorrectionLevel: 'L'
                     }, (err, canvas) => {
-                        if (!err) {
-                            container.appendChild(canvas);
-                        }
+                        if (!err) container.appendChild(canvas);
                     });
                 },
 
@@ -864,27 +1224,43 @@
                 },
 
                 async markReportDelivered() {
-                    // Mark report as delivered
                     await xIRS.StationDB.markReportDelivered(this.currentPacketId);
 
-                    // Mark actions as synced
                     const pending = await xIRS.StationDB.getPendingActions();
                     const ids = pending.map(a => a.id);
                     await xIRS.StationDB.markActionsSynced(ids);
 
                     await this.refreshData();
                     this.showToast('報告已交付 Runner', 'success');
-                    this.showGenerateReport = false;
+                    this.showReport = false;
+                },
+
+                // Register
+                openRegister() {
+                    this.showRegister = true;
+                    this.registerForm = { name: '', notes: '' };
+                },
+
+                async submitRegister() {
+                    const personId = this.nextPersonId;
+
+                    await xIRS.StationDB.registerPerson({
+                        id: personId,
+                        name: this.registerForm.name,
+                        notes: this.registerForm.notes
+                    });
+
+                    const action = xIRS.ActionBuilder.register(personId, {
+                        name: this.registerForm.name
+                    });
+                    await xIRS.StationDB.queueAction(action);
+
+                    await this.refreshData();
+                    this.showToast(`已登記 ${personId}: ${this.registerForm.name}`, 'success');
+                    this.showRegister = false;
                 },
 
                 // Settings
-                async saveSettings() {
-                    xIRS.StationConfig.save(this.settingsForm);
-                    this.config = { ...this.settingsForm };
-                    this.showToast('設定已儲存', 'success');
-                    this.showSettings = false;
-                },
-
                 async exportData() {
                     const data = await xIRS.StationDB.exportAll();
                     const json = JSON.stringify(data, null, 2);
@@ -898,15 +1274,17 @@
                     this.showToast('資料已匯出', 'success');
                 },
 
-                async clearAllData() {
-                    if (!confirm('確定要清除所有資料嗎？此操作無法復原。')) return;
+                async resetStation() {
+                    if (!confirm('確定要重置站點嗎？所有資料將被清除。')) return;
+                    if (!confirm('此操作無法復原，確定要繼續？')) return;
 
                     await xIRS.StationDB.clearAll();
                     xIRS.StationConfig.clear();
                     this.config = null;
-                    await this.refreshData();
-                    this.showToast('所有資料已清除', 'info');
+                    this.isPaired = false;
+                    this.onboardingStep = 1;
                     this.showSettings = false;
+                    this.showToast('站點已重置', 'info');
                 },
 
                 // Helpers
@@ -923,9 +1301,7 @@
 
                 showToast(message, type = 'info') {
                     this.toast = { show: true, message, type };
-                    setTimeout(() => {
-                        this.toast.show = false;
-                    }, 3000);
+                    setTimeout(() => this.toast.show = false, 3000);
                 }
             };
         }

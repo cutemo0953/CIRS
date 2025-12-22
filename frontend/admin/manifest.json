@@ -4,8 +4,8 @@
   "description": "社區災害物資與人員管理系統",
   "start_url": "/admin/",
   "display": "standalone",
-  "background_color": "#e0f2f1",
-  "theme_color": "#00897b",
+  "background_color": "#eaf3d7",
+  "theme_color": "#4c826b",
   "orientation": "portrait-primary",
   "icons": [
     {

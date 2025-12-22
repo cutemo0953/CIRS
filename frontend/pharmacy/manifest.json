@@ -1,13 +1,13 @@
 {
-  "name": "xIRS Station - 物資站",
-  "short_name": "物資站",
-  "description": "xIRS 離線物資管理 - 收發、盤點、人員登記",
-  "start_url": "/station/",
+  "name": "xIRS Pharmacy - 藥局站",
+  "short_name": "藥局站",
+  "description": "xIRS 離線藥局管理 - 處方驗證、發藥、臨床紀錄",
+  "start_url": "/pharmacy/",
   "display": "standalone",
-  "background_color": "#0d9488",
-  "theme_color": "#0d9488",
+  "background_color": "#4f46e5",
+  "theme_color": "#4f46e5",
   "orientation": "portrait",
-  "scope": "/station/",
+  "scope": "/pharmacy/",
   "icons": [
     {
       "src": "icons/icon-72x72.png",
@@ -51,6 +51,6 @@
       "type": "image/png"
     }
   ],
-  "categories": ["productivity", "utilities"],
+  "categories": ["medical", "productivity"],
   "lang": "zh-TW"
 }

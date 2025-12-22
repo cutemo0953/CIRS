@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="theme-color" content="#00897b">
+    <meta name="theme-color" content="#4c826b">
     <title>CIRS - 社區韌性物資管理</title>
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="/frontend/assets/icons/icon-192.png">
@@ -18,16 +18,12 @@
             theme: {
                 extend: {
                     colors: {
-                        // xIRS v2.0: Teal + Deep Blue color scheme
+                        // CIRS: Original muted green color scheme
                         primary: {
-                            100: '#e0f2f1',  // Light teal background
-                            400: '#4db6ac',  // Teal medium
-                            600: '#00897b',  // Teal main
-                            700: '#00796b',  // Teal dark
-                        },
-                        accent: {
-                            600: '#1e3a5f',  // Deep blue
-                            700: '#0d2840',  // Darker blue
+                            100: '#eaf3d7',  // Light green background
+                            400: '#a6c3ac',  // Green medium
+                            600: '#4c826b',  // Green main
+                            700: '#3d6a58',  // Green dark
                         }
                     }
                 }
@@ -36,7 +32,7 @@
     </script>
     <style>
         [x-cloak] { display: none !important; }
-        .tab-active { background-color: #00897b; color: white; }
+        .tab-active { background-color: #4c826b; color: white; }
         .bottom-nav { padding-bottom: env(safe-area-inset-bottom); }
         .card-press:active { transform: scale(0.98); }
         input, select, textarea { font-size: 16px !important; }
