@@ -138,7 +138,7 @@ db_lock = threading.Lock()
 
 def get_connection():
     conn = sqlite3.connect(
-        "data/cirs.db",
+        "data/xirs_hub.db",  # v2.0+, auto-migrates from cirs.db
         check_same_thread=False,
         timeout=30.0  # 等待 Lock 最多 30 秒
     )
@@ -1120,7 +1120,7 @@ async function handleImageUpload(file) {
 │   ├── database.py          # SQLite 連線
 │   ├── requirements.txt
 │   └── data/
-│       └── cirs.db          # SQLite 檔案
+│       └── xirs_hub.db      # SQLite 檔案 (v2.0+)
 │
 ├── frontend/
 │   ├── index.html           # PWA 主檔案
@@ -1671,7 +1671,7 @@ Raspberry Pi SD 卡空間有限，需要自動備份與清理機制。
 │  │  SD Card        │                                   │
 │  │  /home/pi/CIRS/ │                                   │
 │  │  └─ data/       │                                   │
-│  │     └─ cirs.db  │  ←── 主資料庫 (即時寫入)          │
+│  │     └─ xirs_hub.db  ←── 主資料庫 (v2.0+, 即時寫入)  │
 │  └────────┬────────┘                                   │
 │           │ 每日備份                                    │
 │           ▼                                             │
@@ -1679,8 +1679,8 @@ Raspberry Pi SD 卡空間有限，需要自動備份與清理機制。
 │  │  USB 外接硬碟    │                                   │
 │  │  /mnt/backup/   │                                   │
 │  │  └─ cirs/       │                                   │
-│  │     ├─ 2024-12-08_cirs.db                          │
-│  │     ├─ 2024-12-07_cirs.db                          │
+│  │     ├─ 2024-12-08_xirs_hub.db                      │
+│  │     ├─ 2024-12-07_xirs_hub.db                      │
 │  │     └─ ...      │  ←── 保留 30 天                   │
 │  └─────────────────┘                                   │
 └─────────────────────────────────────────────────────────┘
@@ -1692,8 +1692,8 @@ Raspberry Pi SD 卡空間有限，需要自動備份與清理機制。
 #!/bin/bash
 # /home/pi/CIRS/scripts/backup.sh
 
-# 設定
-CIRS_DB="/home/pi/CIRS/backend/data/cirs.db"
+# 設定 (v2.0+: xirs_hub.db, auto-migrates from cirs.db)
+CIRS_DB="/home/pi/CIRS/backend/data/xirs_hub.db"
 BACKUP_DIR="/mnt/backup/cirs"
 RETENTION_DAYS=30
 DATE=$(date +%Y-%m-%d)
@@ -1708,22 +1708,22 @@ fi
 mkdir -p "$BACKUP_DIR"
 
 # 備份 SQLite (使用 .backup 確保一致性)
-sqlite3 "$CIRS_DB" ".backup '$BACKUP_DIR/${DATE}_cirs.db'"
+sqlite3 "$CIRS_DB" ".backup '$BACKUP_DIR/${DATE}_xirs_hub.db'"
 
 # 壓縮備份
-gzip -f "$BACKUP_DIR/${DATE}_cirs.db"
+gzip -f "$BACKUP_DIR/${DATE}_xirs_hub.db"
 
 # 清理舊備份 (保留 30 天)
 find "$BACKUP_DIR" -name "*.db.gz" -mtime +$RETENTION_DAYS -delete
 
 # 記錄
-echo "$(date): 備份完成 - ${DATE}_cirs.db.gz" >> "$BACKUP_DIR/backup.log"
+echo "$(date): 備份完成 - ${DATE}_xirs_hub.db.gz" >> "$BACKUP_DIR/backup.log"
 ```
 
 ### 15.5 自動清理機制
 
 ```sql
--- 清理策略 (加入 cirs.db)
+-- 清理策略 (xirs_hub.db)
 
 -- 1. EventLog: 保留 90 天
 DELETE FROM event_log
@@ -1744,7 +1744,7 @@ AND created_at < datetime('now', '-3 days');
 #!/bin/bash
 # /home/pi/CIRS/scripts/cleanup.sh
 
-CIRS_DB="/home/pi/CIRS/backend/data/cirs.db"
+CIRS_DB="/home/pi/CIRS/backend/data/xirs_hub.db"
 
 echo "開始清理..."
 
@@ -1810,10 +1810,10 @@ sudo chown -R pi:pi /mnt/backup
 sudo systemctl stop cirs
 
 # 2. 備份當前資料庫 (以防萬一)
-cp /home/pi/CIRS/backend/data/cirs.db /home/pi/CIRS/backend/data/cirs.db.broken
+cp /home/pi/CIRS/backend/data/xirs_hub.db /home/pi/CIRS/backend/data/xirs_hub.db.broken
 
 # 3. 解壓縮備份
-gunzip -c /mnt/backup/cirs/2024-12-07_cirs.db.gz > /home/pi/CIRS/backend/data/cirs.db
+gunzip -c /mnt/backup/cirs/2024-12-07_xirs_hub.db.gz > /home/pi/CIRS/backend/data/xirs_hub.db
 
 # 4. 重啟服務
 sudo systemctl start cirs
@@ -1902,7 +1902,7 @@ curl http://localhost:8091/api/stats
 - [x] 人員狀態統計
 - [x] 前端 Dashboard 整合
 
-### Phase 8: Satellite PWA ✅ (v1.2)
+### Phase 8: Satellite PWA ✅ (v1.4)
 - [x] QR Code 配對機制
 - [x] URL Token 連接
 - [x] 離線暫存 (IndexedDB)
@@ -1919,6 +1919,13 @@ curl http://localhost:8091/api/stats
 - [x] v1.2: 智慧貼上 (自動解析 pairing_code URL、自動分離 Hub URL 與配對碼)
 - [x] v1.2: 配對後角色選擇 (志工/管理員)
 - [x] v1.2: 設定頁角色顯示與切換功能
+- [x] v1.3: 6-digit numeric code + rate limiting (5 attempts/min)
+- [x] v1.3.1: Role control in pairing codes (allowed_roles)
+- [x] v1.4: Device registration (satellite_devices table)
+- [x] v1.4: Device revocation/unrevoke endpoints
+- [x] v1.4: Device blacklist (permanent block)
+- [x] v1.4: Device list endpoint for admin
+- [x] v1.4: Last activity tracking
 - [ ] MIRS Satellite 支援
 
 ### Phase 9: xIRS Secure Exchange ✅ (v2.0)
@@ -2105,6 +2112,29 @@ Satellite PWA 讓志工手機成為「傳令兵」，透過 WiFi 連接 Hub（Ra
 - [x] 庫存查詢介面 (分類篩選、離線快取)
 - [x] Portal 綠色主題配色 (#4c826b)
 - [x] iOS Fallback (Pending 指示器 + Sync Now)
+
+**v1.3 安全強化 (2025-12)**
+- [x] 6-digit numeric pairing code (取代字母混合)
+- [x] Rate limiting (5 attempts/min per IP)
+- [x] Role control in pairing codes (allowed_roles: volunteer, admin)
+
+**v1.4 裝置管理 (2025-12-20)**
+- [x] satellite_devices 資料表 (裝置註冊)
+- [x] Device registration on exchange
+- [x] Device revocation (暫時禁止，可重新配對)
+- [x] Device blacklist (永久禁止)
+- [x] Admin device list endpoint
+- [x] Last activity tracking
+
+**v1.4 API Endpoints:**
+```
+GET  /api/auth/satellite/devices        # 列出所有裝置 (admin)
+POST /api/auth/satellite/devices/revoke # 撤銷裝置
+POST /api/auth/satellite/devices/unrevoke # 恢復裝置
+POST /api/auth/satellite/devices/blacklist # 永久禁止
+POST /api/auth/satellite/devices/unblacklist # 解除黑名單
+PATCH /api/auth/satellite/devices/{id}  # 更新裝置名稱
+```
 
 ### 20.4 相關文件
 

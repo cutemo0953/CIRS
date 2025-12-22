@@ -1,12 +1,14 @@
 # CIRS - Community Inventory Resilience System
 
-> 社區韌性物資管理系統 v1.7.1
+> 社區韌性物資管理系統 v2.0 (xIRS Hub)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
 ## 概述
 
 CIRS 是社區級災難韌性管理系統，整合物資管理、人員報到、檢傷分類、互助通訊等功能。設計用於 Raspberry Pi 部署，支援離線運作。
+
+**v2.0 重大更新**: xIRS 分散式物流系統 - 支援多站點離線協作
 
 ### 核心功能
 
@@ -22,33 +24,38 @@ CIRS 是社區級災難韌性管理系統，整合物資管理、人員報到、
 | **HIRS 同步** | 發放物資 QR Code 同步到個人 HIRS |
 | **MIRS 連結** | RED/YELLOW 傷患可連結至 MIRS 處置記錄 |
 | **Satellite PWA** | 志工行動 App，支援離線報到/物資領取 |
-| **xIRS 安全交換** | 國防級端對端加密 USB 資料傳輸 (v2.0) |
+| **xIRS 分散式物流** | 多站點離線協作、USB 安全交換 (v2.0) |
 
-### v1.7 新功能：xIRS 安全資料交換
+### v2.0 新功能：xIRS 分散式物流
 
-xIRS (Cross-IRS) 是專為離線 USB 傳輸設計的安全通訊協議：
+xIRS (Cross-IRS) 是專為離線環境設計的分散式物流系統：
 
+- **多站點架構** - Hub (管理中心) + Station (分站) + Runner (物資運送)
+- **離線優先** - Store-and-forward 模型，無需即時網路
 - **端對端加密** - Curve25519 + XSalsa20-Poly1305
 - **數位簽章** - Ed25519 防竄改驗證
-- **防重放攻擊** - UUID + 時間戳 + 已處理清單
-- **信任名冊** - 只接收已驗證站點的資料
+- **Manifest/Report** - 出貨清單與收貨回報自動對帳
 
-詳見 [xIRS 技術規格](docs/xIRS_SECURE_EXCHANGE_SPEC_v2.md)
+詳見 [xIRS 分散式物流規格](docs/xIRS_DISTRIBUTED_LOGISTICS_SPEC_v1.8.md)
 
 ### 系統架構
 
 ```
 ┌─────────────────────────────────────────────────┐
-│  Raspberry Pi (192.168.x.x) - Hub              │
+│  Raspberry Pi (192.168.x.x) - xIRS Hub         │
 ├─────────────────────────────────────────────────┤
-│  Port 80:   Portal (統一入口)                   │
+│  /admin/   - 管理控制台 (原 /frontend/)         │
+│  /station/ - 分站 PWA                           │
+│  /runner/  - Runner PWA (Blind Carrier)         │
+│  /doctor/  - 醫師 PWA (Lite CPOE)               │
+│  /portal/  - 公開狀態看板                       │
 │  Port 8090: CIRS API (FastAPI)                  │
-│  Port 8000: MIRS (醫療庫存，選配)               │
 └─────────────────────────────────────────────────┘
-              ↑ WiFi / LAN
+              ↑ WiFi / LAN / USB
     ┌─────────┴─────────┐
+    │  Station PWA      │  ← 分站平板
+    │  Runner PWA       │  ← 運送人員手機
     │  Satellite PWA    │  ← 志工手機
-    │  (離線優先)        │     報到/物資領取
     └───────────────────┘
 ```
 
@@ -126,7 +133,7 @@ uvicorn main:app --host 0.0.0.0 --port 8090 --reload
 
 # 6. 開啟瀏覽器測試
 # API 文件: http://localhost:8090/docs
-# 前端介面: http://localhost:8090/frontend
+# 管理控制台: http://localhost:8090/admin
 # Portal 入口: http://localhost:8090/portal
 ```
 
@@ -233,7 +240,7 @@ python init_db.py
 # 5. 啟動後端
 uvicorn main:app --host 0.0.0.0 --port 8090 --reload
 
-# 6. 開啟瀏覽器: http://localhost:8090/frontend
+# 6. 開啟瀏覽器: http://localhost:8090/admin
 ```
 
 ### Raspberry Pi 部署
@@ -306,7 +313,7 @@ sudo systemctl status cirs
 如果是現有部署，需手動新增 staff/medic 帳號：
 
 ```bash
-sqlite3 backend/data/cirs.db "INSERT OR IGNORE INTO person (id, display_name, role, pin_hash) VALUES
+sqlite3 backend/data/xirs_hub.db "INSERT OR IGNORE INTO person (id, display_name, role, pin_hash) VALUES
   ('staff001', '志工小明', 'staff', '\$2b\$12\$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC'),
   ('medic001', '醫護小華', 'medic', '\$2b\$12\$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/X4.V0jlKfM1c4QGPC');"
 ```
@@ -329,7 +336,7 @@ CIRS/
 │   │   └── system.py        # 系統 (時間同步等)
 │   ├── requirements.txt
 │   └── data/
-│       └── cirs.db          # SQLite 資料庫
+│       └── xirs_hub.db      # SQLite 資料庫 (v2.0+, auto-migrates from cirs.db)
 │
 ├── frontend/
 │   ├── index.html           # PWA 主檔案
@@ -384,7 +391,10 @@ CIRS v1.4 採用 Dual-Track 設計，明確分離公共資訊與操作功能：
 | 介面 | 用途 | 使用者 | URL |
 |------|------|--------|-----|
 | **Portal** | 公共資訊看板 | 所有人（無需登入） | `/portal` |
-| **Frontend** | 操作人員控制台 | Staff/Medic/Admin | `/frontend` |
+| **Admin** | 管理控制台 | Staff/Medic/Admin | `/admin` |
+| **Station** | 分站 PWA | Station Lead | `/station` |
+| **Runner** | 運送 PWA | Runner | `/runner` |
+| **Doctor** | 醫師 PWA | Prescriber | `/doctor` |
 
 ### Portal (公共看板)
 - **交通燈狀態系統**：四大指標（收容人數、飲用水、糧食、設備）
@@ -493,6 +503,24 @@ curl http://localhost:8090/api/person/P0001/audit-log
 - 開發任務清單
 
 ## 更新日誌
+
+### v2.0.0 (2025-12-22) - xIRS Distributed Logistics
+- **重大更新**：xIRS 分散式物流系統
+  - Station PWA - 分站物資管理
+  - Runner PWA - Blind Carrier 物資運送
+  - Doctor PWA - Lite CPOE 處方開立
+  - Manifest/Report 離線對帳機制
+- **架構調整**：
+  - 資料庫更名 `cirs.db` → `xirs_hub.db` (自動遷移)
+  - URL 路徑標準化：`/admin/`, `/station/`, `/runner/`, `/doctor/`
+  - `/frontend/` 自動轉向 `/admin/`
+- **UI 更新**：
+  - Admin 控制台改用 Teal + Deep Blue 配色
+  - 扁平化設計，Heroicon 圖示
+- **新增文件**：
+  - [xIRS 分散式物流規格](docs/xIRS_DISTRIBUTED_LOGISTICS_SPEC_v1.8.md)
+  - [xIRS Lite CPOE 規格](docs/xIRS_LITE_CPOE_SPEC_v1.0.md)
+  - [xIRS 架構調整](docs/xIRS_ARCHITECTURE_ADJUSTMENTS_v2.md)
 
 ### v1.7.1 (2025-12-18) - Satellite PWA v1.3.1
 - **新增**：角色控制功能

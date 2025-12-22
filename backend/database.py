@@ -1,7 +1,11 @@
 """
-CIRS Database Connection Module
+xIRS Hub Database Connection Module
 SQLite with WAL mode for concurrent access
 Supports both file-based (production) and in-memory (Vercel demo) modes
+
+Note: Renamed from cirs.db to xirs_hub.db (v2.0)
+- CIRS/MIRS are UI views, not separate databases
+- This is the authoritative Hub database
 """
 import sqlite3
 from contextlib import contextmanager
@@ -17,21 +21,58 @@ IS_VERCEL = os.environ.get("VERCEL") == "1"
 # Use pathlib for cross-platform path safety
 BACKEND_DIR = Path(__file__).parent
 PROJECT_ROOT = BACKEND_DIR.parent
+DATA_DIR = BACKEND_DIR / "data"
+
+# Database naming (v2.0: unified as xirs_hub.db)
+DB_NAME = "xirs_hub.db"
+OLD_DB_NAME = "cirs.db"  # For migration
 
 if IS_VERCEL:
     # In-memory database for Vercel serverless
     DB_PATH = ":memory:"
-    print("[CIRS DB] Running in Vercel demo mode (in-memory)")
+    print("[xIRS Hub] Running in Vercel demo mode (in-memory)")
 else:
     # File-based database for local/production
-    DB_PATH = str(BACKEND_DIR / "data" / "cirs.db")
-    print(f"[CIRS DB] Running in production mode: {DB_PATH}")
+    DB_PATH = str(DATA_DIR / DB_NAME)
+    print(f"[xIRS Hub] Running in production mode: {DB_PATH}")
 
 # Global lock for write operations
 db_lock = threading.Lock()
 
 # Singleton connection for in-memory mode (persists across requests)
 _memory_connection = None
+
+
+def migrate_db_name():
+    """
+    Migrate database file from cirs.db to xirs_hub.db
+    This ensures backward compatibility with existing installations.
+    """
+    if IS_VERCEL:
+        return  # No file migration for in-memory mode
+
+    old_path = DATA_DIR / OLD_DB_NAME
+    new_path = DATA_DIR / DB_NAME
+
+    # Ensure data directory exists
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+    # If old file exists and new file doesn't, rename it
+    if old_path.exists() and not new_path.exists():
+        print(f"[xIRS Hub] Migrating database: {old_path} → {new_path}")
+        old_path.rename(new_path)
+
+        # Also migrate WAL and SHM files if they exist
+        for suffix in ['-wal', '-shm']:
+            old_wal = old_path.with_suffix(old_path.suffix + suffix)
+            new_wal = new_path.with_suffix(new_path.suffix + suffix)
+            if old_wal.exists():
+                old_wal.rename(new_wal)
+                print(f"[xIRS Hub] Migrated {old_wal.name}")
+
+        print("[xIRS Hub] Database migration complete")
+    elif old_path.exists() and new_path.exists():
+        print(f"[xIRS Hub] Warning: Both {OLD_DB_NAME} and {DB_NAME} exist. Using {DB_NAME}.")
 
 
 def get_connection():
@@ -51,9 +92,11 @@ def get_connection():
             _memory_connection.execute("PRAGMA foreign_keys=ON;")
         return _memory_connection
     else:
-        # For file-based mode, create new connection each time
+        # For file-based mode, ensure migration is done first
+        migrate_db_name()
+
         # Ensure data directory exists
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        DATA_DIR.mkdir(parents=True, exist_ok=True)
 
         conn = sqlite3.connect(
             DB_PATH,
@@ -106,7 +149,7 @@ def init_db():
             if schema_path.exists():
                 with open(schema_path, "r") as f:
                     conn.executescript(f.read())
-                print("[CIRS DB] In-memory database initialized with schema")
+                print("[xIRS Hub] In-memory database initialized with schema")
             return
 
         # For file-based: check if inventory table exists and apply migrations BEFORE schema
@@ -120,9 +163,9 @@ def init_db():
         if schema_path.exists():
             with open(schema_path, "r") as f:
                 conn.executescript(f.read())
-            print(f"[CIRS DB] Database initialized at {DB_PATH}")
+            print(f"[xIRS Hub] Database initialized at {DB_PATH}")
         else:
-            print(f"[CIRS DB] Warning: schema.sql not found at {schema_path}")
+            print(f"[xIRS Hub] Warning: schema.sql not found at {schema_path}")
 
 
 def reset_memory_db():
@@ -381,6 +424,97 @@ def apply_migrations(conn):
         conn.execute("CREATE INDEX IF NOT EXISTS idx_action_logs_batch ON action_logs(batch_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_action_logs_device ON action_logs(device_id)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_action_logs_time ON action_logs(processed_at)")
+
+    # ============================================================================
+    # xIRS Distributed Logistics v1.8 Tables
+    # ============================================================================
+
+    # Logistics Stations table
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='logistics_stations'")
+    if not cursor.fetchone():
+        print("Migration: Creating logistics_stations table")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS logistics_stations (
+                station_id TEXT PRIMARY KEY,
+                display_name TEXT NOT NULL,
+                station_secret TEXT NOT NULL,
+                last_sync_at DATETIME,
+                last_seq_id INTEGER DEFAULT 0,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                is_active INTEGER DEFAULT 1
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logistics_stations_active ON logistics_stations(is_active)")
+
+    # Logistics Manifests table
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='logistics_manifests'")
+    if not cursor.fetchone():
+        print("Migration: Creating logistics_manifests table")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS logistics_manifests (
+                manifest_id TEXT PRIMARY KEY,
+                short_code TEXT NOT NULL,
+                station_id TEXT NOT NULL,
+                items TEXT NOT NULL,
+                signature TEXT NOT NULL,
+                status TEXT DEFAULT 'PENDING',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                acknowledged_at DATETIME,
+                FOREIGN KEY (station_id) REFERENCES logistics_stations(station_id)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logistics_manifests_station ON logistics_manifests(station_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logistics_manifests_status ON logistics_manifests(status)")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_logistics_manifests_short_code ON logistics_manifests(short_code)")
+
+    # Seen Packets (deduplication) table
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='seen_packets'")
+    if not cursor.fetchone():
+        print("Migration: Creating seen_packets table")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS seen_packets (
+                packet_id TEXT PRIMARY KEY,
+                station_id TEXT NOT NULL,
+                received_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                payload_hash TEXT NOT NULL,
+                FOREIGN KEY (station_id) REFERENCES logistics_stations(station_id)
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_seen_packets_station ON seen_packets(station_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_seen_packets_time ON seen_packets(received_at)")
+
+    # Logistics Audit Log table
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='logistics_audit'")
+    if not cursor.fetchone():
+        print("Migration: Creating logistics_audit table")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS logistics_audit (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                station_id TEXT,
+                packet_id TEXT,
+                manifest_id TEXT,
+                details TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logistics_audit_type ON logistics_audit(event_type)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logistics_audit_station ON logistics_audit(station_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_logistics_audit_time ON logistics_audit(created_at)")
+
+    # Hub Keys table (stores signing and encryption keypairs)
+    cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='hub_keys'")
+    if not cursor.fetchone():
+        print("Migration: Creating hub_keys table")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS hub_keys (
+                key_type TEXT PRIMARY KEY,
+                private_key TEXT NOT NULL,
+                public_key TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                rotated_at DATETIME
+            )
+        """)
 
     conn.commit()
     print("Migrations applied successfully")

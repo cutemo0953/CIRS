@@ -205,8 +205,8 @@ sudo kill -9 <PID>
 ### 備份資料
 
 ```bash
-# CIRS 資料庫
-cp /home/pi/CIRS/backend/data/cirs.db ~/backup/
+# CIRS 資料庫 (v2.0+ uses xirs_hub.db)
+cp /home/pi/CIRS/backend/data/xirs_hub.db ~/backup/
 
 # MIRS 資料庫
 cp /home/pi/MIRS/data/*.db ~/backup/
@@ -218,8 +218,8 @@ cp /home/pi/MIRS/data/*.db ~/backup/
 # 停止服務
 sudo systemctl stop cirs mirs
 
-# 還原
-cp ~/backup/cirs.db /home/pi/CIRS/backend/data/
+# 還原 (注意：舊版 cirs.db 會自動遷移為 xirs_hub.db)
+cp ~/backup/xirs_hub.db /home/pi/CIRS/backend/data/
 
 # 重啟服務
 sudo systemctl start cirs mirs

@@ -10,6 +10,7 @@ from datetime import datetime
 import json
 import os
 import sys
+import hashlib
 
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -73,7 +74,8 @@ async def get_satellite_device(credentials: HTTPAuthorizationCredentials = Depen
 
     return {
         "device_id": payload.get("device_id"),
-        "hub_name": payload.get("hub_name", "CIRS Hub")
+        "hub_name": payload.get("hub_name", "CIRS Hub"),
+        "allowed_roles": payload.get("allowed_roles", "volunteer")
     }
 
 
@@ -428,6 +430,9 @@ class CheckinRequest(BaseModel):
     card_number: Optional[str] = None
     notes: Optional[str] = None
     is_new: Optional[bool] = False
+    # v1.4: Admin-only fields
+    national_id: Optional[str] = None  # 身分證字號
+    phone: Optional[str] = None  # 電話
 
 
 class SupplyRequest(BaseModel):
@@ -452,12 +457,27 @@ async def direct_checkin(request: CheckinRequest, device: dict = Depends(get_sat
         if action == 'register':
             # Register new person with triage status and zone
             location = request.zone_name or request.zone_id or ''
+
+            # Generate next person ID (P0001, P0002, ...)
+            cursor = conn.execute("SELECT MAX(CAST(SUBSTR(id, 2) AS INTEGER)) FROM person WHERE id LIKE 'P%'")
+            max_num = cursor.fetchone()[0] or 0
+            new_id = f"P{max_num + 1:04d}"
+
+            # Hash sensitive fields for privacy (v1.4)
+            national_id_hash = None
+            phone_hash = None
+            if request.national_id:
+                national_id_hash = hashlib.sha256(request.national_id.upper().encode()).hexdigest()
+            if request.phone:
+                phone_hash = hashlib.sha256(request.phone.encode()).hexdigest()
+
             cursor = conn.execute(
-                """INSERT INTO person (display_name, role, triage_status, current_location, notes, card_number, checked_in_at, created_at, updated_at)
-                   VALUES (?, 'public', ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
-                (request.name or request.person_id, request.triage_status, location, request.notes, request.card_number)
+                """INSERT INTO person (id, display_name, role, triage_status, current_location, notes,
+                   national_id_hash, phone_hash, checked_in_at, created_at, updated_at)
+                   VALUES (?, ?, 'public', ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)""",
+                (new_id, request.name or request.person_id, request.triage_status, location, request.notes,
+                 national_id_hash, phone_hash)
             )
-            new_id = cursor.lastrowid
 
             # Record in event_log
             conn.execute(
@@ -477,7 +497,7 @@ async def direct_checkin(request: CheckinRequest, device: dict = Depends(get_sat
                 "name": request.name,
                 "triage_status": request.triage_status,
                 "location": location,
-                "message": f"已登記：{request.name}（{triage_label}）"
+                "message": f"已登記：{request.name}（{triage_label}）編號 {new_id}"
             }
 
         elif action == 'checkin':
@@ -629,4 +649,76 @@ async def direct_supply(request: SupplyRequest, device: dict = Depends(get_satel
         "quantity": request.quantity,
         "remaining": new_qty,
         "message": f"已發放 {item['name']} x{request.quantity} 給 {request.person_name or request.person_id}"
+    }
+
+
+# ============================================================================
+# Stocktake Endpoint (v1.4) - Inventory Adjustment from Satellite PWA
+# ============================================================================
+
+class StocktakeRequest(BaseModel):
+    """Inventory adjustment request from Satellite PWA"""
+    item_id: int
+    new_quantity: int
+    reason: Optional[str] = None
+
+
+@router.post("/stocktake")
+async def stocktake_adjustment(request: StocktakeRequest, device: dict = Depends(get_satellite_device)):
+    """
+    Adjust inventory quantity (stocktake/盤點) from Satellite PWA (v1.4).
+    Only available for admin role.
+    """
+    device_id = device.get("device_id", "unknown")
+
+    # Check if device has admin role
+    allowed_roles = device.get("allowed_roles", "volunteer")
+    if "admin" not in allowed_roles:
+        return {
+            "success": False,
+            "message": "權限不足：只有管理員可以調整庫存"
+        }
+
+    with write_db() as conn:
+        # Get current item
+        cursor = conn.execute(
+            "SELECT id, name, quantity FROM inventory WHERE id = ?",
+            (request.item_id,)
+        )
+        item = cursor.fetchone()
+
+        if item is None:
+            return {
+                "success": False,
+                "message": f"找不到物資 ID: {request.item_id}"
+            }
+
+        old_qty = item['quantity'] or 0
+        new_qty = request.new_quantity
+        diff = new_qty - old_qty
+
+        # Update inventory
+        conn.execute(
+            "UPDATE inventory SET quantity = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            (new_qty, request.item_id)
+        )
+
+        # Record in event_log
+        event_type = 'STOCKTAKE_ADJUST' if diff != 0 else 'STOCKTAKE_VERIFY'
+        reason = request.reason or '盤點調整'
+        conn.execute(
+            """INSERT INTO event_log (event_type, item_id, quantity_change, notes, operator_id)
+               VALUES (?, ?, ?, ?, ?)""",
+            (event_type, request.item_id, diff, f"Satellite 盤點: {reason}", device_id)
+        )
+
+    diff_str = f"+{diff}" if diff > 0 else str(diff)
+    return {
+        "success": True,
+        "item_id": item['id'],
+        "item_name": item['name'],
+        "old_quantity": old_qty,
+        "new_quantity": new_qty,
+        "difference": diff,
+        "message": f"{item['name']}: {old_qty} → {new_qty} ({diff_str})"
     }

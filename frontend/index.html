@@ -4057,8 +4057,8 @@
                             throw new Error('Failed to generate QR code');
                         }
 
-                        // Fetch pairing info (includes 6-digit code)
-                        const infoRes = await this.apiCall('/api/auth/pairing-info');
+                        // Fetch pairing info (includes 6-digit code) - v1.4: pass allowed_roles
+                        const infoRes = await this.apiCall(`/api/auth/pairing-info?allowed_roles=${this.satelliteAllowedRoles}`);
                         if (infoRes.ok) {
                             this.satellitePairingInfo = await infoRes.json();
                         } else {

@@ -108,8 +108,8 @@ deploy_cirs() {
     pip install fastapi uvicorn[standard] qrcode pillow python-multipart aiofiles
     deactivate
 
-    # 初始化資料庫
-    if [ ! -f "data/cirs.db" ]; then
+    # 初始化資料庫 (xirs_hub.db, auto-migrates from cirs.db)
+    if [ ! -f "data/xirs_hub.db" ] && [ ! -f "data/cirs.db" ]; then
         echo -e "${GREEN}[*] 初始化資料庫...${NC}"
         mkdir -p data
         source ../venv/bin/activate

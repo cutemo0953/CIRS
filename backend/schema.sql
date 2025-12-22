@@ -451,7 +451,29 @@ CREATE INDEX IF NOT EXISTS idx_action_logs_device ON action_logs(device_id);
 CREATE INDEX IF NOT EXISTS idx_action_logs_time ON action_logs(processed_at);
 
 -- ============================================
--- 19. 預設資料
+-- 19. Satellite Devices (已配對裝置 v1.4)
+-- ============================================
+CREATE TABLE IF NOT EXISTS satellite_devices (
+    device_id TEXT PRIMARY KEY,          -- 裝置 ID (由 PWA 生成)
+    device_name TEXT,                    -- 裝置名稱 (可選，由管理員設定)
+    allowed_roles TEXT DEFAULT 'volunteer',  -- 允許角色
+    is_revoked INTEGER DEFAULT 0,        -- 是否已撤銷
+    is_blacklisted INTEGER DEFAULT 0,    -- 是否黑名單
+    last_activity_at DATETIME,           -- 最後活動時間
+    paired_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    revoked_at DATETIME,                 -- 撤銷時間
+    revoked_by TEXT,                     -- 撤銷者 person_id
+    revoke_reason TEXT,                  -- 撤銷原因
+    user_agent TEXT,                     -- 裝置 User-Agent
+    ip_address TEXT                      -- 配對時 IP
+);
+
+CREATE INDEX IF NOT EXISTS idx_satellite_devices_revoked ON satellite_devices(is_revoked);
+CREATE INDEX IF NOT EXISTS idx_satellite_devices_blacklist ON satellite_devices(is_blacklisted);
+CREATE INDEX IF NOT EXISTS idx_satellite_devices_activity ON satellite_devices(last_activity_at);
+
+-- ============================================
+-- 20. 預設資料
 -- ============================================
 
 -- 預設設定

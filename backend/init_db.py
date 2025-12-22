@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """
-CIRS Database Initialization Script
+xIRS Hub Database Initialization Script
 Creates the SQLite database and initializes schema
+
+Note: Database renamed from cirs.db to xirs_hub.db (v2.0)
 """
 import os
 import sqlite3
@@ -9,8 +11,27 @@ import sys
 
 # Database path
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
-DB_PATH = os.path.join(DATA_DIR, 'cirs.db')
+DB_NAME = 'xirs_hub.db'
+OLD_DB_NAME = 'cirs.db'
+DB_PATH = os.path.join(DATA_DIR, DB_NAME)
+OLD_DB_PATH = os.path.join(DATA_DIR, OLD_DB_NAME)
 SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'schema.sql')
+
+
+def migrate_old_database():
+    """Migrate from cirs.db to xirs_hub.db if needed"""
+    if os.path.exists(OLD_DB_PATH) and not os.path.exists(DB_PATH):
+        print(f"Migrating database: {OLD_DB_NAME} → {DB_NAME}")
+        os.rename(OLD_DB_PATH, DB_PATH)
+        # Also migrate WAL and SHM files
+        for suffix in ['-wal', '-shm']:
+            old_file = OLD_DB_PATH + suffix
+            new_file = DB_PATH + suffix
+            if os.path.exists(old_file):
+                os.rename(old_file, new_file)
+        print("Migration complete!")
+        return True
+    return False
 
 
 def init_database():
@@ -21,9 +42,12 @@ def init_database():
         os.makedirs(DATA_DIR)
         print(f"Created data directory: {DATA_DIR}")
 
+    # Try to migrate old database first
+    migrated = migrate_old_database()
+
     # Check if database already exists
     db_exists = os.path.exists(DB_PATH)
-    if db_exists:
+    if db_exists and not migrated:
         response = input(f"Database already exists at {DB_PATH}. Reinitialize? (y/N): ")
         if response.lower() != 'y':
             print("Aborted.")

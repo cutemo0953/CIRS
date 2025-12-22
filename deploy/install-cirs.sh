@@ -46,7 +46,8 @@ deactivate
 # 4. 初始化資料庫
 echo -e "${GREEN}[4/5] 初始化資料庫...${NC}"
 cd "$CIRS_DIR/backend"
-if [ ! -f "data/cirs.db" ]; then
+# Check for either xirs_hub.db (new) or cirs.db (old, will be migrated)
+if [ ! -f "data/xirs_hub.db" ] && [ ! -f "data/cirs.db" ]; then
     mkdir -p data
     source ../venv/bin/activate
     python3 -c "from main import init_db; init_db()" 2>/dev/null || echo "  (資料庫將在首次啟動時建立)"

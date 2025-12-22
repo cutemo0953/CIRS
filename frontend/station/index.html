@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#1e40af">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="xIRS Station">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="format-detection" content="telephone=no">
+
+    <title>xIRS Station</title>
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-152x152.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="icons/icon-96x96.png">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        station: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            200: '#bfdbfe',
+                            300: '#93c5fd',
+                            400: '#60a5fa',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                            800: '#1e40af',
+                            900: '#1e3a8a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Alpine.js -->
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <!-- TweetNaCl.js for crypto -->
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl-fast.min.js"></script>
+
+    <!-- QR Code Generator -->
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+
+    <!-- QR Scanner -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+    <!-- xIRS Libraries -->
+    <script src="../../shared/js/xirs-crypto.js"></script>
+    <script src="../../shared/js/xirs-protocol.js"></script>
+    <script src="../../shared/js/xirs-storage.js"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+
+        /* Safe area for notched devices */
+        .safe-top { padding-top: env(safe-area-inset-top, 0); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 0); }
+
+        /* QR Display */
+        .qr-container canvas {
+            max-width: 100%;
+            height: auto !important;
+        }
+
+        /* Offline indicator */
+        .offline-banner {
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+        }
+
+        /* Modal backdrop */
+        .modal-backdrop {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen safe-top safe-bottom" x-data="stationApp()" x-init="init()">
+
+    <!-- Offline Banner -->
+    <div x-show="!isOnline" x-cloak class="offline-banner text-white text-center py-2 text-sm font-medium">
+        <span class="mr-2">&#9888;</span> 離線模式 - 資料將於連線後同步
+    </div>
+
+    <!-- Header -->
+    <header class="bg-station-800 text-white px-4 py-3 sticky top-0 z-40">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-station-600 rounded-lg flex items-center justify-center font-bold text-lg">
+                    S
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg" x-text="config?.stationId || 'xIRS Station'"></h1>
+                    <p class="text-station-300 text-xs" x-text="config?.displayName || '未設定'"></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <button @click="showSettings = true" class="p-2 hover:bg-station-700 rounded-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Stats Bar -->
+    <div class="bg-white border-b px-4 py-3 grid grid-cols-3 gap-4 text-center">
+        <div>
+            <div class="text-2xl font-bold text-station-600" x-text="stats.inventoryCount"></div>
+            <div class="text-xs text-gray-500">物資品項</div>
+        </div>
+        <div>
+            <div class="text-2xl font-bold text-amber-600" x-text="stats.pendingActions"></div>
+            <div class="text-xs text-gray-500">待同步動作</div>
+        </div>
+        <div>
+            <div class="text-2xl font-bold text-green-600" x-text="stats.personsCount"></div>
+            <div class="text-xs text-gray-500">登記人員</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="p-4 pb-24">
+        <!-- Quick Actions -->
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <button @click="openScanManifest()" class="bg-white rounded-xl p-4 shadow-sm border-2 border-station-200 hover:border-station-400 transition-colors">
+                <div class="w-12 h-12 bg-station-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <svg class="w-6 h-6 text-station-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"></path>
+                    </svg>
+                </div>
+                <div class="font-medium text-gray-800">掃描清單</div>
+                <div class="text-xs text-gray-500">接收補給物資</div>
+            </button>
+
+            <button @click="openDispense()" class="bg-white rounded-xl p-4 shadow-sm border-2 border-green-200 hover:border-green-400 transition-colors">
+                <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                    </svg>
+                </div>
+                <div class="font-medium text-gray-800">物資發放</div>
+                <div class="text-xs text-gray-500">記錄發放動作</div>
+            </button>
+
+            <button @click="openRegister()" class="bg-white rounded-xl p-4 shadow-sm border-2 border-purple-200 hover:border-purple-400 transition-colors">
+                <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <svg class="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"></path>
+                    </svg>
+                </div>
+                <div class="font-medium text-gray-800">人員登記</div>
+                <div class="text-xs text-gray-500">新增避難者</div>
+            </button>
+
+            <button @click="openGenerateReport()" class="bg-white rounded-xl p-4 shadow-sm border-2 border-amber-200 hover:border-amber-400 transition-colors">
+                <div class="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                    <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                </div>
+                <div class="font-medium text-gray-800">產生報告</div>
+                <div class="text-xs text-gray-500">給 Runner 帶回</div>
+            </button>
+        </div>
+
+        <!-- Inventory Section -->
+        <div class="bg-white rounded-xl shadow-sm mb-6">
+            <div class="px-4 py-3 border-b flex items-center justify-between">
+                <h2 class="font-bold text-gray-800">庫存清單</h2>
+                <button @click="refreshInventory()" class="text-station-600 text-sm">重新整理</button>
+            </div>
+            <div class="divide-y max-h-64 overflow-y-auto">
+                <template x-for="item in inventory" :key="item.code">
+                    <div class="px-4 py-3 flex items-center justify-between">
+                        <div>
+                            <div class="font-medium" x-text="item.name || item.code"></div>
+                            <div class="text-xs text-gray-500" x-text="item.code"></div>
+                        </div>
+                        <div class="text-right">
+                            <div class="font-bold text-lg" :class="item.quantity < 10 ? 'text-red-600' : 'text-gray-800'" x-text="item.quantity"></div>
+                            <div class="text-xs text-gray-500" x-text="item.unit"></div>
+                        </div>
+                    </div>
+                </template>
+                <div x-show="inventory.length === 0" class="px-4 py-8 text-center text-gray-500">
+                    尚無庫存資料
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Actions -->
+        <div class="bg-white rounded-xl shadow-sm">
+            <div class="px-4 py-3 border-b flex items-center justify-between">
+                <h2 class="font-bold text-gray-800">最近動作</h2>
+                <span class="text-xs text-gray-500" x-text="`${stats.pendingActions} 待同步`"></span>
+            </div>
+            <div class="divide-y max-h-48 overflow-y-auto">
+                <template x-for="action in recentActions" :key="action.id">
+                    <div class="px-4 py-3 flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                             :class="{
+                                 'bg-green-500': action.type === 'RECEIVE',
+                                 'bg-blue-500': action.type === 'DISPENSE',
+                                 'bg-purple-500': action.type === 'REGISTER'
+                             }">
+                            <span x-text="action.type.charAt(0)"></span>
+                        </div>
+                        <div class="flex-1">
+                            <div class="font-medium text-sm" x-text="action.item_code || action.person_id || action.type"></div>
+                            <div class="text-xs text-gray-500" x-text="formatTime(action.ts)"></div>
+                        </div>
+                        <div x-show="action.qty" class="font-bold" x-text="action.qty"></div>
+                        <div x-show="!action.synced" class="w-2 h-2 bg-amber-400 rounded-full"></div>
+                    </div>
+                </template>
+                <div x-show="recentActions.length === 0" class="px-4 py-8 text-center text-gray-500">
+                    尚無動作記錄
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Navigation -->
+    <nav class="fixed bottom-0 left-0 right-0 bg-white border-t safe-bottom z-40">
+        <div class="grid grid-cols-4 py-2">
+            <button @click="currentTab = 'home'" class="flex flex-col items-center py-2" :class="currentTab === 'home' ? 'text-station-600' : 'text-gray-400'">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+                </svg>
+                <span class="text-xs mt-1">首頁</span>
+            </button>
+            <button @click="currentTab = 'inventory'" class="flex flex-col items-center py-2" :class="currentTab === 'inventory' ? 'text-station-600' : 'text-gray-400'">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path>
+                </svg>
+                <span class="text-xs mt-1">庫存</span>
+            </button>
+            <button @click="currentTab = 'persons'" class="flex flex-col items-center py-2" :class="currentTab === 'persons' ? 'text-station-600' : 'text-gray-400'">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                </svg>
+                <span class="text-xs mt-1">人員</span>
+            </button>
+            <button @click="currentTab = 'history'" class="flex flex-col items-center py-2 relative" :class="currentTab === 'history' ? 'text-station-600' : 'text-gray-400'">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <span class="text-xs mt-1">歷史</span>
+                <span x-show="stats.pendingActions > 0" class="absolute top-1 right-4 w-4 h-4 bg-amber-500 text-white text-xs rounded-full flex items-center justify-center" x-text="stats.pendingActions"></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Scan Manifest Modal -->
+    <div x-show="showScanManifest" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="closeScanManifest()">
+            <div class="px-4 py-3 border-b flex items-center justify-between bg-station-800 text-white">
+                <h3 class="font-bold">掃描補給清單</h3>
+                <button @click="closeScanManifest()" class="p-1">&times;</button>
+            </div>
+            <div class="p-4">
+                <!-- Scanner View -->
+                <div x-show="!manifestResult" class="space-y-4">
+                    <div id="manifest-scanner" class="w-full aspect-square bg-gray-900 rounded-lg overflow-hidden"></div>
+                    <p class="text-center text-sm text-gray-600">將 QR Code 對準掃描框</p>
+
+                    <!-- Manual Entry -->
+                    <div class="border-t pt-4">
+                        <p class="text-sm text-gray-500 mb-2">QR 無法辨識？輸入短碼：</p>
+                        <div class="flex gap-2">
+                            <input type="text" x-model="manualShortCode" placeholder="4位數短碼"
+                                   class="flex-1 border rounded-lg px-3 py-2 text-center text-xl tracking-widest"
+                                   maxlength="4" pattern="[0-9]*">
+                            <button @click="submitManualCode()" class="bg-station-600 text-white px-4 py-2 rounded-lg">確認</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Result View -->
+                <div x-show="manifestResult" class="space-y-4">
+                    <div class="text-center py-4">
+                        <div x-show="manifestResult?.valid" class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                        </div>
+                        <div x-show="!manifestResult?.valid" class="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                        </div>
+                        <h4 class="font-bold text-lg" x-text="manifestResult?.valid ? '清單驗證成功' : '驗證失敗'"></h4>
+                        <p class="text-sm text-gray-500" x-text="manifestResult?.error || manifestResult?.manifest?.manifest_id"></p>
+                    </div>
+
+                    <template x-if="manifestResult?.valid">
+                        <div>
+                            <h5 class="font-medium mb-2">物資項目：</h5>
+                            <div class="bg-gray-50 rounded-lg divide-y">
+                                <template x-for="item in manifestResult.manifest.items" :key="item.code">
+                                    <div class="px-3 py-2 flex justify-between">
+                                        <span x-text="item.code"></span>
+                                        <span class="font-bold" x-text="`${item.qty} ${item.unit}`"></span>
+                                    </div>
+                                </template>
+                            </div>
+                            <button @click="confirmManifest()" class="w-full mt-4 bg-green-600 text-white py-3 rounded-lg font-bold">
+                                確認收貨並更新庫存
+                            </button>
+                        </div>
+                    </template>
+
+                    <button @click="manifestResult = null" class="w-full text-gray-500 py-2">
+                        重新掃描
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dispense Modal -->
+    <div x-show="showDispense" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="showDispense = false">
+            <div class="px-4 py-3 border-b flex items-center justify-between bg-green-700 text-white">
+                <h3 class="font-bold">物資發放</h3>
+                <button @click="showDispense = false" class="p-1">&times;</button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">選擇物資</label>
+                    <select x-model="dispenseForm.itemCode" class="w-full border rounded-lg px-3 py-2">
+                        <option value="">請選擇...</option>
+                        <template x-for="item in inventory" :key="item.code">
+                            <option :value="item.code" x-text="`${item.name || item.code} (剩餘 ${item.quantity})`"></option>
+                        </template>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">發放數量</label>
+                    <input type="number" x-model.number="dispenseForm.qty" min="1" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">領取人 ID (選填)</label>
+                    <input type="text" x-model="dispenseForm.personId" placeholder="例：P0001" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <button @click="submitDispense()" :disabled="!dispenseForm.itemCode || !dispenseForm.qty"
+                        class="w-full bg-green-600 text-white py-3 rounded-lg font-bold disabled:opacity-50">
+                    確認發放
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Person Modal -->
+    <div x-show="showRegister" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="showRegister = false">
+            <div class="px-4 py-3 border-b flex items-center justify-between bg-purple-700 text-white">
+                <h3 class="font-bold">人員登記</h3>
+                <button @click="showRegister = false" class="p-1">&times;</button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div class="bg-purple-50 rounded-lg px-4 py-3 text-center">
+                    <p class="text-sm text-purple-600">將分配 ID</p>
+                    <p class="text-2xl font-bold text-purple-800" x-text="nextPersonId"></p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">姓名</label>
+                    <input type="text" x-model="registerForm.name" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">備註 (選填)</label>
+                    <textarea x-model="registerForm.notes" rows="2" class="w-full border rounded-lg px-3 py-2"></textarea>
+                </div>
+                <button @click="submitRegister()" :disabled="!registerForm.name"
+                        class="w-full bg-purple-600 text-white py-3 rounded-lg font-bold disabled:opacity-50">
+                    確認登記
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Generate Report Modal -->
+    <div x-show="showGenerateReport" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-hidden" @click.away="showGenerateReport = false">
+            <div class="px-4 py-3 border-b flex items-center justify-between bg-amber-600 text-white">
+                <h3 class="font-bold">產生回報封包</h3>
+                <button @click="showGenerateReport = false" class="p-1">&times;</button>
+            </div>
+            <div class="p-4">
+                <div x-show="!reportQRChunks" class="space-y-4">
+                    <div class="bg-amber-50 rounded-lg p-4 text-center">
+                        <p class="text-3xl font-bold text-amber-600" x-text="stats.pendingActions"></p>
+                        <p class="text-sm text-amber-700">待同步動作</p>
+                    </div>
+                    <p class="text-sm text-gray-600 text-center">
+                        將待同步的動作打包成加密 QR Code，<br>交由 Runner 帶回 Hub。
+                    </p>
+                    <button @click="generateReport()" :disabled="stats.pendingActions === 0"
+                            class="w-full bg-amber-600 text-white py-3 rounded-lg font-bold disabled:opacity-50">
+                        產生 QR Code
+                    </button>
+                </div>
+
+                <div x-show="reportQRChunks" class="space-y-4">
+                    <div class="text-center">
+                        <p class="text-sm text-gray-500 mb-2">
+                            <span x-text="currentChunkIndex + 1"></span> / <span x-text="reportQRChunks?.length || 0"></span>
+                        </p>
+                        <div id="report-qr" class="qr-container flex justify-center"></div>
+                        <p class="mt-2 font-mono text-xs text-gray-400" x-text="currentPacketId"></p>
+                    </div>
+
+                    <div x-show="reportQRChunks?.length > 1" class="flex justify-center gap-4">
+                        <button @click="prevChunk()" :disabled="currentChunkIndex === 0"
+                                class="px-4 py-2 border rounded-lg disabled:opacity-50">
+                            ← 上一頁
+                        </button>
+                        <button @click="nextChunk()" :disabled="currentChunkIndex >= reportQRChunks.length - 1"
+                                class="px-4 py-2 border rounded-lg disabled:opacity-50">
+                            下一頁 →
+                        </button>
+                    </div>
+
+                    <button @click="markReportDelivered()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold">
+                        Runner 已掃描完成
+                    </button>
+
+                    <button @click="reportQRChunks = null" class="w-full text-gray-500 py-2">
+                        返回
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 modal-backdrop flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" @click.away="showSettings = false">
+            <div class="px-4 py-3 border-b flex items-center justify-between bg-gray-800 text-white sticky top-0">
+                <h3 class="font-bold">Station 設定</h3>
+                <button @click="showSettings = false" class="p-1">&times;</button>
+            </div>
+            <div class="p-4 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Station ID</label>
+                    <input type="text" x-model="settingsForm.stationId" placeholder="例：STATION-PARK" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">顯示名稱</label>
+                    <input type="text" x-model="settingsForm.displayName" placeholder="例：公園站" class="w-full border rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Station Secret (HMAC)</label>
+                    <textarea x-model="settingsForm.stationSecret" rows="2" placeholder="Base64 encoded" class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hub 簽章公鑰 (Ed25519)</label>
+                    <textarea x-model="settingsForm.hubPublicKey" rows="2" placeholder="Base64 encoded" class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Hub 加密公鑰 (X25519)</label>
+                    <textarea x-model="settingsForm.hubEncryptionKey" rows="2" placeholder="Base64 encoded" class="w-full border rounded-lg px-3 py-2 font-mono text-xs"></textarea>
+                </div>
+
+                <button @click="saveSettings()" class="w-full bg-station-600 text-white py-3 rounded-lg font-bold">
+                    儲存設定
+                </button>
+
+                <div class="border-t pt-4 space-y-2">
+                    <button @click="exportData()" class="w-full border border-gray-300 py-2 rounded-lg text-gray-700">
+                        匯出資料備份
+                    </button>
+                    <button @click="clearAllData()" class="w-full border border-red-300 py-2 rounded-lg text-red-600">
+                        清除所有資料
+                    </button>
+                </div>
+
+                <p class="text-center text-xs text-gray-400">xIRS Station v1.8.0</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div x-show="toast.show" x-cloak
+         x-transition:enter="transition ease-out duration-300"
+         x-transition:enter-start="opacity-0 translate-y-2"
+         x-transition:enter-end="opacity-100 translate-y-0"
+         x-transition:leave="transition ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed bottom-24 left-4 right-4 z-50">
+        <div class="rounded-lg px-4 py-3 shadow-lg text-white text-center"
+             :class="{
+                 'bg-green-600': toast.type === 'success',
+                 'bg-red-600': toast.type === 'error',
+                 'bg-amber-600': toast.type === 'warning',
+                 'bg-blue-600': toast.type === 'info'
+             }"
+             x-text="toast.message">
+        </div>
+    </div>
+
+    <script>
+        function stationApp() {
+            return {
+                // State
+                isOnline: navigator.onLine,
+                currentTab: 'home',
+                config: null,
+                inventory: [],
+                recentActions: [],
+                stats: {
+                    inventoryCount: 0,
+                    pendingActions: 0,
+                    personsCount: 0
+                },
+
+                // Modals
+                showScanManifest: false,
+                showDispense: false,
+                showRegister: false,
+                showGenerateReport: false,
+                showSettings: false,
+
+                // Scan manifest
+                manifestScanner: null,
+                manifestResult: null,
+                manualShortCode: '',
+
+                // Dispense form
+                dispenseForm: {
+                    itemCode: '',
+                    qty: 1,
+                    personId: ''
+                },
+
+                // Register form
+                registerForm: {
+                    name: '',
+                    notes: ''
+                },
+                nextPersonId: 'P0001',
+
+                // Report generation
+                reportQRChunks: null,
+                currentChunkIndex: 0,
+                currentPacketId: '',
+
+                // Settings form
+                settingsForm: {
+                    stationId: '',
+                    displayName: '',
+                    stationSecret: '',
+                    hubPublicKey: '',
+                    hubEncryptionKey: ''
+                },
+
+                // Toast
+                toast: {
+                    show: false,
+                    message: '',
+                    type: 'info'
+                },
+
+                // Initialize
+                async init() {
+                    // Online/offline detection
+                    window.addEventListener('online', () => this.isOnline = true);
+                    window.addEventListener('offline', () => this.isOnline = false);
+
+                    // Load config
+                    this.config = xIRS.StationConfig.load();
+                    if (this.config) {
+                        this.settingsForm = { ...this.config };
+                    }
+
+                    // Initialize database
+                    await xIRS.StationDB.init();
+
+                    // Load data
+                    await this.refreshData();
+
+                    console.log('[Station] Initialized');
+                },
+
+                async refreshData() {
+                    await this.refreshInventory();
+                    await this.refreshActions();
+                    await this.refreshStats();
+                },
+
+                async refreshInventory() {
+                    this.inventory = await xIRS.StationDB.getInventory();
+                },
+
+                async refreshActions() {
+                    const pending = await xIRS.StationDB.getPendingActions();
+                    this.recentActions = pending.slice(0, 10);
+                },
+
+                async refreshStats() {
+                    const inv = await xIRS.StationDB.getInventory();
+                    const actionStats = await xIRS.StationDB.getActionStats();
+                    const persons = await xIRS.StationDB.getPersons();
+
+                    this.stats = {
+                        inventoryCount: inv.length,
+                        pendingActions: actionStats.pending,
+                        personsCount: persons.length
+                    };
+
+                    this.nextPersonId = await xIRS.StationDB.generatePersonId();
+                },
+
+                // Scan Manifest
+                openScanManifest() {
+                    this.showScanManifest = true;
+                    this.manifestResult = null;
+                    this.manualShortCode = '';
+
+                    this.$nextTick(() => {
+                        this.startManifestScanner();
+                    });
+                },
+
+                closeScanManifest() {
+                    this.stopManifestScanner();
+                    this.showScanManifest = false;
+                },
+
+                startManifestScanner() {
+                    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+
+                    this.manifestScanner = new Html5Qrcode("manifest-scanner");
+                    this.manifestScanner.start(
+                        { facingMode: "environment" },
+                        config,
+                        (decodedText) => this.onManifestScanned(decodedText),
+                        () => {}
+                    ).catch(err => {
+                        console.error('[Scanner] Error:', err);
+                        this.showToast('無法啟動相機', 'error');
+                    });
+                },
+
+                stopManifestScanner() {
+                    if (this.manifestScanner) {
+                        this.manifestScanner.stop().catch(() => {});
+                        this.manifestScanner = null;
+                    }
+                },
+
+                async onManifestScanned(decodedText) {
+                    this.stopManifestScanner();
+
+                    if (!this.config?.hubPublicKey) {
+                        this.manifestResult = { valid: false, error: '未設定 Hub 公鑰' };
+                        return;
+                    }
+
+                    const result = xIRS.ManifestParser.parseFromQR(decodedText, this.config.hubPublicKey);
+                    this.manifestResult = result;
+
+                    if (result.valid) {
+                        // Check if already processed
+                        const processed = await xIRS.StationDB.isManifestProcessed(result.manifest.manifest_id);
+                        if (processed) {
+                            this.manifestResult = { valid: false, error: '此清單已處理過' };
+                        }
+                    }
+                },
+
+                async submitManualCode() {
+                    if (this.manualShortCode.length !== 4) {
+                        this.showToast('請輸入4位數短碼', 'warning');
+                        return;
+                    }
+
+                    // Manual codes are treated as unverified claims
+                    this.manifestResult = {
+                        valid: true,
+                        manifest: {
+                            manifest_id: `MANUAL-${this.manualShortCode}-${Date.now()}`,
+                            short_code: this.manualShortCode,
+                            station_id: this.config?.stationId || 'UNKNOWN',
+                            items: []
+                        },
+                        unverified: true
+                    };
+
+                    this.showToast('短碼已輸入，請手動確認物資', 'warning');
+                },
+
+                async confirmManifest() {
+                    if (!this.manifestResult?.valid) return;
+
+                    const manifest = this.manifestResult.manifest;
+
+                    // Update inventory
+                    await xIRS.StationDB.bulkUpdateInventory(manifest.items, 'add');
+
+                    // Record manifest
+                    await xIRS.StationDB.recordManifest(manifest);
+
+                    // Queue receive actions
+                    for (const item of manifest.items) {
+                        const action = xIRS.ActionBuilder.receive(
+                            item.code, item.qty, item.unit, manifest.manifest_id
+                        );
+                        await xIRS.StationDB.queueAction(action);
+                    }
+
+                    await this.refreshData();
+                    this.showToast(`已收貨 ${manifest.items.length} 項物資`, 'success');
+                    this.closeScanManifest();
+                },
+
+                // Dispense
+                openDispense() {
+                    this.showDispense = true;
+                    this.dispenseForm = { itemCode: '', qty: 1, personId: '' };
+                },
+
+                async submitDispense() {
+                    const { itemCode, qty, personId } = this.dispenseForm;
+
+                    // Update inventory
+                    try {
+                        await xIRS.StationDB.adjustQuantity(itemCode, -qty);
+                    } catch (e) {
+                        this.showToast(e.message, 'error');
+                        return;
+                    }
+
+                    // Queue action
+                    const action = xIRS.ActionBuilder.dispense(itemCode, qty, 'unit', personId);
+                    await xIRS.StationDB.queueAction(action);
+
+                    await this.refreshData();
+                    this.showToast(`已發放 ${itemCode} x${qty}`, 'success');
+                    this.showDispense = false;
+                },
+
+                // Register
+                openRegister() {
+                    this.showRegister = true;
+                    this.registerForm = { name: '', notes: '' };
+                },
+
+                async submitRegister() {
+                    const personId = this.nextPersonId;
+
+                    // Register person
+                    await xIRS.StationDB.registerPerson({
+                        id: personId,
+                        name: this.registerForm.name,
+                        notes: this.registerForm.notes
+                    });
+
+                    // Queue action
+                    const action = xIRS.ActionBuilder.register(personId, {
+                        name: this.registerForm.name
+                    });
+                    await xIRS.StationDB.queueAction(action);
+
+                    await this.refreshData();
+                    this.showToast(`已登記 ${personId}: ${this.registerForm.name}`, 'success');
+                    this.showRegister = false;
+                },
+
+                // Generate Report
+                openGenerateReport() {
+                    this.showGenerateReport = true;
+                    this.reportQRChunks = null;
+                    this.currentChunkIndex = 0;
+                },
+
+                async generateReport() {
+                    if (!this.config?.stationSecret || !this.config?.hubEncryptionKey) {
+                        this.showToast('未設定 Station 憑證', 'error');
+                        return;
+                    }
+
+                    const pending = await xIRS.StationDB.getPendingActions();
+                    if (pending.length === 0) {
+                        this.showToast('沒有待同步的動作', 'warning');
+                        return;
+                    }
+
+                    // Build report
+                    const builder = new xIRS.ReportBuilder(
+                        this.config.stationId,
+                        this.config.stationSecret,
+                        this.config.hubEncryptionKey
+                    );
+
+                    const actions = pending.map(a => ({
+                        type: a.type,
+                        item_code: a.item_code,
+                        qty: a.qty,
+                        unit: a.unit,
+                        person_id: a.person_id,
+                        ts: a.ts
+                    }));
+
+                    const report = await builder.createReport(actions);
+                    this.currentPacketId = report.packet_id;
+
+                    // Get encrypted chunks
+                    this.reportQRChunks = builder.toEncryptedChunks(report);
+
+                    // Store report
+                    const envelope = builder.encryptReport(report);
+                    await xIRS.StationDB.storeReport(report.packet_id, envelope, this.reportQRChunks);
+
+                    // Render first QR
+                    this.$nextTick(() => {
+                        this.renderQRCode();
+                    });
+                },
+
+                renderQRCode() {
+                    const container = document.getElementById('report-qr');
+                    if (!container || !this.reportQRChunks) return;
+
+                    container.innerHTML = '';
+                    const chunk = this.reportQRChunks[this.currentChunkIndex];
+
+                    QRCode.toCanvas(chunk, {
+                        width: 280,
+                        margin: 2,
+                        errorCorrectionLevel: 'L'
+                    }, (err, canvas) => {
+                        if (!err) {
+                            container.appendChild(canvas);
+                        }
+                    });
+                },
+
+                prevChunk() {
+                    if (this.currentChunkIndex > 0) {
+                        this.currentChunkIndex--;
+                        this.renderQRCode();
+                    }
+                },
+
+                nextChunk() {
+                    if (this.currentChunkIndex < this.reportQRChunks.length - 1) {
+                        this.currentChunkIndex++;
+                        this.renderQRCode();
+                    }
+                },
+
+                async markReportDelivered() {
+                    // Mark report as delivered
+                    await xIRS.StationDB.markReportDelivered(this.currentPacketId);
+
+                    // Mark actions as synced
+                    const pending = await xIRS.StationDB.getPendingActions();
+                    const ids = pending.map(a => a.id);
+                    await xIRS.StationDB.markActionsSynced(ids);
+
+                    await this.refreshData();
+                    this.showToast('報告已交付 Runner', 'success');
+                    this.showGenerateReport = false;
+                },
+
+                // Settings
+                async saveSettings() {
+                    xIRS.StationConfig.save(this.settingsForm);
+                    this.config = { ...this.settingsForm };
+                    this.showToast('設定已儲存', 'success');
+                    this.showSettings = false;
+                },
+
+                async exportData() {
+                    const data = await xIRS.StationDB.exportAll();
+                    const json = JSON.stringify(data, null, 2);
+                    const blob = new Blob([json], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `station-backup-${new Date().toISOString().slice(0,10)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                    this.showToast('資料已匯出', 'success');
+                },
+
+                async clearAllData() {
+                    if (!confirm('確定要清除所有資料嗎？此操作無法復原。')) return;
+
+                    await xIRS.StationDB.clearAll();
+                    xIRS.StationConfig.clear();
+                    this.config = null;
+                    await this.refreshData();
+                    this.showToast('所有資料已清除', 'info');
+                    this.showSettings = false;
+                },
+
+                // Helpers
+                formatTime(ts) {
+                    if (!ts) return '';
+                    const date = new Date(ts * 1000);
+                    return date.toLocaleString('zh-TW', {
+                        month: 'numeric',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                    });
+                },
+
+                showToast(message, type = 'info') {
+                    this.toast = { show: true, message, type };
+                    setTimeout(() => {
+                        this.toast.show = false;
+                    }, 3000);
+                }
+            };
+        }
+    </script>
+</body>
+</html>

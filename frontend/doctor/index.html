@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0ea5e9">
+    <title>xIRS Doctor</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icons/icon-192x192.png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl-fast.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        [x-cloak] { display: none !important; }
+        .safe-top { padding-top: env(safe-area-inset-top); }
+        .safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+        .priority-stat { @apply bg-red-100 border-red-500 text-red-700; }
+        .priority-urgent { @apply bg-orange-100 border-orange-500 text-orange-700; }
+        .priority-routine { @apply bg-gray-100 border-gray-400 text-gray-700; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen safe-top safe-bottom" x-data="doctorApp()" x-init="init()">
+
+    <!-- Header -->
+    <header class="bg-sky-500 text-white px-4 py-3 sticky top-0 z-50 shadow-lg safe-top">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">👨‍⚕️</span>
+                <div>
+                    <h1 class="font-bold text-lg">xIRS Doctor</h1>
+                    <p class="text-xs text-sky-100" x-text="credentials ? credentials.name : '未設定'"></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-2">
+                <span class="text-xs bg-sky-600 px-2 py-1 rounded" x-text="'今日: ' + todayRxCount + ' 張'"></span>
+                <button @click="showSettings = true" class="p-2 hover:bg-sky-600 rounded-lg">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="pb-20">
+        <!-- No Credentials Warning -->
+        <template x-if="!credentials">
+            <div class="m-4 p-6 bg-yellow-50 border-2 border-yellow-400 rounded-xl text-center">
+                <div class="text-4xl mb-3">🔐</div>
+                <h2 class="font-bold text-lg text-yellow-800 mb-2">尚未設定醫師憑證</h2>
+                <p class="text-yellow-700 text-sm mb-4">請先設定您的醫師身份與簽章金鑰</p>
+                <button @click="showSettings = true" class="bg-yellow-500 text-white px-6 py-2 rounded-lg font-medium">
+                    前往設定
+                </button>
+            </div>
+        </template>
+
+        <!-- Patient Selection Screen -->
+        <div x-show="currentScreen === 'patients'" x-cloak class="p-4">
+            <!-- Search -->
+            <div class="mb-4">
+                <div class="relative">
+                    <input type="text" x-model="patientSearch" placeholder="搜尋病患 ID 或姓名..."
+                           class="w-full pl-10 pr-4 py-3 rounded-xl border-2 border-gray-200 focus:border-sky-500 focus:outline-none">
+                    <svg class="w-5 h-5 absolute left-3 top-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                </div>
+            </div>
+
+            <!-- Recent Patients -->
+            <div class="mb-4">
+                <h3 class="text-sm font-medium text-gray-500 mb-2">最近看診</h3>
+                <div class="space-y-2">
+                    <template x-for="patient in filteredPatients" :key="patient.patient_id">
+                        <button @click="selectPatient(patient)"
+                                class="w-full bg-white p-4 rounded-xl shadow-sm flex items-center justify-between hover:bg-sky-50 transition">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center">
+                                    <span class="text-sky-600 font-bold" x-text="patient.name?.charAt(0) || '?'"></span>
+                                </div>
+                                <div class="text-left">
+                                    <div class="font-medium" x-text="patient.name"></div>
+                                    <div class="text-xs text-gray-500">
+                                        <span x-text="patient.patient_id"></span>
+                                        <span x-show="patient.age_group" x-text="' · ' + getAgeGroupLabel(patient.age_group)"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </button>
+                    </template>
+                    <template x-if="filteredPatients.length === 0 && patientSearch">
+                        <div class="text-center py-8 text-gray-500">
+                            <p>找不到符合的病患</p>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Add New Patient -->
+            <button @click="showNewPatient = true"
+                    class="w-full bg-sky-500 text-white p-4 rounded-xl flex items-center justify-center gap-2 font-medium hover:bg-sky-600 transition">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                </svg>
+                新增病患
+            </button>
+        </div>
+
+        <!-- Prescription Entry Screen -->
+        <div x-show="currentScreen === 'prescription'" x-cloak class="p-4">
+            <!-- Patient Info Bar -->
+            <div class="bg-white p-3 rounded-xl shadow-sm mb-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-sky-100 rounded-full flex items-center justify-center">
+                        <span class="text-sky-600 font-bold" x-text="selectedPatient?.name?.charAt(0) || '?'"></span>
+                    </div>
+                    <div>
+                        <div class="font-medium" x-text="selectedPatient?.name"></div>
+                        <div class="text-xs text-gray-500" x-text="selectedPatient?.patient_id"></div>
+                    </div>
+                </div>
+                <button @click="currentScreen = 'patients'; selectedPatient = null" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Diagnosis -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-600 mb-1">診斷/主訴</label>
+                <input type="text" x-model="rxForm.diagnosis" placeholder="例: 上呼吸道感染"
+                       class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-sky-500 focus:outline-none">
+            </div>
+
+            <!-- Medications -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-2">
+                    <label class="text-sm font-medium text-gray-600">處方內容</label>
+                    <span class="text-xs text-gray-400" x-text="rxForm.items.length + ' 項藥品'"></span>
+                </div>
+
+                <div class="space-y-2 mb-3">
+                    <template x-for="(item, index) in rxForm.items" :key="index">
+                        <div class="bg-white p-3 rounded-xl shadow-sm">
+                            <div class="flex items-start justify-between mb-2">
+                                <div class="flex-1">
+                                    <div class="font-medium text-sm" x-text="item.name"></div>
+                                    <div class="text-xs text-gray-500" x-text="item.code"></div>
+                                </div>
+                                <button @click="removeRxItem(index)" class="text-red-400 hover:text-red-600 p-1">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                    </svg>
+                                </button>
+                            </div>
+                            <div class="flex items-center gap-2 text-sm">
+                                <input type="number" x-model.number="item.qty" min="1"
+                                       class="w-16 px-2 py-1 border rounded text-center">
+                                <span x-text="item.unit"></span>
+                                <select x-model="item.freq" class="flex-1 px-2 py-1 border rounded">
+                                    <template x-for="freq in frequencyCodes" :key="freq.code">
+                                        <option :value="freq.code" x-text="freq.code + ' ' + freq.label"></option>
+                                    </template>
+                                </select>
+                                <input type="number" x-model.number="item.duration_days" min="1"
+                                       class="w-12 px-2 py-1 border rounded text-center">
+                                <span>天</span>
+                            </div>
+                            <div class="mt-2">
+                                <input type="text" x-model="item.instruction" placeholder="用藥指示"
+                                       class="w-full px-2 py-1 text-sm border rounded">
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <button @click="showMedicationPicker = true"
+                        class="w-full border-2 border-dashed border-gray-300 p-4 rounded-xl text-gray-500 hover:border-sky-500 hover:text-sky-500 transition flex items-center justify-center gap-2">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                    </svg>
+                    新增藥品
+                </button>
+            </div>
+
+            <!-- Priority -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-600 mb-2">優先級</label>
+                <div class="flex gap-2">
+                    <button @click="rxForm.priority = 'ROUTINE'"
+                            :class="rxForm.priority === 'ROUTINE' ? 'bg-gray-200 border-gray-500' : 'bg-white border-gray-300'"
+                            class="flex-1 py-2 rounded-lg border-2 text-sm font-medium">
+                        一般
+                    </button>
+                    <button @click="rxForm.priority = 'URGENT'"
+                            :class="rxForm.priority === 'URGENT' ? 'bg-orange-100 border-orange-500 text-orange-700' : 'bg-white border-gray-300'"
+                            class="flex-1 py-2 rounded-lg border-2 text-sm font-medium">
+                        優先
+                    </button>
+                    <button @click="rxForm.priority = 'STAT'"
+                            :class="rxForm.priority === 'STAT' ? 'bg-red-100 border-red-500 text-red-700' : 'bg-white border-gray-300'"
+                            class="flex-1 py-2 rounded-lg border-2 text-sm font-medium">
+                        緊急
+                    </button>
+                </div>
+            </div>
+
+            <!-- Notes -->
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-600 mb-1">備註</label>
+                <textarea x-model="rxForm.note" placeholder="過敏史、特殊注意事項..."
+                          class="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-sky-500 focus:outline-none" rows="2"></textarea>
+            </div>
+
+            <!-- Sign Button -->
+            <button @click="signAndCreateRx()"
+                    :disabled="!canSignRx"
+                    :class="canSignRx ? 'bg-sky-500 hover:bg-sky-600' : 'bg-gray-300 cursor-not-allowed'"
+                    class="w-full text-white p-4 rounded-xl font-bold text-lg flex items-center justify-center gap-2 transition">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                簽章並開立處方
+            </button>
+        </div>
+
+        <!-- QR Display Screen -->
+        <div x-show="currentScreen === 'qr'" x-cloak class="p-4 text-center">
+            <div class="bg-white rounded-2xl shadow-lg p-6 mb-4">
+                <div class="text-green-500 text-5xl mb-4">✓</div>
+                <h2 class="text-xl font-bold mb-2">處方已開立</h2>
+                <p class="text-gray-500 text-sm mb-4" x-text="currentRxOrder?.rx_id"></p>
+
+                <!-- QR Code Display -->
+                <div class="mb-4">
+                    <template x-if="qrCodes.length === 1">
+                        <div class="inline-block p-4 bg-white border-2 border-gray-200 rounded-xl">
+                            <canvas id="qr-canvas" class="mx-auto"></canvas>
+                        </div>
+                    </template>
+                    <template x-if="qrCodes.length > 1">
+                        <div>
+                            <div class="inline-block p-4 bg-white border-2 border-gray-200 rounded-xl mb-2">
+                                <canvas id="qr-canvas" class="mx-auto"></canvas>
+                            </div>
+                            <div class="flex items-center justify-center gap-4">
+                                <button @click="prevQR()" :disabled="currentQRIndex === 0"
+                                        :class="currentQRIndex === 0 ? 'text-gray-300' : 'text-sky-500'"
+                                        class="p-2">
+                                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                                    </svg>
+                                </button>
+                                <span class="text-lg font-medium" x-text="(currentQRIndex + 1) + ' / ' + qrCodes.length"></span>
+                                <button @click="nextQR()" :disabled="currentQRIndex === qrCodes.length - 1"
+                                        :class="currentQRIndex === qrCodes.length - 1 ? 'text-gray-300' : 'text-sky-500'"
+                                        class="p-2">
+                                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Rx Summary -->
+                <div class="text-left bg-gray-50 rounded-xl p-4 mb-4">
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-gray-500">病患</span>
+                        <span class="font-medium" x-text="currentRxOrder?.patient?.name"></span>
+                    </div>
+                    <div class="flex justify-between text-sm mb-2">
+                        <span class="text-gray-500">藥品數</span>
+                        <span class="font-medium" x-text="currentRxOrder?.items?.length + ' 項'"></span>
+                    </div>
+                    <div class="flex justify-between text-sm">
+                        <span class="text-gray-500">開立時間</span>
+                        <span class="font-medium" x-text="formatTimestamp(currentRxOrder?.ts)"></span>
+                    </div>
+                </div>
+
+                <p class="text-gray-500 text-sm">請病患持此 QR Code 至藥局領藥</p>
+            </div>
+
+            <button @click="startNewRx()"
+                    class="w-full bg-sky-500 text-white p-4 rounded-xl font-medium hover:bg-sky-600 transition">
+                開立下一張處方
+            </button>
+        </div>
+    </main>
+
+    <!-- New Patient Modal -->
+    <div x-show="showNewPatient" x-cloak class="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div class="absolute inset-0 bg-black/50" @click="showNewPatient = false"></div>
+        <div class="relative bg-white w-full sm:max-w-md sm:rounded-2xl rounded-t-2xl p-6 safe-bottom">
+            <h3 class="text-lg font-bold mb-4">新增病患</h3>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">病患 ID</label>
+                    <input type="text" x-model="newPatient.patient_id" placeholder="例: P0001"
+                           class="w-full px-4 py-2 rounded-lg border focus:border-sky-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">姓名</label>
+                    <input type="text" x-model="newPatient.name" placeholder="病患姓名"
+                           class="w-full px-4 py-2 rounded-lg border focus:border-sky-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">年齡組</label>
+                    <select x-model="newPatient.age_group" class="w-full px-4 py-2 rounded-lg border focus:border-sky-500 focus:outline-none">
+                        <option value="">請選擇</option>
+                        <option value="infant">嬰兒 (0-1歲)</option>
+                        <option value="child">兒童 (2-12歲)</option>
+                        <option value="adolescent">青少年 (13-17歲)</option>
+                        <option value="adult">成人 (18-64歲)</option>
+                        <option value="elderly">老年 (65歲以上)</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-600 mb-1">體重 (kg)</label>
+                    <input type="number" x-model.number="newPatient.weight_kg" placeholder="體重"
+                           class="w-full px-4 py-2 rounded-lg border focus:border-sky-500 focus:outline-none">
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button @click="showNewPatient = false" class="flex-1 py-3 border rounded-xl font-medium">
+                    取消
+                </button>
+                <button @click="addPatient()" :disabled="!newPatient.patient_id || !newPatient.name"
+                        class="flex-1 py-3 bg-sky-500 text-white rounded-xl font-medium disabled:bg-gray-300">
+                    新增
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Medication Picker Modal -->
+    <div x-show="showMedicationPicker" x-cloak class="fixed inset-0 z-50 flex flex-col">
+        <div class="absolute inset-0 bg-black/50" @click="showMedicationPicker = false"></div>
+        <div class="relative bg-white flex-1 mt-16 rounded-t-2xl flex flex-col safe-bottom overflow-hidden">
+            <div class="p-4 border-b">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-lg font-bold">選擇藥品</h3>
+                    <button @click="showMedicationPicker = false" class="text-gray-400">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                    </button>
+                </div>
+                <input type="text" x-model="medicationSearch" placeholder="搜尋藥品名稱或代碼..."
+                       class="w-full px-4 py-2 rounded-lg border focus:border-sky-500 focus:outline-none">
+            </div>
+
+            <!-- Favorites -->
+            <div x-show="!medicationSearch && favorites.length > 0" class="p-4 border-b bg-yellow-50">
+                <h4 class="text-sm font-medium text-yellow-700 mb-2">常用藥品</h4>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="med in favorites" :key="med.code">
+                        <button @click="addMedicationToRx(med)"
+                                class="px-3 py-1 bg-white border border-yellow-300 rounded-full text-sm hover:bg-yellow-100">
+                            <span x-text="med.name"></span>
+                        </button>
+                    </template>
+                </div>
+            </div>
+
+            <!-- Medication List -->
+            <div class="flex-1 overflow-y-auto">
+                <template x-for="med in filteredMedications" :key="med.code">
+                    <button @click="addMedicationToRx(med)"
+                            class="w-full p-4 border-b flex items-center justify-between hover:bg-gray-50">
+                        <div class="text-left">
+                            <div class="font-medium" x-text="med.name"></div>
+                            <div class="text-xs text-gray-500">
+                                <span x-text="med.code"></span>
+                                <span x-show="med.is_controlled" class="ml-2 text-red-500">管制藥品</span>
+                            </div>
+                        </div>
+                        <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                        </svg>
+                    </button>
+                </template>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div x-show="showSettings" x-cloak class="fixed inset-0 z-50 flex flex-col">
+        <div class="absolute inset-0 bg-black/50" @click="showSettings = false"></div>
+        <div class="relative bg-white flex-1 mt-8 rounded-t-2xl flex flex-col safe-bottom overflow-hidden">
+            <div class="p-4 border-b flex items-center justify-between">
+                <h3 class="text-lg font-bold">設定</h3>
+                <button @click="showSettings = false" class="text-gray-400">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4">
+                <!-- Credentials Section -->
+                <div class="mb-6">
+                    <h4 class="font-medium text-gray-700 mb-3">醫師憑證</h4>
+
+                    <template x-if="credentials">
+                        <div class="bg-green-50 border border-green-200 rounded-xl p-4 mb-4">
+                            <div class="flex items-center gap-2 text-green-700 mb-2">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                <span class="font-medium">憑證已設定</span>
+                            </div>
+                            <div class="text-sm text-green-600">
+                                <div><strong>ID:</strong> <span x-text="credentials.prescriber_id"></span></div>
+                                <div><strong>姓名:</strong> <span x-text="credentials.name"></span></div>
+                                <div><strong>職稱:</strong> <span x-text="credentials.title"></span></div>
+                            </div>
+                            <button @click="clearCredentials()" class="mt-3 text-sm text-red-500 underline">
+                                清除憑證
+                            </button>
+                        </div>
+                    </template>
+
+                    <template x-if="!credentials">
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">醫師 ID</label>
+                                <input type="text" x-model="settingsForm.prescriber_id" placeholder="例: DOC-001"
+                                       class="w-full px-4 py-2 rounded-lg border focus:border-sky-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">姓名</label>
+                                <input type="text" x-model="settingsForm.name" placeholder="您的姓名"
+                                       class="w-full px-4 py-2 rounded-lg border focus:border-sky-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">職稱</label>
+                                <input type="text" x-model="settingsForm.title" placeholder="例: 醫師" value="醫師"
+                                       class="w-full px-4 py-2 rounded-lg border focus:border-sky-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">執照號碼</label>
+                                <input type="text" x-model="settingsForm.license_no" placeholder="例: 醫字第012345號"
+                                       class="w-full px-4 py-2 rounded-lg border focus:border-sky-500 focus:outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-600 mb-1">私鑰 (Base64)</label>
+                                <textarea x-model="settingsForm.private_key" placeholder="貼上 Ed25519 私鑰或留空自動產生"
+                                          class="w-full px-4 py-2 rounded-lg border focus:border-sky-500 focus:outline-none text-xs font-mono" rows="2"></textarea>
+                            </div>
+
+                            <button @click="generateNewKeys()" class="text-sm text-sky-500 underline">
+                                產生新金鑰
+                            </button>
+
+                            <button @click="saveCredentials()"
+                                    :disabled="!settingsForm.prescriber_id || !settingsForm.name"
+                                    class="w-full py-3 bg-sky-500 text-white rounded-xl font-medium disabled:bg-gray-300">
+                                儲存憑證
+                            </button>
+                        </div>
+                    </template>
+                </div>
+
+                <!-- Medication Catalog -->
+                <div class="mb-6">
+                    <h4 class="font-medium text-gray-700 mb-3">藥品目錄</h4>
+                    <p class="text-sm text-gray-500 mb-2">目前載入 <span x-text="medications.length"></span> 種藥品</p>
+                    <button @click="loadDemoMedications()" class="text-sm text-sky-500 underline">
+                        載入示範藥品
+                    </button>
+                </div>
+
+                <!-- Data Management -->
+                <div class="mb-6">
+                    <h4 class="font-medium text-gray-700 mb-3">資料管理</h4>
+                    <div class="space-y-2">
+                        <button @click="exportData()" class="w-full py-2 border rounded-lg text-sm">
+                            匯出資料
+                        </button>
+                        <button @click="clearAllData()" class="w-full py-2 border border-red-300 text-red-500 rounded-lg text-sm">
+                            清除所有資料
+                        </button>
+                    </div>
+                </div>
+
+                <!-- About -->
+                <div class="text-center text-gray-400 text-xs mt-8">
+                    <p>xIRS Doctor PWA v1.0</p>
+                    <p>Lite CPOE for Disaster Medical Response</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Load xIRS libraries -->
+    <script src="/shared/js/xirs-crypto.js"></script>
+    <script src="/shared/js/xirs-rx.js"></script>
+    <script src="/shared/js/xirs-doctor-db.js"></script>
+
+    <script>
+        function doctorApp() {
+            return {
+                // State
+                currentScreen: 'patients',
+                credentials: null,
+                patients: [],
+                medications: [],
+                favorites: [],
+                selectedPatient: null,
+                todayRxCount: 0,
+
+                // Modals
+                showSettings: false,
+                showNewPatient: false,
+                showMedicationPicker: false,
+
+                // Search
+                patientSearch: '',
+                medicationSearch: '',
+
+                // Forms
+                newPatient: { patient_id: '', name: '', age_group: '', weight_kg: null },
+                settingsForm: { prescriber_id: '', name: '', title: '醫師', license_no: '', private_key: '' },
+                rxForm: {
+                    diagnosis: '',
+                    items: [],
+                    priority: 'ROUTINE',
+                    note: ''
+                },
+
+                // QR display
+                currentRxOrder: null,
+                qrCodes: [],
+                currentQRIndex: 0,
+
+                // Reference data
+                frequencyCodes: [
+                    { code: 'QD', label: '每日一次' },
+                    { code: 'BID', label: '每日兩次' },
+                    { code: 'TID', label: '每日三次' },
+                    { code: 'QID', label: '每日四次' },
+                    { code: 'Q4H', label: '每4小時' },
+                    { code: 'Q6H', label: '每6小時' },
+                    { code: 'Q8H', label: '每8小時' },
+                    { code: 'PRN', label: '需要時' },
+                    { code: 'STAT', label: '立即' },
+                    { code: 'HS', label: '睡前' },
+                    { code: 'AC', label: '飯前' },
+                    { code: 'PC', label: '飯後' }
+                ],
+
+                // Computed
+                get filteredPatients() {
+                    if (!this.patientSearch) return this.patients;
+                    const q = this.patientSearch.toLowerCase();
+                    return this.patients.filter(p =>
+                        p.name?.toLowerCase().includes(q) ||
+                        p.patient_id?.toLowerCase().includes(q)
+                    );
+                },
+
+                get filteredMedications() {
+                    if (!this.medicationSearch) return this.medications;
+                    const q = this.medicationSearch.toLowerCase();
+                    return this.medications.filter(m =>
+                        m.name?.toLowerCase().includes(q) ||
+                        m.code?.toLowerCase().includes(q)
+                    );
+                },
+
+                get canSignRx() {
+                    return this.credentials &&
+                           this.selectedPatient &&
+                           this.rxForm.items.length > 0;
+                },
+
+                // Init
+                async init() {
+                    console.log('[Doctor] Initializing...');
+
+                    // Wait for xIRS libraries
+                    await this.waitForLibraries();
+
+                    // Load data from IndexedDB
+                    await this.loadData();
+
+                    // Register service worker
+                    if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.register('service-worker.js')
+                            .then(reg => console.log('[Doctor] SW registered'))
+                            .catch(err => console.error('[Doctor] SW failed:', err));
+                    }
+
+                    console.log('[Doctor] Ready');
+                },
+
+                async waitForLibraries() {
+                    let attempts = 0;
+                    while ((!window.xIRS || !window.xIRS.DoctorDB) && attempts < 50) {
+                        await new Promise(r => setTimeout(r, 100));
+                        attempts++;
+                    }
+                    if (!window.xIRS?.DoctorDB) {
+                        console.error('[Doctor] Libraries not loaded!');
+                    }
+                },
+
+                async loadData() {
+                    try {
+                        await xIRS.DoctorDB.init();
+
+                        // Load credentials
+                        this.credentials = await xIRS.DoctorDB.getCredentials();
+
+                        // Load patients
+                        this.patients = await xIRS.DoctorDB.getRecentPatients(20);
+
+                        // Load medications
+                        this.medications = await xIRS.DoctorDB.getAllMedications();
+
+                        // Load favorites
+                        this.favorites = await xIRS.DoctorDB.getTopFavorites(5);
+
+                        // Count today's Rx
+                        this.todayRxCount = await xIRS.DoctorDB.getTodayRxCount();
+
+                        console.log('[Doctor] Data loaded:', {
+                            hasCredentials: !!this.credentials,
+                            patients: this.patients.length,
+                            medications: this.medications.length
+                        });
+                    } catch (e) {
+                        console.error('[Doctor] Failed to load data:', e);
+                    }
+                },
+
+                // Patient methods
+                selectPatient(patient) {
+                    this.selectedPatient = patient;
+                    this.currentScreen = 'prescription';
+                    this.resetRxForm();
+                },
+
+                async addPatient() {
+                    if (!this.newPatient.patient_id || !this.newPatient.name) return;
+
+                    await xIRS.DoctorDB.savePatient(this.newPatient);
+                    this.patients = await xIRS.DoctorDB.getRecentPatients(20);
+
+                    this.showNewPatient = false;
+                    this.newPatient = { patient_id: '', name: '', age_group: '', weight_kg: null };
+                },
+
+                getAgeGroupLabel(ageGroup) {
+                    const labels = {
+                        infant: '嬰兒',
+                        child: '兒童',
+                        adolescent: '青少年',
+                        adult: '成人',
+                        elderly: '老年'
+                    };
+                    return labels[ageGroup] || ageGroup;
+                },
+
+                // Medication methods
+                addMedicationToRx(med) {
+                    this.rxForm.items.push({
+                        code: med.code,
+                        name: med.name,
+                        qty: med.default_qty || 1,
+                        unit: med.unit || 'tab',
+                        freq: med.default_freq || 'TID',
+                        duration_days: 3,
+                        route: med.route || 'PO',
+                        instruction: med.default_instruction || '飯後服用',
+                        is_controlled: med.is_controlled || false,
+                        schedule: med.schedule || null
+                    });
+
+                    // Track as favorite
+                    xIRS.DoctorDB.addFavorite(med.code);
+
+                    this.showMedicationPicker = false;
+                    this.medicationSearch = '';
+                },
+
+                removeRxItem(index) {
+                    this.rxForm.items.splice(index, 1);
+                },
+
+                // Rx methods
+                resetRxForm() {
+                    this.rxForm = {
+                        diagnosis: '',
+                        items: [],
+                        priority: 'ROUTINE',
+                        note: ''
+                    };
+                },
+
+                async signAndCreateRx() {
+                    if (!this.canSignRx) return;
+
+                    try {
+                        // Create RxBuilder
+                        const builder = new xIRS.Rx.RxBuilder(
+                            this.credentials.prescriber_id,
+                            this.credentials.name,
+                            this.credentials.private_key
+                        );
+
+                        // Create Rx
+                        this.currentRxOrder = builder.createRx({
+                            patient: {
+                                id: this.selectedPatient.patient_id,
+                                name: this.selectedPatient.name,
+                                age_group: this.selectedPatient.age_group,
+                                weight_kg: this.selectedPatient.weight_kg
+                            },
+                            items: this.rxForm.items,
+                            priority: this.rxForm.priority,
+                            diagnosis_text: this.rxForm.diagnosis,
+                            note: this.rxForm.note
+                        });
+
+                        // Generate QR codes
+                        this.qrCodes = builder.toQRCodes(this.currentRxOrder);
+                        this.currentQRIndex = 0;
+
+                        // Save to history
+                        await xIRS.DoctorDB.recordIssuedRx(this.currentRxOrder);
+
+                        // Update patient last seen
+                        await xIRS.DoctorDB.savePatient(this.selectedPatient);
+
+                        // Update count
+                        this.todayRxCount = await xIRS.DoctorDB.getTodayRxCount();
+
+                        // Show QR screen
+                        this.currentScreen = 'qr';
+
+                        // Render QR
+                        this.$nextTick(() => this.renderQR());
+
+                        console.log('[Doctor] Rx created:', this.currentRxOrder.rx_id);
+                    } catch (e) {
+                        console.error('[Doctor] Failed to create Rx:', e);
+                        alert('建立處方失敗: ' + e.message);
+                    }
+                },
+
+                renderQR() {
+                    const canvas = document.getElementById('qr-canvas');
+                    if (!canvas || !this.qrCodes.length) return;
+
+                    QRCode.toCanvas(canvas, this.qrCodes[this.currentQRIndex], {
+                        width: 250,
+                        margin: 2,
+                        errorCorrectionLevel: 'M'
+                    });
+                },
+
+                prevQR() {
+                    if (this.currentQRIndex > 0) {
+                        this.currentQRIndex--;
+                        this.$nextTick(() => this.renderQR());
+                    }
+                },
+
+                nextQR() {
+                    if (this.currentQRIndex < this.qrCodes.length - 1) {
+                        this.currentQRIndex++;
+                        this.$nextTick(() => this.renderQR());
+                    }
+                },
+
+                startNewRx() {
+                    this.currentScreen = 'patients';
+                    this.selectedPatient = null;
+                    this.currentRxOrder = null;
+                    this.qrCodes = [];
+                    this.resetRxForm();
+                },
+
+                formatTimestamp(ts) {
+                    if (!ts) return '';
+                    const date = new Date(ts * 1000);
+                    return date.toLocaleString('zh-TW');
+                },
+
+                // Settings methods
+                generateNewKeys() {
+                    const keys = xIRS.Rx.PrescriberKeys.generate();
+                    this.settingsForm.private_key = keys.privateKey;
+                    alert('已產生新金鑰');
+                },
+
+                async saveCredentials() {
+                    if (!this.settingsForm.prescriber_id || !this.settingsForm.name) return;
+
+                    // Generate keys if not provided
+                    let privateKey = this.settingsForm.private_key;
+                    let publicKey;
+
+                    if (!privateKey) {
+                        const keys = xIRS.Rx.PrescriberKeys.generate();
+                        privateKey = keys.privateKey;
+                        publicKey = keys.publicKey;
+                    } else {
+                        publicKey = xIRS.Rx.PrescriberKeys.derivePublicKey(privateKey);
+                    }
+
+                    const cred = {
+                        prescriber_id: this.settingsForm.prescriber_id,
+                        name: this.settingsForm.name,
+                        title: this.settingsForm.title || '醫師',
+                        license_no: this.settingsForm.license_no,
+                        private_key: privateKey,
+                        public_key: publicKey
+                    };
+
+                    await xIRS.DoctorDB.saveCredentials(cred);
+                    this.credentials = await xIRS.DoctorDB.getCredentials();
+
+                    this.settingsForm = { prescriber_id: '', name: '', title: '醫師', license_no: '', private_key: '' };
+                    alert('憑證已儲存');
+                },
+
+                async clearCredentials() {
+                    if (!confirm('確定要清除憑證嗎？')) return;
+                    await xIRS.DoctorDB.clearCredentials();
+                    this.credentials = null;
+                },
+
+                async loadDemoMedications() {
+                    const demoMeds = [
+                        { code: 'MED-PARA-500', name: 'Paracetamol 500mg', category: '解熱鎮痛', unit: 'tab', default_freq: 'TID', default_qty: 6 },
+                        { code: 'MED-AMOX-250', name: 'Amoxicillin 250mg', category: '抗生素', unit: 'cap', default_freq: 'TID', default_qty: 9 },
+                        { code: 'MED-AMOX-500', name: 'Amoxicillin 500mg', category: '抗生素', unit: 'cap', default_freq: 'TID', default_qty: 9 },
+                        { code: 'MED-IBU-400', name: 'Ibuprofen 400mg', category: '解熱鎮痛', unit: 'tab', default_freq: 'TID', default_qty: 6 },
+                        { code: 'MED-DICLO-25', name: 'Diclofenac 25mg', category: '消炎止痛', unit: 'tab', default_freq: 'TID', default_qty: 9 },
+                        { code: 'MED-OMEP-20', name: 'Omeprazole 20mg', category: '腸胃藥', unit: 'cap', default_freq: 'QD', default_qty: 7 },
+                        { code: 'MED-LORA-10', name: 'Loratadine 10mg', category: '抗過敏', unit: 'tab', default_freq: 'QD', default_qty: 7 },
+                        { code: 'MED-CEFI-500', name: 'Cefixime 500mg', category: '抗生素', unit: 'tab', default_freq: 'BID', default_qty: 6 },
+                        { code: 'MED-DEXT-15', name: 'Dextromethorphan 15mg', category: '止咳', unit: 'tab', default_freq: 'TID', default_qty: 9 },
+                        { code: 'MED-SALB-INH', name: 'Salbutamol Inhaler', category: '呼吸道', unit: 'puff', default_freq: 'PRN', default_qty: 200, route: 'INH' },
+                        { code: 'MED-METR-250', name: 'Metronidazole 250mg', category: '抗生素', unit: 'tab', default_freq: 'TID', default_qty: 21 },
+                        { code: 'MED-CIPR-500', name: 'Ciprofloxacin 500mg', category: '抗生素', unit: 'tab', default_freq: 'BID', default_qty: 10 },
+                        { code: 'MED-PRED-5', name: 'Prednisolone 5mg', category: '類固醇', unit: 'tab', default_freq: 'QD', default_qty: 5 },
+                        { code: 'MED-MORPH-10', name: 'Morphine 10mg', category: '止痛', unit: 'tab', default_freq: 'Q4H', default_qty: 5, is_controlled: true, schedule: 'II' },
+                        { code: 'MED-TRAM-50', name: 'Tramadol 50mg', category: '止痛', unit: 'cap', default_freq: 'TID', default_qty: 9, is_controlled: true, schedule: 'IV' }
+                    ];
+
+                    await xIRS.DoctorDB.saveMedications(demoMeds);
+                    this.medications = await xIRS.DoctorDB.getAllMedications();
+                    this.favorites = await xIRS.DoctorDB.getTopFavorites(5);
+                    alert('已載入 ' + demoMeds.length + ' 種示範藥品');
+                },
+
+                async exportData() {
+                    const data = await xIRS.DoctorDB.exportAll();
+                    const json = JSON.stringify(data, null, 2);
+                    const blob = new Blob([json], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `doctor-export-${new Date().toISOString().slice(0,10)}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                },
+
+                async clearAllData() {
+                    if (!confirm('確定要清除所有資料嗎？此操作無法復原。')) return;
+
+                    // Clear IndexedDB by closing and deleting
+                    xIRS.DoctorDB.close();
+                    await indexedDB.deleteDatabase('xIRS_Doctor');
+
+                    // Reload
+                    location.reload();
+                }
+            };
+        }
+    </script>
+</body>
+</html>

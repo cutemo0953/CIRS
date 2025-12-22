@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xIRS Rx Protocol Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 { color: #333; }
+        .test-section {
+            background: white;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #2563eb;
+        }
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1d4ed8; }
+        .success { color: #16a34a; font-weight: bold; }
+        .error { color: #dc2626; font-weight: bold; }
+        .result { margin-top: 10px; padding: 10px; background: #f8fafc; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>xIRS Rx Protocol Test</h1>
+    <p>Testing Lite CPOE Phase 5A: Core Protocol</p>
+
+    <div class="test-section">
+        <h2>1. Load Libraries</h2>
+        <button onclick="checkLibraries()">Check Libraries</button>
+        <div id="lib-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>2. Key Generation Test</h2>
+        <button onclick="testKeyGeneration()">Generate Prescriber Keys</button>
+        <div id="key-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>3. Rx Creation & Signing Test</h2>
+        <button onclick="testRxCreation()">Create & Sign Rx</button>
+        <div id="rx-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>4. Rx Verification Test</h2>
+        <button onclick="testRxVerification()">Verify Rx Signature</button>
+        <div id="verify-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>5. Dispense Record Test</h2>
+        <button onclick="testDispenseRecord()">Create Dispense Record</button>
+        <div id="dispense-result" class="result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>6. QR Chunking Test</h2>
+        <button onclick="testQRChunking()">Generate Rx QR Codes</button>
+        <div id="qr-result" class="result"></div>
+    </div>
+
+    <!-- Load TweetNaCl -->
+    <script src="https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl-fast.min.js"></script>
+
+    <!-- Load xIRS libraries -->
+    <script src="/shared/js/xirs-crypto.js"></script>
+    <script src="/shared/js/xirs-rx.js"></script>
+    <script src="/shared/js/xirs-dispense.js"></script>
+
+    <script>
+        // Test state
+        let testKeys = null;
+        let testRxOrder = null;
+        let testCertificate = null;
+
+        function log(elementId, message, isError = false) {
+            const el = document.getElementById(elementId);
+            const cls = isError ? 'error' : 'success';
+            if (typeof message === 'object') {
+                el.innerHTML = `<pre>${JSON.stringify(message, null, 2)}</pre>`;
+            } else {
+                el.innerHTML = `<span class="${cls}">${message}</span>`;
+            }
+        }
+
+        function checkLibraries() {
+            const results = [];
+
+            if (typeof nacl !== 'undefined') {
+                results.push('TweetNaCl loaded');
+            } else {
+                results.push('TweetNaCl MISSING');
+            }
+
+            if (typeof xIRS !== 'undefined') {
+                results.push(`xIRS Crypto v${xIRS.VERSION} loaded`);
+            } else {
+                results.push('xIRS Crypto MISSING');
+            }
+
+            if (xIRS?.Rx) {
+                results.push(`xIRS Rx v${xIRS.Rx.VERSION} loaded`);
+            } else {
+                results.push('xIRS Rx MISSING');
+            }
+
+            if (xIRS?.Dispense) {
+                results.push(`xIRS Dispense v${xIRS.Dispense.VERSION} loaded`);
+            } else {
+                results.push('xIRS Dispense MISSING');
+            }
+
+            log('lib-result', results.join('\n'));
+        }
+
+        function testKeyGeneration() {
+            try {
+                // Generate prescriber keypair
+                testKeys = xIRS.Rx.PrescriberKeys.generate();
+
+                // Verify we can derive public from private
+                const derivedPublic = xIRS.Rx.PrescriberKeys.derivePublicKey(testKeys.privateKey);
+
+                // Create mock certificate
+                testCertificate = {
+                    type: 'PRESCRIBER_CERT',
+                    version: '1.0',
+                    prescriber_id: 'DOC-TEST-001',
+                    name: '測試醫師',
+                    title: '醫師',
+                    license_no: '醫字第999999號',
+                    public_key: testKeys.publicKey,
+                    key_id: 'DOC-TEST-001-2025',
+                    permissions: {
+                        can_prescribe_controlled: true,
+                        controlled_schedule: ['II', 'III', 'IV'],
+                        max_days_supply: 30
+                    },
+                    valid_from: '2025-01-01',
+                    valid_until: '2025-12-31',
+                    issued_by: 'HUB-TEST',
+                    issued_at: Date.now()
+                };
+
+                log('key-result', {
+                    status: 'Keys generated successfully',
+                    publicKey: testKeys.publicKey.substring(0, 20) + '...',
+                    privateKey: testKeys.privateKey.substring(0, 20) + '...',
+                    derivedPublicMatches: derivedPublic === testKeys.publicKey,
+                    certificate: testCertificate
+                });
+            } catch (e) {
+                log('key-result', `Error: ${e.message}`, true);
+            }
+        }
+
+        function testRxCreation() {
+            if (!testKeys) {
+                log('rx-result', 'Please generate keys first', true);
+                return;
+            }
+
+            try {
+                // Create RxBuilder
+                const builder = new xIRS.Rx.RxBuilder(
+                    'DOC-TEST-001',
+                    '測試醫師',
+                    testKeys.privateKey
+                );
+
+                // Create Rx order
+                testRxOrder = builder.createRx({
+                    patient: {
+                        id: 'P0042',
+                        name: '陳小華',
+                        age_group: 'adult',
+                        weight_kg: 65
+                    },
+                    items: [
+                        {
+                            code: 'MED-PARA-500',
+                            name: 'Paracetamol 500mg',
+                            qty: 6,
+                            unit: 'tab',
+                            freq: 'TID',
+                            duration_days: 2,
+                            route: 'PO',
+                            instruction: '飯後服用'
+                        },
+                        {
+                            code: 'MED-AMOX-250',
+                            name: 'Amoxicillin 250mg',
+                            qty: 9,
+                            unit: 'cap',
+                            freq: 'TID',
+                            duration_days: 3,
+                            route: 'PO',
+                            instruction: '飯後服用，需完成療程'
+                        }
+                    ],
+                    priority: 'ROUTINE',
+                    diagnosis_text: '上呼吸道感染',
+                    note: '對 Penicillin 無過敏史'
+                });
+
+                log('rx-result', {
+                    status: 'Rx created and signed',
+                    rx_id: testRxOrder.rx_id,
+                    patient: testRxOrder.patient.name,
+                    items_count: testRxOrder.items.length,
+                    signature: testRxOrder.signature.substring(0, 30) + '...',
+                    full_order: testRxOrder
+                });
+            } catch (e) {
+                log('rx-result', `Error: ${e.message}`, true);
+            }
+        }
+
+        function testRxVerification() {
+            if (!testRxOrder || !testCertificate) {
+                log('verify-result', 'Please create Rx first', true);
+                return;
+            }
+
+            try {
+                // Create verifier and load certificate
+                const verifier = new xIRS.Rx.RxVerifier();
+                verifier.addCertificate(testCertificate);
+
+                // Verify Rx
+                const result = verifier.verify(testRxOrder);
+
+                log('verify-result', {
+                    status: result.valid ? 'Signature VALID' : 'Signature INVALID',
+                    verification_result: result
+                });
+
+                // Also test tampering detection
+                const tampered = JSON.parse(JSON.stringify(testRxOrder));
+                tampered.items[0].qty = 100; // Tamper with quantity
+
+                const tamperedResult = verifier.verify(tampered);
+                log('verify-result', {
+                    original_valid: result.valid,
+                    original_result: result,
+                    tampered_valid: tamperedResult.valid,
+                    tampered_error: tamperedResult.error,
+                    message: 'Tampering detection ' + (tamperedResult.valid ? 'FAILED' : 'WORKING')
+                });
+            } catch (e) {
+                log('verify-result', `Error: ${e.message}`, true);
+            }
+        }
+
+        async function testDispenseRecord() {
+            if (!testRxOrder) {
+                log('dispense-result', 'Please create Rx first', true);
+                return;
+            }
+
+            try {
+                // Create DispenseBuilder
+                const builder = new xIRS.Dispense.DispenseBuilder(
+                    'PHARM-01',
+                    'dGVzdC1zZWNyZXQ=' // Base64 of 'test-secret'
+                );
+
+                // Create filled dispense record
+                const dispenseRecord = await builder.createFilledRecord(
+                    testRxOrder,
+                    'PHARM-001',
+                    '林藥師',
+                    {
+                        'MED-PARA-500': { lot_number: 'LOT2024A', expiry_date: '2025-06' },
+                        'MED-AMOX-250': { lot_number: 'LOT2024B', expiry_date: '2025-08' }
+                    }
+                );
+
+                // Test controlled substance checker
+                const controlledCheck = xIRS.Dispense.ControlledChecker.check(testRxOrder);
+
+                log('dispense-result', {
+                    status: 'Dispense record created',
+                    dispense_id: dispenseRecord.dispense_id,
+                    rx_id: dispenseRecord.rx_id,
+                    status: dispenseRecord.status,
+                    hmac_present: !!dispenseRecord.hmac,
+                    controlled_check: controlledCheck,
+                    full_record: dispenseRecord
+                });
+            } catch (e) {
+                log('dispense-result', `Error: ${e.message}`, true);
+            }
+        }
+
+        function testQRChunking() {
+            if (!testRxOrder) {
+                log('qr-result', 'Please create Rx first', true);
+                return;
+            }
+
+            try {
+                // Generate QR codes
+                const builder = new xIRS.Rx.RxBuilder(
+                    'DOC-TEST-001',
+                    '測試醫師',
+                    testKeys.privateKey
+                );
+                const qrCodes = builder.toQRCodes(testRxOrder);
+
+                // Parse first chunk to verify
+                const parsed = xIRS.QRChunker.parseChunk(qrCodes[0]);
+
+                // Test reassembler
+                const reassembler = new xIRS.QRReassembler();
+                let reassembled = null;
+                for (const qr of qrCodes) {
+                    reassembled = reassembler.addChunk(qr);
+                }
+
+                const matches = reassembled &&
+                    reassembled.rx_id === testRxOrder.rx_id &&
+                    reassembled.signature === testRxOrder.signature;
+
+                log('qr-result', {
+                    status: 'QR codes generated',
+                    chunk_count: qrCodes.length,
+                    first_chunk_preview: qrCodes[0].substring(0, 50) + '...',
+                    parsed_info: parsed,
+                    reassembly_success: reassembler.isComplete,
+                    data_integrity: matches ? 'VERIFIED' : 'MISMATCH'
+                });
+            } catch (e) {
+                log('qr-result', `Error: ${e.message}`, true);
+            }
+        }
+
+        // Auto-check on load
+        window.onload = function() {
+            checkLibraries();
+        };
+    </script>
+</body>
+</html>

@@ -16,12 +16,17 @@ from database import init_db, get_db, dict_from_row, IS_VERCEL, reset_memory_db
 BACKEND_DIR = Path(__file__).parent
 BASE_DIR = BACKEND_DIR.parent
 FRONTEND_DIR = BASE_DIR / 'frontend'
+ADMIN_DIR = BASE_DIR / 'frontend' / 'admin'  # xIRS v2.0: Admin console at /admin/
 MOBILE_DIR = BASE_DIR / 'frontend' / 'mobile'
+STATION_DIR = BASE_DIR / 'frontend' / 'station'
+RUNNER_DIR = BASE_DIR / 'frontend' / 'runner'
+DOCTOR_DIR = BASE_DIR / 'frontend' / 'doctor'
 PORTAL_DIR = BASE_DIR / 'portal'
 FILES_DIR = BASE_DIR / 'files'
+SHARED_DIR = BASE_DIR / 'shared'
 
 # Import routes
-from routes import auth, inventory, person, events, messages, system, backup, zone, resilience, staff, satellite
+from routes import auth, inventory, person, events, messages, system, backup, zone, resilience, staff, satellite, logistics
 
 
 @asynccontextmanager
@@ -73,6 +78,7 @@ app.include_router(zone.router, prefix="/api/zone", tags=["Zone"])
 app.include_router(resilience.router, prefix="/api/resilience", tags=["Resilience"])
 app.include_router(staff.router, prefix="/api/staff", tags=["Staff"])
 app.include_router(satellite.router, prefix="/api/satellite", tags=["Satellite"])
+app.include_router(logistics.router, prefix="/api/logistics", tags=["Logistics"])
 
 
 @app.get("/")
@@ -359,15 +365,23 @@ async def serve_portal():
         return FileResponse(str(portal_index))
     return {"error": "Portal not found"}
 
-# Frontend PWA
+# Admin Console (xIRS v2.0: canonical path)
+@app.get("/admin")
+@app.get("/admin/")
+async def serve_admin():
+    """Serve admin console index.html"""
+    admin_index = ADMIN_DIR / 'index.html'
+    if admin_index.exists():
+        return FileResponse(str(admin_index))
+    return {"error": "Admin console not found"}
+
+# Frontend PWA (legacy - redirect to /admin/)
 @app.get("/frontend")
 @app.get("/frontend/")
 async def serve_frontend():
-    """Serve frontend index.html"""
-    frontend_index = FRONTEND_DIR / 'index.html'
-    if frontend_index.exists():
-        return FileResponse(str(frontend_index))
-    return {"error": "Frontend not found"}
+    """Legacy redirect to /admin/"""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/admin/")
 
 # Mount static directories (only if they exist and not on Vercel)
 # On Vercel, static files are served by the static build
@@ -375,6 +389,26 @@ if not IS_VERCEL:
     # Mount mobile PWA first (more specific path)
     if MOBILE_DIR.exists():
         app.mount("/mobile", StaticFiles(directory=str(MOBILE_DIR), html=True), name="mobile")
+
+    # Mount Station PWA for xIRS Distributed Logistics
+    if STATION_DIR.exists():
+        app.mount("/station", StaticFiles(directory=str(STATION_DIR), html=True), name="station")
+
+    # Mount Runner PWA for xIRS Blind Carrier
+    if RUNNER_DIR.exists():
+        app.mount("/runner", StaticFiles(directory=str(RUNNER_DIR), html=True), name="runner")
+
+    # Mount Doctor PWA for xIRS Lite CPOE
+    if DOCTOR_DIR.exists():
+        app.mount("/doctor", StaticFiles(directory=str(DOCTOR_DIR), html=True), name="doctor")
+
+    # Mount Admin Console (xIRS v2.0: canonical path /admin/)
+    if ADMIN_DIR.exists():
+        app.mount("/admin", StaticFiles(directory=str(ADMIN_DIR), html=True), name="admin")
+
+    # Mount shared JS libraries
+    if SHARED_DIR.exists():
+        app.mount("/shared", StaticFiles(directory=str(SHARED_DIR)), name="shared")
 
     if FRONTEND_DIR.exists():
         app.mount("/frontend", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")

@@ -1,6 +1,13 @@
-# Satellite PWA 開發規格書 v1.3.1
+# Satellite PWA 開發規格書 v1.4
 
 > Hub & Spoke 架構：讓志工手機成為「傳令兵」
+
+**v1.4 更新 (2025-12-20):**
+- 裝置管理：新增 `satellite_devices` 資料表追蹤已配對裝置
+- 撤銷/恢復：支援暫時撤銷裝置權限，可重新配對恢復
+- 黑名單：永久封鎖惡意裝置，即使重新配對也無法使用
+- 活動追蹤：記錄裝置最後活動時間、IP 位址、User-Agent
+- MIRS 整合：MIRS Mobile API 同步升級至 v1.4
 
 **v1.3.1 更新 (2025-12-18):**
 - 角色控制：Hub 可指定配對碼允許的角色（僅志工/僅管理員/兩者）
@@ -145,6 +152,47 @@ POST /api/auth/satellite/exchange # 交換配對碼取得 JWT
 | 使用次數 | 單次使用，成功後立即失效 |
 | 組合數 | 1,000,000 種 |
 | 防護 | API 限速 5 次/分鐘/IP |
+
+#### 裝置管理 API (v1.4)
+
+```
+# Hub 端 (Admin Only)
+GET  /api/auth/satellite/devices           # 列出所有已配對裝置
+     Response: {
+       "devices": [...],
+       "total": 5,
+       "active": 3,
+       "revoked": 1,
+       "blacklisted": 1
+     }
+
+POST /api/auth/satellite/devices/revoke    # 撤銷裝置（可重新配對）
+     Body: { "device_id": "...", "reason": "遺失裝置" }
+     Response: { "success": true, "message": "裝置已撤銷" }
+
+POST /api/auth/satellite/devices/unrevoke  # 恢復已撤銷的裝置
+     Body: { "device_id": "..." }
+     Response: { "success": true, "message": "裝置已恢復" }
+
+POST /api/auth/satellite/devices/blacklist # 永久封鎖（無法重新配對）
+     Body: { "device_id": "...", "reason": "惡意裝置" }
+     Response: { "success": true, "message": "裝置已加入黑名單" }
+
+POST /api/auth/satellite/devices/unblacklist # 解除黑名單
+     Body: { "device_id": "..." }
+     Response: { "success": true, "message": "裝置已從黑名單移除" }
+
+PATCH /api/auth/satellite/devices/{device_id} # 更新裝置名稱
+     Body: { "device_name": "志工A的手機" }
+```
+
+#### 裝置狀態說明 (v1.4)
+
+| 狀態 | 說明 | 可重新配對 |
+|------|------|-----------|
+| Active | 正常使用中 | - |
+| Revoked | 暫時撤銷 | ✓ 可以 |
+| Blacklisted | 永久封鎖 | ✗ 不可 |
 
 #### 操作 API
 

@@ -1,9 +1,9 @@
 """
 CIRS Authentication Routes
 PIN-based authentication with JWT tokens
-Satellite PWA Pairing v1.3 (6-digit Numeric Code + Rate Limiting)
+Satellite PWA Pairing v1.4 (Device Registration + Revocation/Blacklist)
 """
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Depends, Request, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -421,10 +421,17 @@ async def get_pairing_qr(request: Request, credentials: HTTPAuthorizationCredent
 
 
 @router.get("/pairing-info")
-async def get_pairing_info(request: Request, credentials: HTTPAuthorizationCredentials = Depends(security)):
+async def get_pairing_info(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    allowed_roles: str = Query(default='volunteer', description="Allowed roles: volunteer, admin, or volunteer,admin")
+):
     """
-    Get pairing information as JSON (v1.3: separate QR URL and pairing code).
+    Get pairing information as JSON (v1.4: supports allowed_roles parameter).
     Requires admin authentication.
+
+    Query params:
+        allowed_roles: 'volunteer', 'admin', or 'volunteer,admin' (default: volunteer)
     """
     # Require admin role
     user = await get_current_user(credentials)
@@ -450,8 +457,8 @@ async def get_pairing_info(request: Request, credentials: HTTPAuthorizationCrede
     if forwarded_host:
         host_ip = forwarded_host.split(":")[0]
 
-    # Create pairing code (v1.3.1: default volunteer only, can be changed via POST)
-    pairing = create_pairing_code(hub_name)
+    # Create pairing code with specified allowed_roles (v1.4 fix)
+    pairing = create_pairing_code(hub_name, allowed_roles)
 
     return {
         "hub_name": hub_name,
@@ -542,16 +549,73 @@ async def generate_pairing_code_with_roles(
     }
 
 
+def is_device_allowed(device_id: str) -> dict:
+    """Check if a device is allowed (not revoked or blacklisted) - v1.4"""
+    with get_db() as conn:
+        cursor = conn.execute(
+            """SELECT device_id, is_revoked, is_blacklisted, allowed_roles
+               FROM satellite_devices WHERE device_id = ?""",
+            (device_id,)
+        )
+        row = cursor.fetchone()
+
+        if row is None:
+            # New device - allowed
+            return {"allowed": True, "is_new": True}
+
+        device = dict_from_row(row)
+
+        if device.get('is_blacklisted'):
+            return {"allowed": False, "error": "Device is blacklisted", "is_blacklisted": True}
+
+        if device.get('is_revoked'):
+            return {"allowed": False, "error": "Device access has been revoked", "is_revoked": True}
+
+        return {
+            "allowed": True,
+            "is_new": False,
+            "allowed_roles": device.get('allowed_roles', 'volunteer')
+        }
+
+
+def register_device(device_id: str, allowed_roles: str, user_agent: str = None, ip_address: str = None):
+    """Register a new device or update existing one - v1.4"""
+    with write_db() as conn:
+        # Check if device exists
+        cursor = conn.execute(
+            "SELECT device_id FROM satellite_devices WHERE device_id = ?",
+            (device_id,)
+        )
+        exists = cursor.fetchone() is not None
+
+        if exists:
+            # Update existing device (re-pairing)
+            conn.execute(
+                """UPDATE satellite_devices
+                   SET allowed_roles = ?, is_revoked = 0, last_activity_at = CURRENT_TIMESTAMP,
+                       user_agent = COALESCE(?, user_agent), ip_address = COALESCE(?, ip_address)
+                   WHERE device_id = ?""",
+                (allowed_roles, user_agent, ip_address, device_id)
+            )
+        else:
+            # Insert new device
+            conn.execute(
+                """INSERT INTO satellite_devices (device_id, allowed_roles, user_agent, ip_address, last_activity_at)
+                   VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                (device_id, allowed_roles, user_agent, ip_address)
+            )
+
+
 @router.post("/satellite/exchange")
 async def exchange_pairing_code(request_body: SatelliteExchangeRequest, request: Request):
     """
-    Exchange a pairing code for a JWT token (v1.3: with rate limiting).
+    Exchange a pairing code for a JWT token (v1.4: with device registration).
 
     Flow:
     1. User opens PWA via QR code (static URL)
     2. User enters 6-digit pairing code shown on Portal
     3. Satellite POSTs pairing_code + device_id to this endpoint
-    4. Hub validates code and returns JWT bound to device_id
+    4. Hub validates code, checks device status, and returns JWT bound to device_id
 
     Rate limit: 5 attempts per minute per IP address.
     The JWT is valid for 12 hours and bound to the device_id.
@@ -569,6 +633,14 @@ async def exchange_pairing_code(request_body: SatelliteExchangeRequest, request:
             detail="Too many attempts. Please wait 60 seconds before trying again."
         )
 
+    # v1.4: Check if device is blacklisted (before validating code to save DB writes)
+    device_status = is_device_allowed(request_body.device_id)
+    if device_status.get('is_blacklisted'):
+        raise HTTPException(
+            status_code=403,
+            detail="This device has been permanently blocked. Contact administrator."
+        )
+
     # Validate pairing code
     result = validate_pairing_code(request_body.pairing_code, request_body.device_id)
 
@@ -577,6 +649,10 @@ async def exchange_pairing_code(request_body: SatelliteExchangeRequest, request:
 
     # v1.3.1: Get allowed_roles from pairing code
     allowed_roles = result.get('allowed_roles', 'volunteer')
+
+    # v1.4: Register or update device
+    user_agent = request.headers.get("User-Agent")
+    register_device(request_body.device_id, allowed_roles, user_agent, client_ip)
 
     # Create JWT token bound to this device with role control
     token = create_satellite_token(result['hub_name'], request_body.device_id, allowed_roles)
@@ -594,7 +670,7 @@ async def exchange_pairing_code(request_body: SatelliteExchangeRequest, request:
 @router.post("/satellite/verify")
 async def verify_satellite_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """
-    Verify a satellite pairing token (v1.3.1: includes allowed_roles).
+    Verify a satellite pairing token (v1.4: includes device status check).
     Returns hub info if valid.
     """
     if credentials is None:
@@ -607,10 +683,283 @@ async def verify_satellite_token(credentials: HTTPAuthorizationCredentials = Dep
     if payload.get("type") != "satellite_pairing":
         raise HTTPException(status_code=401, detail="Invalid token type")
 
+    # v1.4: Check device status
+    device_id = payload.get("device_id")
+    if device_id:
+        device_status = is_device_allowed(device_id)
+        if not device_status.get('allowed'):
+            raise HTTPException(
+                status_code=403,
+                detail=device_status.get('error', 'Device access denied')
+            )
+
+        # Update last activity
+        with write_db() as conn:
+            conn.execute(
+                "UPDATE satellite_devices SET last_activity_at = CURRENT_TIMESTAMP WHERE device_id = ?",
+                (device_id,)
+            )
+
     return {
         "valid": True,
         "hub_name": payload.get("hub_name", "CIRS Hub"),
-        "device_id": payload.get("device_id"),  # v1.1: bound device
+        "device_id": device_id,  # v1.1: bound device
         "allowed_roles": payload.get("allowed_roles", "volunteer"),  # v1.3.1: role control
         "issued_at": payload.get("issued_at")
+    }
+
+
+# ============================================================================
+# Device Management Endpoints (v1.4)
+# ============================================================================
+
+class DeviceActionRequest(BaseModel):
+    """Request body for device actions (revoke, unrevoke, blacklist)"""
+    device_id: str
+    reason: str = None
+
+
+@router.get("/satellite/devices")
+async def list_satellite_devices(credentials: HTTPAuthorizationCredentials = Depends(security)):
+    """
+    List all registered satellite devices (v1.4).
+    Requires admin authentication.
+    """
+    user = await get_current_user(credentials)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    with get_db() as conn:
+        cursor = conn.execute("""
+            SELECT device_id, device_name, allowed_roles, is_revoked, is_blacklisted,
+                   last_activity_at, paired_at, revoked_at, revoked_by, revoke_reason,
+                   user_agent, ip_address
+            FROM satellite_devices
+            ORDER BY last_activity_at DESC
+        """)
+        devices = [dict_from_row(row) for row in cursor.fetchall()]
+
+    return {
+        "devices": devices,
+        "total": len(devices),
+        "active": sum(1 for d in devices if not d.get('is_revoked') and not d.get('is_blacklisted')),
+        "revoked": sum(1 for d in devices if d.get('is_revoked') and not d.get('is_blacklisted')),
+        "blacklisted": sum(1 for d in devices if d.get('is_blacklisted'))
+    }
+
+
+@router.post("/satellite/devices/revoke")
+async def revoke_device(
+    request_body: DeviceActionRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Revoke a device's access (v1.4).
+    Device can re-pair later with a new pairing code.
+    Requires admin authentication.
+    """
+    user = await get_current_user(credentials)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    with write_db() as conn:
+        cursor = conn.execute(
+            "SELECT device_id, is_blacklisted FROM satellite_devices WHERE device_id = ?",
+            (request_body.device_id,)
+        )
+        device = cursor.fetchone()
+
+        if device is None:
+            raise HTTPException(status_code=404, detail="Device not found")
+
+        if device['is_blacklisted']:
+            raise HTTPException(status_code=400, detail="Device is blacklisted, cannot revoke")
+
+        conn.execute(
+            """UPDATE satellite_devices
+               SET is_revoked = 1, revoked_at = CURRENT_TIMESTAMP,
+                   revoked_by = ?, revoke_reason = ?
+               WHERE device_id = ?""",
+            (user['id'], request_body.reason, request_body.device_id)
+        )
+
+    return {
+        "success": True,
+        "device_id": request_body.device_id,
+        "message": "Device access revoked. Device can re-pair with a new code."
+    }
+
+
+@router.post("/satellite/devices/unrevoke")
+async def unrevoke_device(
+    request_body: DeviceActionRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Restore a revoked device's access (v1.4).
+    Requires admin authentication.
+    """
+    user = await get_current_user(credentials)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    with write_db() as conn:
+        cursor = conn.execute(
+            "SELECT device_id, is_blacklisted, is_revoked FROM satellite_devices WHERE device_id = ?",
+            (request_body.device_id,)
+        )
+        device = cursor.fetchone()
+
+        if device is None:
+            raise HTTPException(status_code=404, detail="Device not found")
+
+        if device['is_blacklisted']:
+            raise HTTPException(status_code=400, detail="Device is blacklisted, cannot unrevoke. Remove from blacklist first.")
+
+        if not device['is_revoked']:
+            raise HTTPException(status_code=400, detail="Device is not revoked")
+
+        conn.execute(
+            """UPDATE satellite_devices
+               SET is_revoked = 0, revoked_at = NULL, revoked_by = NULL, revoke_reason = NULL
+               WHERE device_id = ?""",
+            (request_body.device_id,)
+        )
+
+    return {
+        "success": True,
+        "device_id": request_body.device_id,
+        "message": "Device access restored."
+    }
+
+
+@router.post("/satellite/devices/blacklist")
+async def blacklist_device(
+    request_body: DeviceActionRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Permanently blacklist a device (v1.4).
+    Device cannot re-pair even with a new pairing code.
+    Requires admin authentication.
+    """
+    user = await get_current_user(credentials)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    with write_db() as conn:
+        cursor = conn.execute(
+            "SELECT device_id FROM satellite_devices WHERE device_id = ?",
+            (request_body.device_id,)
+        )
+        device = cursor.fetchone()
+
+        if device is None:
+            # Create blacklist entry even if device never paired
+            conn.execute(
+                """INSERT INTO satellite_devices (device_id, is_blacklisted, revoked_by, revoke_reason)
+                   VALUES (?, 1, ?, ?)""",
+                (request_body.device_id, user['id'], request_body.reason)
+            )
+        else:
+            conn.execute(
+                """UPDATE satellite_devices
+                   SET is_blacklisted = 1, is_revoked = 1,
+                       revoked_at = CURRENT_TIMESTAMP, revoked_by = ?, revoke_reason = ?
+                   WHERE device_id = ?""",
+                (user['id'], request_body.reason, request_body.device_id)
+            )
+
+    return {
+        "success": True,
+        "device_id": request_body.device_id,
+        "message": "Device permanently blacklisted."
+    }
+
+
+@router.post("/satellite/devices/unblacklist")
+async def unblacklist_device(
+    request_body: DeviceActionRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Remove a device from blacklist (v1.4).
+    Device can then re-pair with a new pairing code.
+    Requires admin authentication.
+    """
+    user = await get_current_user(credentials)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    with write_db() as conn:
+        cursor = conn.execute(
+            "SELECT device_id, is_blacklisted FROM satellite_devices WHERE device_id = ?",
+            (request_body.device_id,)
+        )
+        device = cursor.fetchone()
+
+        if device is None:
+            raise HTTPException(status_code=404, detail="Device not found")
+
+        if not device['is_blacklisted']:
+            raise HTTPException(status_code=400, detail="Device is not blacklisted")
+
+        conn.execute(
+            """UPDATE satellite_devices
+               SET is_blacklisted = 0, is_revoked = 0,
+                   revoked_at = NULL, revoked_by = NULL, revoke_reason = NULL
+               WHERE device_id = ?""",
+            (request_body.device_id,)
+        )
+
+    return {
+        "success": True,
+        "device_id": request_body.device_id,
+        "message": "Device removed from blacklist. Device can now re-pair."
+    }
+
+
+@router.patch("/satellite/devices/{device_id}")
+async def update_device_name(
+    device_id: str,
+    device_name: str = None,
+    credentials: HTTPAuthorizationCredentials = Depends(security)
+):
+    """
+    Update device name/label (v1.4).
+    Requires admin authentication.
+    """
+    user = await get_current_user(credentials)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    if user.get('role') != 'admin':
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    with write_db() as conn:
+        cursor = conn.execute(
+            "SELECT device_id FROM satellite_devices WHERE device_id = ?",
+            (device_id,)
+        )
+        if cursor.fetchone() is None:
+            raise HTTPException(status_code=404, detail="Device not found")
+
+        conn.execute(
+            "UPDATE satellite_devices SET device_name = ? WHERE device_id = ?",
+            (device_name, device_id)
+        )
+
+    return {
+        "success": True,
+        "device_id": device_id,
+        "device_name": device_name
     }

@@ -32,11 +32,12 @@ CIRS/
 
 ```python
 IS_VERCEL = os.environ.get("VERCEL") == "1"
+DB_NAME = "xirs_hub.db"  # v2.0+, auto-migrates from cirs.db
 
 if IS_VERCEL:
     DB_PATH = ":memory:"
 else:
-    DB_PATH = str(BACKEND_DIR / "data" / "cirs.db")
+    DB_PATH = str(BACKEND_DIR / "data" / DB_NAME)
 ```
 
 ### 2. Serverless 入口 (`api/index.py`)
