@@ -27,7 +27,7 @@ FILES_DIR = BASE_DIR / 'files'
 SHARED_DIR = BASE_DIR / 'shared'
 
 # Import routes
-from routes import auth, inventory, person, events, messages, system, backup, zone, resilience, staff, satellite, logistics
+from routes import auth, inventory, person, events, messages, system, backup, zone, resilience, staff, satellite, logistics, registrations, medications
 
 
 @asynccontextmanager
@@ -80,6 +80,8 @@ app.include_router(resilience.router, prefix="/api/resilience", tags=["Resilienc
 app.include_router(staff.router, prefix="/api/staff", tags=["Staff"])
 app.include_router(satellite.router, prefix="/api/satellite", tags=["Satellite"])
 app.include_router(logistics.router, prefix="/api/logistics", tags=["Logistics"])
+app.include_router(registrations.router, prefix="/api/registrations", tags=["Registrations"])
+app.include_router(medications.router, prefix="/api/medications", tags=["Medications"])
 
 
 @app.get("/")

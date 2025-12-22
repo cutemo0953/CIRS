@@ -148,23 +148,26 @@
                             返回
                         </button>
                         <h2 class="text-2xl font-bold">配對 Hub</h2>
-                        <p class="text-white/70 mt-1">掃描管理員提供的 QR Code</p>
+                        <p class="text-white/70 mt-1">輸入管理員提供的 6 碼配對碼</p>
                     </div>
 
                     <!-- Content -->
                     <div class="flex-1 p-6 space-y-6">
-                        <!-- QR Scanner -->
-                        <div class="bg-gray-900 rounded-2xl overflow-hidden aspect-square relative">
-                            <div id="pairing-scanner" class="w-full h-full"></div>
-                            <div x-show="pairingStatus === 'connecting'" class="absolute inset-0 bg-black/80 flex items-center justify-center">
-                                <div class="text-center text-white">
-                                    <svg class="w-12 h-12 mx-auto animate-spin" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                    </svg>
-                                    <p class="mt-4" x-text="pairingMessage"></p>
-                                </div>
-                            </div>
+                        <!-- Connecting Status -->
+                        <div x-show="pairingStatus === 'connecting'" class="bg-station-50 rounded-2xl p-8 text-center">
+                            <svg class="w-16 h-16 mx-auto animate-spin text-station-600" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            <p class="mt-4 text-station-700 font-medium" x-text="pairingMessage"></p>
+                        </div>
+
+                        <!-- Success Status -->
+                        <div x-show="pairingStatus === 'success'" class="bg-green-50 rounded-2xl p-8 text-center">
+                            <svg class="w-16 h-16 mx-auto text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            <p class="mt-4 text-green-700 font-medium">配對成功！</p>
                         </div>
 
                         <!-- Error message -->
@@ -174,32 +177,29 @@
                             <button @click="resetPairing()" class="mt-3 text-sm underline">重試</button>
                         </div>
 
-                        <!-- Divider -->
-                        <div class="flex items-center gap-4">
-                            <div class="flex-1 h-px bg-gray-200"></div>
-                            <span class="text-sm text-gray-400">或</span>
-                            <div class="flex-1 h-px bg-gray-200"></div>
-                        </div>
-
-                        <!-- Manual Entry -->
-                        <div class="space-y-4">
+                        <!-- 6-digit Code Entry (Primary) -->
+                        <div x-show="pairingStatus !== 'connecting' && pairingStatus !== 'success'" class="space-y-4">
                             <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">Hub URL</label>
-                                <input type="url" x-model="manualPairing.hubUrl"
-                                       placeholder="https://hub.example.com"
-                                       class="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-station-500 focus:border-station-500">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-gray-700 mb-2">配對碼 (6 碼)</label>
+                                <label class="block text-sm font-medium text-gray-700 mb-2">輸入配對碼 (6 碼)</label>
                                 <input type="text" x-model="manualPairing.code"
                                        placeholder="A3X9K2" maxlength="6"
+                                       @input="manualPairing.code = manualPairing.code.toUpperCase()"
                                        class="w-full border border-gray-300 rounded-lg px-4 py-3 text-center text-2xl tracking-widest font-mono uppercase focus:ring-2 focus:ring-station-500 focus:border-station-500">
                             </div>
                             <button @click="pairManually()"
-                                    :disabled="!manualPairing.hubUrl || manualPairing.code.length < 6"
+                                    :disabled="manualPairing.code.length < 6"
                                     class="w-full bg-station-600 text-white py-4 rounded-xl font-bold disabled:opacity-50 disabled:cursor-not-allowed">
-                                手動配對
+                                配對
                             </button>
+                            <!-- Show Hub URL as info (collapsible) -->
+                            <details class="text-sm text-gray-500">
+                                <summary class="cursor-pointer">進階選項</summary>
+                                <div class="mt-2">
+                                    <label class="block text-xs text-gray-500 mb-1">Hub URL</label>
+                                    <input type="url" x-model="manualPairing.hubUrl"
+                                           class="w-full border border-gray-200 rounded px-3 py-2 text-sm">
+                                </div>
+                            </details>
                         </div>
 
                         <!-- Offline Import -->
@@ -800,7 +800,7 @@
                 pairingMessage: '',
                 pairingScanner: null,
                 manualPairing: {
-                    hubUrl: '',
+                    hubUrl: `${window.location.protocol}//${window.location.host}`,  // Auto-fill
                     code: ''
                 },
 
@@ -869,17 +869,55 @@
                         await xIRS.StationDB.init();
                         await this.refreshData();
                     } else {
-                        // Start pairing scanner when step 2 is shown
-                        this.$watch('onboardingStep', (step) => {
-                            if (step === 2) {
-                                this.$nextTick(() => this.startPairingScanner());
-                            } else {
-                                this.stopPairingScanner();
-                            }
-                        });
+                        // Check for URL pairing parameters (from QR scan)
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const pairCode = urlParams.get('pair');
+                        const stationId = urlParams.get('id');
+
+                        if (pairCode && stationId) {
+                            // Auto-start pairing from URL params
+                            console.log('[Station] Auto-pairing from URL:', pairCode);
+                            this.onboardingStep = 2;  // Skip to pairing step
+                            this.$nextTick(() => this.autoPairFromURL(pairCode));
+                        }
+                        // No QR scanner - just use 6-digit code input
                     }
 
                     console.log('[Station] v2.3 Initialized');
+                },
+
+                // Auto-pair from URL parameters
+                async autoPairFromURL(pairCode) {
+                    this.pairingStatus = 'connecting';
+                    this.pairingMessage = '正在配對...';
+
+                    // Get hub URL from current location (same server)
+                    const hubUrl = `${window.location.protocol}//${window.location.host}`;
+
+                    try {
+                        const result = await xIRS.PairingAPI.pair(hubUrl, pairCode);
+
+                        if (result.success) {
+                            xIRS.StationConfig.save(result.config);
+                            this.config = result.config;
+                            this.pairingStatus = 'success';
+                            this.pairingMessage = '配對成功！';
+
+                            // Clear URL params
+                            window.history.replaceState({}, '', window.location.pathname);
+
+                            // Move to step 3 (display name confirmation)
+                            setTimeout(() => {
+                                this.onboardingStep = 3;
+                            }, 1000);
+                        } else {
+                            this.pairingStatus = 'error';
+                            this.pairingMessage = result.error;
+                        }
+                    } catch (e) {
+                        this.pairingStatus = 'error';
+                        this.pairingMessage = '配對失敗: ' + e.message;
+                    }
                 },
 
                 // Pairing Flow
@@ -990,7 +1028,7 @@
                 resetPairing() {
                     this.pairingStatus = 'idle';
                     this.pairingMessage = '';
-                    this.$nextTick(() => this.startPairingScanner());
+                    this.manualPairing.code = '';
                 },
 
                 async finishOnboarding() {

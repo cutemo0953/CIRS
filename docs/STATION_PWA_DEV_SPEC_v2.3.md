@@ -1,8 +1,8 @@
 # xIRS Station & Pharmacy PWA Development Specification v2.3
 
-**Version**: 2.3 (Final Merged)
+**Version**: 2.3.1 (Updated)
 **Date**: 2025-12-22
-**Status**: Ready for Development
+**Status**: In Development
 **Supersedes**: v2.0, v2.2
 **Contributors**: Claude, ChatGPT, Gemini
 
@@ -17,6 +17,7 @@
 | **Claude** | Web Crypto over SQLCipher, CERT_UPDATE packet |
 | **ChatGPT** | Pairing security (no embedded secrets), patient_ref hardening |
 | **Gemini** | Final architecture consolidation |
+| **v2.3.1** | Auto-detect IP for `hub_url` via socket (fix localhost issue) |
 
 ---
 
@@ -80,16 +81,28 @@
 
 ### 2.2 配對 QR 格式 (v2.3)
 
+**QR Code 內容 (URL 格式 - 給手機相機掃描)**:
+```
+http://10.42.0.252:8090/station/?pair=A3X9K2&id=STATION-PARK
+```
+
+**API Response (JSON 格式 - 供 PWA 內部掃描器使用)**:
 ```json
 {
   "type": "STATION_PAIR_INVITE",
   "ver": 1,
-  "hub_url": "https://hub.example.com",
-  "pairing_code": "A3X9K2",           // 6-char, expires in 10 min
-  "station_id": "STATION-PARK",       // Pre-assigned ID
-  "station_type": "SUPPLY"            // or "PHARMACY"
+  "hub_url": "http://10.42.0.252:8090",
+  "pairing_code": "A3X9K2",
+  "station_id": "STATION-PARK",
+  "station_type": "SUPPLY"
 }
 ```
+
+> **實作說明 (v2.3.1)**:
+> - QR code 現在使用 **URL 格式**，手機相機掃描後會直接開啟對應的 PWA 頁面
+> - PWA 偵測 URL 參數 (`?pair=xxx&id=xxx`) 並自動開始配對流程
+> - IP 由 API Server 使用 socket 自動偵測，即使從 `localhost` 存取也能產生正確 IP
+> - 此設計讓配對流程從「掃描 QR → 開啟 PWA → 自動配對」一氣呵成
 
 ### 2.3 配對流程
 

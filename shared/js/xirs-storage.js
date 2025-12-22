@@ -1,13 +1,23 @@
 /**
- * xIRS Storage Library v1.8 - IndexedDB Offline Storage
+ * xIRS Storage Library v2.0 - IndexedDB Offline Storage
  *
- * Provides persistent storage for Station PWA:
+ * Provides persistent storage for Station/Pharmacy PWA:
  * - Inventory management
  * - Action queue (pending reports)
  * - Processed manifests
  * - Person registry
+ * - Prescriber certificates (Pharmacy)
+ * - Clinical records (Pharmacy, encrypted)
+ * - Consumption tickets
  *
  * All data survives browser close and works offline.
+ *
+ * v2.0 Changes:
+ * - Added PharmacyDB class with clinical stores
+ * - Added prescribers store for certificate management
+ * - Added clinical store for encrypted Class B data
+ * - Added consumption_tickets store
+ * - Added processed_rx store for Rx deduplication
  */
 
 (function(global) {
@@ -523,10 +533,609 @@
         }
     }
 
-    // Export singleton
+    /**
+     * PharmacyDB - Extended storage for Pharmacy Station
+     * Includes clinical data stores with encryption support
+     */
+    const PHARMACY_DB_NAME = 'xIRS_Pharmacy';
+    const PHARMACY_DB_VERSION = 1;
+
+    class PharmacyDB {
+        constructor() {
+            this.db = null;
+            this._initPromise = null;
+        }
+
+        /**
+         * Initialize database
+         * @returns {Promise<IDBDatabase>}
+         */
+        async init() {
+            if (this.db) return this.db;
+            if (this._initPromise) return this._initPromise;
+
+            this._initPromise = new Promise((resolve, reject) => {
+                const request = indexedDB.open(PHARMACY_DB_NAME, PHARMACY_DB_VERSION);
+
+                request.onerror = () => {
+                    console.error('[PharmacyDB] Failed to open:', request.error);
+                    reject(request.error);
+                };
+
+                request.onsuccess = () => {
+                    this.db = request.result;
+                    console.log('[PharmacyDB] Opened successfully');
+                    resolve(this.db);
+                };
+
+                request.onupgradeneeded = (event) => {
+                    const db = event.target.result;
+                    console.log('[PharmacyDB] Upgrading schema...');
+
+                    // Config store (station config, keys)
+                    if (!db.objectStoreNames.contains('config')) {
+                        db.createObjectStore('config', { keyPath: 'key' });
+                    }
+
+                    // Inventory store (medications)
+                    if (!db.objectStoreNames.contains('inventory')) {
+                        const invStore = db.createObjectStore('inventory', { keyPath: 'code' });
+                        invStore.createIndex('category', 'category', { unique: false });
+                        invStore.createIndex('is_controlled', 'is_controlled', { unique: false });
+                        invStore.createIndex('name', 'name', { unique: false });
+                    }
+
+                    // Prescriber certificates
+                    if (!db.objectStoreNames.contains('prescribers')) {
+                        const presStore = db.createObjectStore('prescribers', { keyPath: 'id' });
+                        presStore.createIndex('name', 'name', { unique: false });
+                        presStore.createIndex('expires_at', 'expires_at', { unique: false });
+                        presStore.createIndex('revoked', 'revoked', { unique: false });
+                    }
+
+                    // Processed prescriptions (Rx deduplication)
+                    if (!db.objectStoreNames.contains('processed_rx')) {
+                        const rxStore = db.createObjectStore('processed_rx', { keyPath: 'rx_id' });
+                        rxStore.createIndex('processed_at', 'processed_at', { unique: false });
+                        rxStore.createIndex('status', 'status', { unique: false });
+                        rxStore.createIndex('nonce', 'nonce', { unique: false });
+                    }
+
+                    // Clinical records (encrypted Class B data)
+                    if (!db.objectStoreNames.contains('clinical')) {
+                        const clinStore = db.createObjectStore('clinical', { keyPath: 'record_id' });
+                        clinStore.createIndex('type', 'type', { unique: false });
+                        clinStore.createIndex('patient_ref', 'patient_ref', { unique: false });
+                        clinStore.createIndex('ts', 'ts', { unique: false });
+                        clinStore.createIndex('synced', 'synced', { unique: false });
+                    }
+
+                    // Dispense queue (pending Rx to fill)
+                    if (!db.objectStoreNames.contains('dispense_queue')) {
+                        const qStore = db.createObjectStore('dispense_queue', { keyPath: 'rx_id' });
+                        qStore.createIndex('priority', 'priority', { unique: false });
+                        qStore.createIndex('received_at', 'received_at', { unique: false });
+                        qStore.createIndex('status', 'status', { unique: false });
+                    }
+
+                    // Action queue (pending sync)
+                    if (!db.objectStoreNames.contains('actions')) {
+                        const actStore = db.createObjectStore('actions', { keyPath: 'id', autoIncrement: true });
+                        actStore.createIndex('type', 'type', { unique: false });
+                        actStore.createIndex('ts', 'ts', { unique: false });
+                        actStore.createIndex('synced', 'synced', { unique: false });
+                    }
+
+                    // Pending reports
+                    if (!db.objectStoreNames.contains('reports')) {
+                        const repStore = db.createObjectStore('reports', { keyPath: 'packet_id' });
+                        repStore.createIndex('created_at', 'created_at', { unique: false });
+                        repStore.createIndex('delivered', 'delivered', { unique: false });
+                    }
+
+                    console.log('[PharmacyDB] Schema created');
+                };
+            });
+
+            return this._initPromise;
+        }
+
+        /**
+         * Get object store transaction
+         */
+        _getStore(storeName, mode = 'readonly') {
+            const tx = this.db.transaction(storeName, mode);
+            return tx.objectStore(storeName);
+        }
+
+        // ===== Prescriber Certificate Methods =====
+
+        /**
+         * Add or update prescriber certificate
+         * @param {Object} cert - { id, name, public_key, expires_at, revoked }
+         * @returns {Promise<string>}
+         */
+        async putPrescriber(cert) {
+            await this.init();
+            const record = {
+                ...cert,
+                updated_at: new Date().toISOString()
+            };
+
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('prescribers', 'readwrite');
+                const request = store.put(record);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        /**
+         * Get prescriber by ID
+         * @param {string} id - Prescriber ID
+         * @returns {Promise<Object|null>}
+         */
+        async getPrescriber(id) {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('prescribers');
+                const request = store.get(id);
+                request.onsuccess = () => resolve(request.result || null);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        /**
+         * Get all valid (non-revoked, non-expired) prescribers
+         * @returns {Promise<Array>}
+         */
+        async getValidPrescribers() {
+            await this.init();
+            const all = await new Promise((resolve, reject) => {
+                const store = this._getStore('prescribers');
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+
+            const now = Math.floor(Date.now() / 1000);
+            return all.filter(p => !p.revoked && p.expires_at > now);
+        }
+
+        /**
+         * Bulk update prescribers from CERT_UPDATE packet
+         * @param {Array} certs - Array of certificates
+         * @returns {Promise<number>} Count updated
+         */
+        async updatePrescribers(certs) {
+            await this.init();
+            let count = 0;
+            for (const cert of certs) {
+                await this.putPrescriber(cert);
+                count++;
+            }
+            return count;
+        }
+
+        // ===== Processed Rx Methods =====
+
+        /**
+         * Check if Rx was already processed
+         * @param {string} rxId - Rx ID
+         * @returns {Promise<Object|null>}
+         */
+        async getProcessedRx(rxId) {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('processed_rx');
+                const request = store.get(rxId);
+                request.onsuccess = () => resolve(request.result || null);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        /**
+         * Record processed Rx
+         * @param {string} rxId - Rx ID
+         * @param {string} nonce - Rx nonce
+         * @param {string} status - FILLED, PARTIAL, REJECTED
+         * @param {string} pharmacistId - Pharmacist ID
+         * @returns {Promise<string>}
+         */
+        async recordProcessedRx(rxId, nonce, status, pharmacistId) {
+            await this.init();
+            const record = {
+                rx_id: rxId,
+                nonce: nonce,
+                status: status,
+                pharmacist_id: pharmacistId,
+                processed_at: new Date().toISOString()
+            };
+
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('processed_rx', 'readwrite');
+                const request = store.put(record);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // ===== Clinical Records Methods (Encrypted) =====
+
+        /**
+         * Store encrypted clinical record
+         * @param {Object} encryptedEnvelope - { type, payload, ... }
+         * @param {string} recordId - Record ID
+         * @param {string} recordType - DISPENSE_RECORD, ADMIN_RECORD, etc.
+         * @param {string} patientRef - Masked patient reference
+         * @returns {Promise<string>}
+         */
+        async storeClinicalRecord(encryptedEnvelope, recordId, recordType, patientRef) {
+            await this.init();
+            const record = {
+                record_id: recordId,
+                type: recordType,
+                patient_ref: patientRef,
+                envelope: encryptedEnvelope,
+                ts: Math.floor(Date.now() / 1000),
+                synced: false,
+                created_at: new Date().toISOString()
+            };
+
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('clinical', 'readwrite');
+                const request = store.put(record);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        /**
+         * Get pending (unsynced) clinical records
+         * @returns {Promise<Array>}
+         */
+        async getPendingClinicalRecords() {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('clinical');
+                const index = store.index('synced');
+                const request = index.getAll(IDBKeyRange.only(false));
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        /**
+         * Mark clinical records as synced
+         * @param {Array<string>} recordIds - Record IDs
+         * @returns {Promise<number>}
+         */
+        async markClinicalRecordsSynced(recordIds) {
+            await this.init();
+            let count = 0;
+
+            for (const id of recordIds) {
+                await new Promise((resolve, reject) => {
+                    const store = this._getStore('clinical', 'readwrite');
+                    const request = store.get(id);
+                    request.onsuccess = () => {
+                        const record = request.result;
+                        if (record) {
+                            record.synced = true;
+                            record.synced_at = new Date().toISOString();
+                            store.put(record);
+                            count++;
+                        }
+                        resolve();
+                    };
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            return count;
+        }
+
+        // ===== Dispense Queue Methods =====
+
+        /**
+         * Add Rx to dispense queue
+         * @param {Object} rx - Rx order object
+         * @returns {Promise<string>}
+         */
+        async addToDispenseQueue(rx) {
+            await this.init();
+            const record = {
+                rx_id: rx.rx_id,
+                prescriber_id: rx.prescriber_id,
+                patient_ref: rx.patient_ref,
+                items: rx.items,
+                priority: rx.priority || 'ROUTINE',
+                status: 'PENDING',
+                received_at: new Date().toISOString(),
+                original_rx: rx
+            };
+
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('dispense_queue', 'readwrite');
+                const request = store.put(record);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        /**
+         * Get pending Rx queue sorted by priority
+         * @returns {Promise<Array>}
+         */
+        async getDispenseQueue() {
+            await this.init();
+            const all = await new Promise((resolve, reject) => {
+                const store = this._getStore('dispense_queue');
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+
+            // Sort by priority (STAT > URGENT > ROUTINE), then by received_at
+            const priorityOrder = { STAT: 0, URGENT: 1, ROUTINE: 2 };
+            return all
+                .filter(r => r.status === 'PENDING')
+                .sort((a, b) => {
+                    const pDiff = (priorityOrder[a.priority] || 2) - (priorityOrder[b.priority] || 2);
+                    if (pDiff !== 0) return pDiff;
+                    return new Date(a.received_at) - new Date(b.received_at);
+                });
+        }
+
+        /**
+         * Update Rx status in queue
+         * @param {string} rxId - Rx ID
+         * @param {string} status - PENDING, FILLING, FILLED, REJECTED
+         * @returns {Promise<void>}
+         */
+        async updateDispenseStatus(rxId, status) {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('dispense_queue', 'readwrite');
+                const request = store.get(rxId);
+                request.onsuccess = () => {
+                    const record = request.result;
+                    if (record) {
+                        record.status = status;
+                        record.updated_at = new Date().toISOString();
+                        store.put(record);
+                    }
+                    resolve();
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // ===== Inventory Methods (with medication specifics) =====
+
+        /**
+         * Get all medications
+         * @returns {Promise<Array>}
+         */
+        async getInventory() {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('inventory');
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        /**
+         * Get controlled substances only
+         * @returns {Promise<Array>}
+         */
+        async getControlledSubstances() {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('inventory');
+                const index = store.index('is_controlled');
+                const request = index.getAll(IDBKeyRange.only(true));
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        /**
+         * Add or update medication
+         * @param {Object} med - Medication object
+         * @returns {Promise<string>}
+         */
+        async putMedication(med) {
+            await this.init();
+            const record = {
+                ...med,
+                updated_at: new Date().toISOString()
+            };
+
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('inventory', 'readwrite');
+                const request = store.put(record);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        /**
+         * Deduct medication quantity
+         * @param {string} code - Medication code
+         * @param {number} qty - Quantity to deduct
+         * @returns {Promise<Object>} Updated medication
+         */
+        async deductMedication(code, qty) {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('inventory', 'readwrite');
+                const request = store.get(code);
+                request.onsuccess = () => {
+                    const med = request.result;
+                    if (!med) {
+                        reject(new Error(`Medication not found: ${code}`));
+                        return;
+                    }
+                    med.quantity = Math.max(0, (med.quantity || 0) - qty);
+                    med.updated_at = new Date().toISOString();
+                    store.put(med);
+                    resolve(med);
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // ===== Config Methods =====
+
+        /**
+         * Get config value
+         * @param {string} key - Config key
+         * @returns {Promise<any>}
+         */
+        async getConfig(key) {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('config');
+                const request = store.get(key);
+                request.onsuccess = () => {
+                    const result = request.result;
+                    resolve(result ? result.value : null);
+                };
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        /**
+         * Set config value
+         * @param {string} key - Config key
+         * @param {any} value - Config value
+         * @returns {Promise<void>}
+         */
+        async setConfig(key, value) {
+            await this.init();
+            return new Promise((resolve, reject) => {
+                const store = this._getStore('config', 'readwrite');
+                const request = store.put({ key, value, updated_at: new Date().toISOString() });
+                request.onsuccess = () => resolve();
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // ===== Utility Methods =====
+
+        /**
+         * Clear all data
+         * @returns {Promise<void>}
+         */
+        async clearAll() {
+            await this.init();
+            const stores = ['config', 'inventory', 'prescribers', 'processed_rx',
+                           'clinical', 'dispense_queue', 'actions', 'reports'];
+
+            for (const storeName of stores) {
+                await new Promise((resolve, reject) => {
+                    const store = this._getStore(storeName, 'readwrite');
+                    const request = store.clear();
+                    request.onsuccess = () => resolve();
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            console.log('[PharmacyDB] All data cleared');
+        }
+
+        /**
+         * Export all data
+         * @returns {Promise<Object>}
+         */
+        async exportAll() {
+            await this.init();
+            const stores = ['config', 'inventory', 'prescribers', 'processed_rx',
+                           'clinical', 'dispense_queue', 'actions', 'reports'];
+
+            const data = {};
+            for (const storeName of stores) {
+                data[storeName] = await new Promise((resolve, reject) => {
+                    const store = this._getStore(storeName);
+                    const request = store.getAll();
+                    request.onsuccess = () => resolve(request.result);
+                    request.onerror = () => reject(request.error);
+                });
+            }
+
+            data.exported_at = new Date().toISOString();
+            return data;
+        }
+    }
+
+    /**
+     * ConsumptionTicketStore - For CONSUMPTION_TICKET deduplication
+     * Used by both Supply Station and Pharmacy Station
+     */
+    class ConsumptionTicketStore {
+        constructor(db) {
+            this.db = db;
+        }
+
+        /**
+         * Check if ticket was already processed
+         * @param {string} ticketId - Ticket ID
+         * @returns {Promise<boolean>}
+         */
+        async isProcessed(ticketId) {
+            // Use localStorage for simplicity (can be upgraded to IndexedDB if needed)
+            const key = `xirs_ticket_${ticketId}`;
+            return localStorage.getItem(key) !== null;
+        }
+
+        /**
+         * Record processed ticket
+         * @param {string} ticketId - Ticket ID
+         * @param {string} eventRef - Event reference
+         * @returns {void}
+         */
+        recordProcessed(ticketId, eventRef) {
+            const key = `xirs_ticket_${ticketId}`;
+            localStorage.setItem(key, JSON.stringify({
+                event_ref: eventRef,
+                processed_at: new Date().toISOString()
+            }));
+        }
+
+        /**
+         * Clear old tickets (older than 7 days)
+         */
+        cleanupOld() {
+            const now = Date.now();
+            const maxAge = 7 * 24 * 60 * 60 * 1000; // 7 days
+
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('xirs_ticket_')) {
+                    try {
+                        const data = JSON.parse(localStorage.getItem(key));
+                        const processed = new Date(data.processed_at).getTime();
+                        if (now - processed > maxAge) {
+                            localStorage.removeItem(key);
+                        }
+                    } catch (e) {
+                        // Invalid data, remove it
+                        localStorage.removeItem(key);
+                    }
+                }
+            }
+        }
+    }
+
+    // Export singletons
     global.xIRS = global.xIRS || {};
     global.xIRS.StationDB = new StationDB();
+    global.xIRS.PharmacyDB = new PharmacyDB();
+    global.xIRS.ConsumptionTicketStore = new ConsumptionTicketStore();
 
-    console.log('[xIRS Storage] v1.8.0 loaded');
+    console.log('[xIRS Storage] v2.0.0 loaded');
 
 })(typeof window !== 'undefined' ? window : global);

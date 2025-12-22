@@ -140,6 +140,39 @@ uvicorn main:app --host 0.0.0.0 --port 8090 --reload
 # Portal 入口: http://localhost:8090/portal
 ```
 
+### 重要：QR Code 掃描與 HTTPS
+
+Doctor PWA 和 Pharmacy PWA 的 **QR Code 掃描功能需要 HTTPS 或 localhost**。這是瀏覽器安全限制。
+
+| 連線方式 | 相機權限 | 說明 |
+|----------|----------|------|
+| `https://...` | ✅ 允許 | 正式環境 |
+| `http://localhost:8090` | ✅ 允許 | 本機開發 |
+| `http://127.0.0.1:8090` | ✅ 允許 | 本機開發 |
+| `http://192.168.x.x:8090` | ❌ **封鎖** | LAN HTTP 不支援相機 |
+
+**解決方案（擇一）：**
+
+```bash
+# 方案 1: 使用 localhost（單機測試）
+uvicorn main:app --host 127.0.0.1 --port 8090
+
+# 方案 2: 使用 ngrok 建立 HTTPS 隧道（快速測試）
+ngrok http 8090
+
+# 方案 3: 使用 mkcert 建立本地憑證（LAN HTTPS）
+brew install mkcert
+mkcert -install
+mkcert 192.168.1.100
+# 然後使用 nginx/caddy 設定 SSL
+```
+
+**不需要相機時**：手動輸入處方編號也可完成配藥流程。
+
+詳見 [xIRS QR Protocol Spec v2.0](docs/xIRS_QR_PROTOCOL_SPEC_v2.0.md)
+
+---
+
 ### 本地端測試流程
 
 ```bash

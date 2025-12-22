@@ -1,13 +1,20 @@
 /**
- * xIRS Crypto Library v1.8 - Browser Compatible
+ * xIRS Crypto Library v2.0 - Browser Compatible
  *
- * Provides cryptographic primitives for Station PWA:
+ * Provides cryptographic primitives for Station/Pharmacy PWA:
  * - Ed25519 signature verification (manifests from Hub)
  * - NaCl SealedBox encryption (reports to Hub)
- * - HMAC-SHA256 authentication
+ * - HMAC-SHA256 authentication and verification
+ * - AES-256-GCM encryption (Class B clinical data)
  * - Base64 encoding/decoding
+ * - QR chunking for large payloads
  *
  * Dependencies: TweetNaCl.js (loaded via CDN)
+ *
+ * v2.0 Changes:
+ * - Added ClinicalEncryption class for AES-GCM
+ * - Added HMAC.verify() function
+ * - Added key derivation from passphrase
  */
 
 (function(global) {
@@ -208,8 +215,206 @@
             }
             const hmac = await this.compute(secretB64, toSign);
             return { ...report, hmac };
+        },
+
+        /**
+         * Verify HMAC
+         * @param {string} secretB64 - Base64-encoded secret
+         * @param {Object} data - Data with hmac field
+         * @returns {Promise<boolean>} True if HMAC is valid
+         */
+        verify: async function(secretB64, data) {
+            if (!data || !data.hmac) return false;
+
+            const toVerify = {};
+            for (const key of Object.keys(data)) {
+                if (key !== 'hmac') {
+                    toVerify[key] = data[key];
+                }
+            }
+
+            try {
+                const expected = await this.compute(secretB64, toVerify);
+                // Constant-time comparison
+                if (expected.length !== data.hmac.length) return false;
+                let result = 0;
+                for (let i = 0; i < expected.length; i++) {
+                    result |= expected.charCodeAt(i) ^ data.hmac.charCodeAt(i);
+                }
+                return result === 0;
+            } catch (e) {
+                console.error('[HMAC] Verification error:', e);
+                return false;
+            }
         }
     };
+
+    /**
+     * ClinicalEncryption - AES-256-GCM for Class B data
+     * Used by Pharmacy PWA to encrypt clinical records locally
+     */
+    class ClinicalEncryption {
+        /**
+         * @param {string} passphraseOrKeyB64 - Passphrase or base64-encoded key
+         * @param {boolean} isRawKey - True if passphraseOrKeyB64 is already a derived key
+         */
+        constructor(passphraseOrKeyB64, isRawKey = false) {
+            this._keyPromise = isRawKey
+                ? this._importKey(passphraseOrKeyB64)
+                : this._deriveKey(passphraseOrKeyB64);
+        }
+
+        /**
+         * Derive key from passphrase using PBKDF2
+         * @param {string} passphrase - User passphrase
+         * @returns {Promise<CryptoKey>}
+         */
+        async _deriveKey(passphrase) {
+            const encoder = new TextEncoder();
+            const keyMaterial = await crypto.subtle.importKey(
+                'raw',
+                encoder.encode(passphrase),
+                'PBKDF2',
+                false,
+                ['deriveKey']
+            );
+
+            // Use station_id as salt in production; for now use fixed salt
+            const salt = encoder.encode('xIRS-Clinical-Salt-v2');
+
+            return crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: salt,
+                    iterations: 100000,
+                    hash: 'SHA-256'
+                },
+                keyMaterial,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        /**
+         * Import a raw key from base64
+         * @param {string} keyB64 - Base64-encoded 256-bit key
+         * @returns {Promise<CryptoKey>}
+         */
+        async _importKey(keyB64) {
+            const keyBytes = Base64.decode(keyB64);
+            return crypto.subtle.importKey(
+                'raw',
+                keyBytes,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        /**
+         * Encrypt data
+         * @param {string|Object} plaintext - Data to encrypt
+         * @returns {Promise<string>} Base64-encoded ciphertext (IV + ciphertext + tag)
+         */
+        async encrypt(plaintext) {
+            const key = await this._keyPromise;
+
+            // Serialize if object
+            if (typeof plaintext === 'object') {
+                plaintext = JSON.stringify(plaintext);
+            }
+
+            const plaintextBytes = new TextEncoder().encode(plaintext);
+
+            // Generate random IV (12 bytes for AES-GCM)
+            const iv = new Uint8Array(12);
+            crypto.getRandomValues(iv);
+
+            // Encrypt
+            const ciphertext = await crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv: iv },
+                key,
+                plaintextBytes
+            );
+
+            // Combine: IV (12) + Ciphertext (includes auth tag)
+            const result = new Uint8Array(12 + ciphertext.byteLength);
+            result.set(iv, 0);
+            result.set(new Uint8Array(ciphertext), 12);
+
+            return Base64.encode(result);
+        }
+
+        /**
+         * Decrypt data
+         * @param {string} ciphertextB64 - Base64-encoded ciphertext
+         * @returns {Promise<string|Object>} Decrypted data
+         */
+        async decrypt(ciphertextB64) {
+            const key = await this._keyPromise;
+
+            const data = Base64.decode(ciphertextB64);
+
+            // Extract IV and ciphertext
+            const iv = data.slice(0, 12);
+            const ciphertext = data.slice(12);
+
+            // Decrypt
+            const plaintextBytes = await crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: iv },
+                key,
+                ciphertext
+            );
+
+            const plaintext = new TextDecoder().decode(plaintextBytes);
+
+            // Try to parse as JSON
+            try {
+                return JSON.parse(plaintext);
+            } catch (e) {
+                return plaintext;
+            }
+        }
+
+        /**
+         * Encrypt a clinical record with metadata
+         * @param {Object} record - Record to encrypt
+         * @returns {Promise<Object>} Encrypted envelope
+         */
+        async encryptRecord(record) {
+            const ciphertext = await this.encrypt(record);
+            return {
+                type: 'ENCRYPTED_CLINICAL',
+                version: '1.0',
+                algorithm: 'AES-256-GCM',
+                payload: ciphertext,
+                ts: Math.floor(Date.now() / 1000)
+            };
+        }
+
+        /**
+         * Decrypt a clinical record envelope
+         * @param {Object} envelope - Encrypted envelope
+         * @returns {Promise<Object>} Decrypted record
+         */
+        async decryptRecord(envelope) {
+            if (envelope.type !== 'ENCRYPTED_CLINICAL') {
+                throw new Error('Invalid envelope type');
+            }
+            return this.decrypt(envelope.payload);
+        }
+
+        /**
+         * Generate a random encryption key
+         * @returns {Promise<string>} Base64-encoded 256-bit key
+         */
+        static async generateKey() {
+            const key = new Uint8Array(32);
+            crypto.getRandomValues(key);
+            return Base64.encode(key);
+        }
+    }
 
     /**
      * QR Chunking for large payloads
@@ -417,12 +622,13 @@
         Ed25519,
         SealedBox,
         HMAC,
+        ClinicalEncryption,
         QRChunker,
         QRReassembler,
         Utils,
-        VERSION: '1.8.0'
+        VERSION: '2.0.0'
     };
 
-    console.log('[xIRS Crypto] v1.8.0 loaded');
+    console.log('[xIRS Crypto] v2.0.0 loaded');
 
 })(typeof window !== 'undefined' ? window : global);

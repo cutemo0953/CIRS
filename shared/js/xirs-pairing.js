@@ -150,7 +150,7 @@
             try {
                 // Normalize URL
                 const baseUrl = hubUrl.replace(/\/$/, '');
-                const url = `${baseUrl}/api/stations/pair`;
+                const url = `${baseUrl}/api/satellite/stations/pair`;
 
                 const response = await fetch(url, {
                     method: 'POST',

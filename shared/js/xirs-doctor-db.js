@@ -1,11 +1,12 @@
 /**
- * xIRS Doctor IndexedDB Storage v1.0
+ * xIRS Doctor IndexedDB Storage v1.1
  *
  * Provides offline storage for Doctor PWA:
  * - Prescriber credentials (encrypted private key)
  * - Recent patients
  * - Issued Rx history
  * - Medication catalog
+ * - Procedure records (v1.1)
  *
  * Dependencies: None (vanilla IndexedDB)
  */
@@ -14,7 +15,7 @@
     'use strict';
 
     const DB_NAME = 'xIRS_Doctor';
-    const DB_VERSION = 1;
+    const DB_VERSION = 2; // v1.1: Added procedures store
 
     /**
      * DoctorDB - IndexedDB wrapper for Doctor PWA
@@ -101,6 +102,15 @@
             if (!db.objectStoreNames.contains('templates')) {
                 const store = db.createObjectStore('templates', { keyPath: 'id' });
                 store.createIndex('name', 'name', { unique: false });
+            }
+
+            // v1.1: Procedure records
+            if (!db.objectStoreNames.contains('procedures')) {
+                const store = db.createObjectStore('procedures', { keyPath: 'id' });
+                store.createIndex('patient_ref', 'patient_ref', { unique: false });
+                store.createIndex('encounter_id', 'encounter_id', { unique: false });
+                store.createIndex('created_at', 'created_at', { unique: false });
+                store.createIndex('surgeon_id', 'surgeon_id', { unique: false });
             }
 
             console.log('[DoctorDB] Stores created');
@@ -545,6 +555,75 @@
             return settings;
         }
 
+        // ==================== Procedures (v1.1) ====================
+
+        /**
+         * Save procedure record
+         * @param {Object} procedure - The procedure record to save
+         */
+        async saveProcedure(procedure) {
+            await this.init();
+            return this._put('procedures', procedure);
+        }
+
+        /**
+         * Get procedure by ID
+         * @param {string} id
+         */
+        async getProcedure(id) {
+            await this.init();
+            return this._get('procedures', id);
+        }
+
+        /**
+         * Get today's procedures
+         * @returns {Promise<Array>} Procedures from today, sorted by created_at desc
+         */
+        async getTodayProcedures() {
+            await this.init();
+            const today = new Date().toISOString().slice(0, 10);
+            const all = await this._getAll('procedures');
+            return all
+                .filter(p => p.created_at?.startsWith(today))
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        }
+
+        /**
+         * Get procedures by patient reference
+         * @param {string} patientRef
+         */
+        async getProceduresByPatient(patientRef) {
+            await this.init();
+            return this._getByIndex('procedures', 'patient_ref', patientRef);
+        }
+
+        /**
+         * Get procedures by encounter (visit)
+         * @param {string} encounterId
+         */
+        async getProceduresByEncounter(encounterId) {
+            await this.init();
+            return this._getByIndex('procedures', 'encounter_id', encounterId);
+        }
+
+        /**
+         * Get all procedures
+         */
+        async getAllProcedures() {
+            await this.init();
+            const all = await this._getAll('procedures');
+            return all.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        }
+
+        /**
+         * Delete procedure
+         * @param {string} id
+         */
+        async deleteProcedure(id) {
+            await this.init();
+            return this._delete('procedures', id);
+        }
+
         // ==================== Helpers ====================
 
         _put(storeName, data) {
@@ -610,6 +689,7 @@
                 favorites: await this._getAll('favorites'),
                 templates: await this._getAll('templates'),
                 settings: await this._getAll('settings'),
+                procedures: await this._getAll('procedures'), // v1.1
                 // Note: credentials are NOT exported for security
                 exported_at: new Date().toISOString()
             };
@@ -637,6 +717,6 @@
         global.xIRS = { DoctorDB: doctorDB };
     }
 
-    console.log('[xIRS DoctorDB] v1.0.0 loaded');
+    console.log('[xIRS DoctorDB] v1.1.0 loaded (with procedures)');
 
 })(typeof window !== 'undefined' ? window : global);

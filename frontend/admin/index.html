@@ -445,6 +445,14 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/>
                                 </svg>
                             </button>
+                            <!-- Registration Button (掛號) - 醫療藍色 -->
+                            <button @click="openRegistrationModal(person)" x-show="currentUser"
+                                    class="p-2 bg-blue-500 hover:bg-blue-600 rounded-lg transition"
+                                    title="掛號看診">
+                                <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/>
+                                </svg>
+                            </button>
                         </div>
                     </div>
                 </template>
@@ -2305,6 +2313,111 @@
         </div>
     </div>
 
+    <!-- Registration Modal (掛號) -->
+    <div x-show="showRegistrationModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showRegistrationModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <svg class="w-5 h-5 mr-2 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                    </svg>
+                    新增掛號
+                </h3>
+                <button @click="showRegistrationModal = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Patient Info -->
+            <div class="bg-gray-50 rounded-lg p-3 mb-4">
+                <div class="flex items-center">
+                    <div class="w-8 h-8 rounded-full flex items-center justify-center mr-3"
+                         :class="{
+                             'bg-green-500': registrationTarget?.triage_status === 'GREEN',
+                             'bg-yellow-500': registrationTarget?.triage_status === 'YELLOW',
+                             'bg-red-500': registrationTarget?.triage_status === 'RED',
+                             'bg-gray-500': !registrationTarget?.triage_status
+                         }">
+                        <span class="text-white text-sm font-bold" x-text="registrationTarget?.display_name?.charAt(0)"></span>
+                    </div>
+                    <div>
+                        <p class="font-medium" x-text="registrationTarget?.display_name"></p>
+                        <p class="text-xs text-gray-500" x-text="'ID: ' + registrationTarget?.id"></p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Priority Selection -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">看診優先等級</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button @click="registrationForm.priority = 'STAT'"
+                            class="py-2 px-3 rounded-lg text-sm font-medium transition"
+                            :class="registrationForm.priority === 'STAT' ? 'bg-red-500 text-white' : 'bg-red-100 text-red-700 hover:bg-red-200'">
+                        STAT 緊急
+                    </button>
+                    <button @click="registrationForm.priority = 'URGENT'"
+                            class="py-2 px-3 rounded-lg text-sm font-medium transition"
+                            :class="registrationForm.priority === 'URGENT' ? 'bg-yellow-500 text-white' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'">
+                        URGENT 急
+                    </button>
+                    <button @click="registrationForm.priority = 'ROUTINE'"
+                            class="py-2 px-3 rounded-lg text-sm font-medium transition"
+                            :class="registrationForm.priority === 'ROUTINE' ? 'bg-green-500 text-white' : 'bg-green-100 text-green-700 hover:bg-green-200'">
+                        ROUTINE 一般
+                    </button>
+                </div>
+            </div>
+
+            <!-- Chief Complaint -->
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">主訴 (選填)</label>
+                <textarea x-model="registrationForm.chief_complaint"
+                          class="w-full border border-gray-200 rounded-lg px-3 py-2 h-20 resize-none"
+                          placeholder="例: 頭痛、發燒、呼吸困難..."></textarea>
+            </div>
+
+            <!-- Actions -->
+            <div class="grid grid-cols-2 gap-2">
+                <button @click="showRegistrationModal = false" class="px-4 py-2 border border-gray-200 rounded-lg">取消</button>
+                <button @click="createRegistration()" class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium">產生掛號單</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registration QR Modal (掛號 QR Code) -->
+    <div x-show="showRegistrationQRModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showRegistrationQRModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-sm text-center">
+            <h3 class="text-lg font-semibold mb-2">掛號單</h3>
+            <p class="text-sm text-gray-500 mb-4" x-text="'掛號號碼: ' + registrationResult?.reg_id"></p>
+
+            <!-- QR Code -->
+            <div class="flex justify-center mb-4">
+                <div id="registrationQRCode" class="bg-white p-4 rounded-lg inline-block"></div>
+            </div>
+
+            <!-- Patient Info -->
+            <div class="bg-gray-50 rounded-lg p-3 mb-4 text-left">
+                <p class="text-sm"><span class="text-gray-500">病患:</span> <span x-text="registrationResult?.patient_ref"></span> <span class="text-gray-400" x-text="'(' + registrationResult?.display_name + ')'"></span></p>
+                <p class="text-sm">
+                    <span class="text-gray-500">優先:</span>
+                    <span class="font-medium" :class="{
+                        'text-red-600': registrationResult?.priority === 'STAT',
+                        'text-yellow-600': registrationResult?.priority === 'URGENT',
+                        'text-green-600': registrationResult?.priority === 'ROUTINE'
+                    }" x-text="registrationResult?.priority"></span>
+                </p>
+                <p x-show="registrationResult?.qr_payload?.chief_complaint" class="text-sm"><span class="text-gray-500">主訴:</span> <span x-text="registrationResult?.qr_payload?.chief_complaint"></span></p>
+            </div>
+
+            <p class="text-xs text-gray-500 mb-4">請讓醫師掃描此 QR Code</p>
+
+            <button @click="showRegistrationQRModal = false" class="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">關閉</button>
+        </div>
+    </div>
+
     <!-- Bundle Edit Modal (新增/編輯組套) -->
     <div x-show="showBundleEditModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showBundleEditModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
@@ -3037,6 +3150,12 @@
                 stationPairingCode: null,
                 stationPairingQRData: null,
                 pairedStations: [],
+                // xIRS Registration (掛號)
+                showRegistrationModal: false,
+                showRegistrationQRModal: false,
+                registrationTarget: null,
+                registrationForm: { priority: 'ROUTINE', chief_complaint: '' },
+                registrationResult: null,
                 showStaffJoinModal: false,
                 showStaffPendingModal: false,
                 editingEquipmentTemplate: null,
@@ -4263,15 +4382,15 @@
                         if (res.ok) {
                             const data = await res.json();
                             this.stationPairingCode = data.pairing_code;
-                            this.stationPairingQRData = data.qr_payload;
+                            this.stationPairingQRData = data.qr_url;  // Use URL format
 
-                            // Generate QR Code
+                            // Generate QR Code with URL (opens PWA directly when scanned)
                             this.$nextTick(() => {
                                 const qrContainer = document.getElementById('station-pairing-qr');
                                 if (qrContainer && typeof qrcode !== 'undefined') {
                                     qrContainer.innerHTML = '';
                                     const qr = qrcode(0, 'M');
-                                    qr.addData(JSON.stringify(data.qr_payload));
+                                    qr.addData(data.qr_url);  // URL format for phone camera
                                     qr.make();
                                     qrContainer.innerHTML = qr.createImgTag(4, 8);
                                 }
@@ -4512,6 +4631,80 @@
                             this.showToast(err.detail || '移動失敗', 'error');
                         }
                     } catch (e) { this.showToast('移動失敗', 'error'); }
+                },
+
+                // xIRS Registration (掛號)
+                openRegistrationModal(person) {
+                    this.registrationTarget = person;
+                    this.registrationForm = {
+                        priority: person.triage_status === 'RED' ? 'STAT' :
+                                  person.triage_status === 'YELLOW' ? 'URGENT' : 'ROUTINE',
+                        chief_complaint: ''
+                    };
+                    this.showRegistrationModal = true;
+                },
+
+                async createRegistration() {
+                    if (!this.registrationTarget) return;
+
+                    try {
+                        const res = await this.apiCall('/api/registrations', {
+                            method: 'POST',
+                            body: {
+                                person_id: this.registrationTarget.id,
+                                priority: this.registrationForm.priority,
+                                chief_complaint: this.registrationForm.chief_complaint
+                            }
+                        });
+
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.registrationResult = data;
+                            this.showRegistrationModal = false;
+                            this.showRegistrationQRModal = true;
+
+                            // Generate QR code
+                            this.$nextTick(() => {
+                                this.generateRegistrationQR(data.qr_payload);
+                            });
+
+                            this.showToast(`掛號成功: ${data.reg_id}`, 'success');
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '掛號失敗', 'error');
+                        }
+                    } catch (e) {
+                        console.error('Registration error:', e);
+                        this.showToast('掛號失敗', 'error');
+                    }
+                },
+
+                generateRegistrationQR(payload) {
+                    const container = document.getElementById('registrationQRCode');
+                    if (!container) {
+                        console.error('QR container not found');
+                        return;
+                    }
+
+                    container.innerHTML = '';
+
+                    // Use qrcode-generator library (lowercase 'qrcode')
+                    if (typeof qrcode !== 'undefined') {
+                        try {
+                            const qr = qrcode(0, 'M');
+                            qr.addData(JSON.stringify(payload));
+                            qr.make();
+                            container.innerHTML = qr.createImgTag(5, 8);
+                            console.log('QR code generated for:', payload.reg_id);
+                        } catch (e) {
+                            console.error('QR generation error:', e);
+                            container.innerHTML = `<pre class="text-xs bg-gray-100 p-2 rounded overflow-auto max-w-xs">${JSON.stringify(payload, null, 2)}</pre>`;
+                        }
+                    } else {
+                        console.warn('QR library not loaded');
+                        // Fallback: show payload as text
+                        container.innerHTML = `<pre class="text-xs text-left bg-gray-100 p-2 rounded overflow-auto max-w-xs">${JSON.stringify(payload, null, 2)}</pre>`;
+                    }
                 },
 
                 async doTriage(status) {

@@ -4,7 +4,8 @@ Includes:
 - Satellite PWA sync (Action Envelope Pattern)
 - Station/Pharmacy pairing (v2.3 secure pairing)
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
+import socket
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -810,17 +811,21 @@ async def pair_station(request: StationPairRequest):
     if not hub_encryption_key:
         hub_encryption_key = base64.b64encode(secrets.token_bytes(32)).decode('utf-8')
 
-    # Get prescriber certs for PHARMACY type
+    # Get prescriber certs for PHARMACY type (optional - table may not exist yet)
     prescriber_certs = []
     if pairing_info['station_type'] == 'PHARMACY':
-        with get_db() as conn:
-            cursor = conn.execute("""
-                SELECT id, name, public_key, issued_at, expires_at
-                FROM prescriber_certs
-                WHERE revoked = 0 AND expires_at > CURRENT_TIMESTAMP
-            """)
-            for row in cursor.fetchall():
-                prescriber_certs.append(dict_from_row(row))
+        try:
+            with get_db() as conn:
+                cursor = conn.execute("""
+                    SELECT id, name, public_key, issued_at, expires_at
+                    FROM prescriber_certs
+                    WHERE revoked = 0 AND expires_at > CURRENT_TIMESTAMP
+                """)
+                for row in cursor.fetchall():
+                    prescriber_certs.append(dict_from_row(row))
+        except Exception:
+            # Table doesn't exist yet - prescriber certs feature not enabled
+            pass
 
     # Record the pairing in database
     with write_db() as conn:
@@ -877,6 +882,7 @@ class GenerateStationPairingRequest(BaseModel):
 @router.post("/stations/generate-pairing")
 async def generate_station_pairing(
     request: GenerateStationPairingRequest,
+    req: Request,
     user: dict = Depends(get_current_user)
 ):
     """
@@ -906,11 +912,33 @@ async def generate_station_pairing(
         'created_by': user.get('id', 'admin')
     }
 
-    # Generate QR payload
+    # Generate QR payload with dynamic hub_url
+    # Use socket to detect actual IP (same as auth.py satellite pairing)
+    def get_host_ip() -> str:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(("8.8.8.8", 80))
+            ip = s.getsockname()[0]
+            s.close()
+            return ip
+        except Exception:
+            return req.headers.get('host', 'localhost:8090').split(':')[0]
+
+    host_ip = get_host_ip()
+    hub_url = f"http://{host_ip}:8090"
+
+    # Determine PWA path based on station type
+    pwa_path = "pharmacy" if request.station_type == "PHARMACY" else "station"
+
+    # QR URL format - directly opens PWA with pairing params
+    # When scanned by phone camera, opens the correct PWA and auto-starts pairing
+    qr_url = f"{hub_url}/{pwa_path}/?pair={code}&id={request.station_id}"
+
+    # JSON payload for programmatic parsing (PWA internal scanner)
     qr_payload = {
         "type": "STATION_PAIR_INVITE",
         "ver": 1,
-        "hub_url": "http://localhost:8090",  # Should be dynamic in production
+        "hub_url": hub_url,
         "pairing_code": code,
         "station_id": request.station_id,
         "station_type": request.station_type
@@ -919,7 +947,8 @@ async def generate_station_pairing(
     return {
         "pairing_code": code,
         "expires_at": expires_at.isoformat(),
-        "qr_payload": qr_payload,
+        "qr_url": qr_url,  # URL format - for phone camera scanning
+        "qr_payload": qr_payload,  # JSON format - for PWA internal scanner
         "message": f"配對碼 {code} 已產生，有效期限 10 分鐘"
     }
 
