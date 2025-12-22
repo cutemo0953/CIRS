@@ -154,6 +154,25 @@
 
 Station 驗證簽章後匯入設定。
 
+### 2.5 Hub Admin UI (配對介面)
+
+Hub 管理員可透過 Admin Console 產生 Station/Pharmacy 配對碼：
+
+**入口**: 系統選單 → 「Station 配對」
+
+**UI 功能**:
+1. **站點類型選擇**: 物資站 (SUPPLY) 或 藥局站 (PHARMACY)
+2. **站點 ID 輸入**: 例如 `STATION-001`
+3. **站點名稱輸入**: 例如「一樓物資站」
+4. **產生配對碼**: 6 字元英數字碼，有效期 10 分鐘
+5. **QR Code 顯示**: 包含 `STATION_PAIR_INVITE` payload
+6. **已配對站點列表**: 顯示所有已完成配對的站點
+
+**API 端點**:
+- `POST /api/satellite/stations/generate-pairing` - 產生配對碼
+- `POST /api/satellite/stations/pair` - 完成配對
+- `GET /api/satellite/stations` - 列出已配對站點
+
 ---
 
 ## 3. 使用者流程 (User Flows)

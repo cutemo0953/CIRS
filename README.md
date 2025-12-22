@@ -1,6 +1,6 @@
 # CIRS - Community Inventory Resilience System
 
-> 社區韌性物資管理系統 v2.0 (xIRS Hub)
+> 社區韌性物資管理系統 v2.3 (xIRS Hub)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 
@@ -44,16 +44,19 @@ xIRS (Cross-IRS) 是專為離線環境設計的分散式物流系統：
 ┌─────────────────────────────────────────────────┐
 │  Raspberry Pi (192.168.x.x) - xIRS Hub         │
 ├─────────────────────────────────────────────────┤
-│  /admin/   - 管理控制台 (原 /frontend/)         │
-│  /station/ - 分站 PWA                           │
-│  /runner/  - Runner PWA (Blind Carrier)         │
-│  /doctor/  - 醫師 PWA (Lite CPOE)               │
-│  /portal/  - 公開狀態看板                       │
+│  /admin/    - 管理控制台 (原 /frontend/)        │
+│  /station/  - 物資站 PWA (Teal)                 │
+│  /pharmacy/ - 藥局站 PWA (Indigo) - v2.3        │
+│  /runner/   - Runner PWA (Blind Carrier)        │
+│  /doctor/   - 醫師 PWA (Lite CPOE)              │
+│  /mobile/   - Satellite PWA (志工手機)          │
+│  /portal/   - 公開狀態看板                      │
 │  Port 8090: CIRS API (FastAPI)                  │
 └─────────────────────────────────────────────────┘
               ↑ WiFi / LAN / USB
     ┌─────────┴─────────┐
-    │  Station PWA      │  ← 分站平板
+    │  Station PWA      │  ← 物資志工平板
+    │  Pharmacy PWA     │  ← 藥師平板 (v2.3)
     │  Runner PWA       │  ← 運送人員手機
     │  Satellite PWA    │  ← 志工手機
     └───────────────────┘
@@ -504,6 +507,30 @@ curl http://localhost:8090/api/person/P0001/audit-log
 
 ## 更新日誌
 
+### v2.3.0 (2025-12-22) - Station PWA Redesign + Pharmacy PWA
+- **Station PWA 全面重設計**：
+  - 3 步驟引導式配對流程（掃描 QR → 輸入配對碼 → 完成）
+  - JTBD 任務導向儀表板：收貨、發放、回報、登記
+  - **Teal 配色** (#0d9488)
+  - Heroicons 取代 emoji
+- **新增 Pharmacy PWA** (`/pharmacy/`)：
+  - 藥師專用臨床介面
+  - 處方掃描與發藥佇列
+  - 隱私模式（預設開啟）保護 PHI
+  - 處方醫師憑證管理
+  - **Indigo 配色** (#4f46e5)
+- **Hub Admin 新功能**：
+  - Station 配對介面（系統選單 → Station 配對）
+  - 支援 物資站(SUPPLY) / 藥局站(PHARMACY) 兩種類型
+  - 產生 6 字元配對碼（10 分鐘有效）
+  - QR Code 顯示與已配對站點列表
+- **色彩修正**：
+  - Admin 控制台恢復原始綠色 (#4c826b)
+  - Station PWA 專用 Teal 配色
+- **Bug 修復**：
+  - 修復 Vercel 500 錯誤（缺少 pynacl 依賴）
+  - 更新 vercel.json 路由
+
 ### v2.0.0 (2025-12-22) - xIRS Distributed Logistics
 - **重大更新**：xIRS 分散式物流系統
   - Station PWA - 分站物資管理
@@ -514,9 +541,6 @@ curl http://localhost:8090/api/person/P0001/audit-log
   - 資料庫更名 `cirs.db` → `xirs_hub.db` (自動遷移)
   - URL 路徑標準化：`/admin/`, `/station/`, `/runner/`, `/doctor/`
   - `/frontend/` 自動轉向 `/admin/`
-- **UI 更新**：
-  - Admin 控制台改用 Teal + Deep Blue 配色
-  - 扁平化設計，Heroicon 圖示
 - **新增文件**：
   - [xIRS 分散式物流規格](docs/xIRS_DISTRIBUTED_LOGISTICS_SPEC_v1.8.md)
   - [xIRS Lite CPOE 規格](docs/xIRS_LITE_CPOE_SPEC_v1.0.md)

@@ -196,6 +196,14 @@
                             </svg>
                             <span x-text="t('systemMenu.satelliteQR')">Satellite 配對</span>
                         </button>
+                        <!-- Station/Pharmacy Pairing v2.3 -->
+                        <button @click="showStationPairingModal = true; showSystemMenu = false"
+                                class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
+                            <svg class="w-4 h-4 mr-2 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                            <span>Station 配對</span>
+                        </button>
                         <a href="/docs" target="_blank"
                            class="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center">
                             <svg class="w-4 h-4 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1914,6 +1922,131 @@
         </div>
     </div>
 
+    <!-- Station/Pharmacy Pairing Modal v2.3 -->
+    <div x-show="showStationPairingModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showStationPairingModal = false">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold flex items-center">
+                    <svg class="w-6 h-6 text-teal-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                    </svg>
+                    Station / Pharmacy 配對
+                </h3>
+                <button @click="showStationPairingModal = false" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Station Type Selection -->
+            <div class="space-y-4">
+                <div class="bg-gray-50 rounded-lg p-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">站點類型</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button @click="stationPairingType = 'SUPPLY'"
+                                :class="stationPairingType === 'SUPPLY' ? 'bg-teal-500 text-white border-teal-500' : 'bg-white text-gray-700 border-gray-300'"
+                                class="border-2 rounded-lg px-4 py-3 text-center transition-colors">
+                            <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+                            </svg>
+                            <span class="block font-medium">物資站</span>
+                            <span class="text-xs opacity-75">Supply</span>
+                        </button>
+                        <button @click="stationPairingType = 'PHARMACY'"
+                                :class="stationPairingType === 'PHARMACY' ? 'bg-indigo-500 text-white border-indigo-500' : 'bg-white text-gray-700 border-gray-300'"
+                                class="border-2 rounded-lg px-4 py-3 text-center transition-colors">
+                            <svg class="w-8 h-8 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/>
+                            </svg>
+                            <span class="block font-medium">藥局站</span>
+                            <span class="text-xs opacity-75">Pharmacy</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Station Info -->
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">站點 ID</label>
+                        <input type="text" x-model="stationPairingId" placeholder="例: STATION-001"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">站點名稱</label>
+                        <input type="text" x-model="stationPairingName" placeholder="例: 一樓物資站"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+                    </div>
+                </div>
+
+                <!-- Generate Button -->
+                <button @click="generateStationPairing()"
+                        :disabled="!stationPairingId"
+                        :class="stationPairingId ? 'bg-teal-600 hover:bg-teal-700' : 'bg-gray-300 cursor-not-allowed'"
+                        class="w-full text-white rounded-lg px-4 py-3 font-medium transition-colors">
+                    產生配對碼
+                </button>
+
+                <!-- Pairing Code Display -->
+                <template x-if="stationPairingCode">
+                    <div class="bg-gradient-to-br from-teal-50 to-teal-100 border-2 border-teal-200 rounded-xl p-4 space-y-4">
+                        <div class="text-center">
+                            <p class="text-sm text-teal-700 mb-2">配對碼 (10分鐘有效)</p>
+                            <div class="bg-white rounded-lg px-6 py-4 inline-block shadow-sm">
+                                <span class="text-4xl font-mono font-bold tracking-widest text-teal-600"
+                                      x-text="stationPairingCode"></span>
+                            </div>
+                        </div>
+
+                        <!-- QR Code -->
+                        <div class="text-center" x-show="stationPairingQRData">
+                            <p class="text-sm text-teal-700 mb-2">或掃描 QR Code</p>
+                            <div id="station-pairing-qr" class="bg-white rounded-lg p-3 inline-block shadow-sm"></div>
+                        </div>
+
+                        <!-- Instructions -->
+                        <div class="bg-white/50 rounded-lg p-3 text-sm text-teal-800">
+                            <p class="font-medium mb-1">使用方式：</p>
+                            <ol class="list-decimal list-inside space-y-1 text-teal-700">
+                                <li>在 Station/Pharmacy PWA 開啟掃描器</li>
+                                <li>掃描上方 QR Code 或手動輸入配對碼</li>
+                                <li>完成配對後即可離線操作</li>
+                            </ol>
+                        </div>
+
+                        <button @click="stationPairingCode = null; stationPairingQRData = null"
+                                class="w-full border border-teal-300 text-teal-700 rounded-lg px-4 py-2 text-sm hover:bg-teal-50">
+                            產生新的配對碼
+                        </button>
+                    </div>
+                </template>
+
+                <!-- Paired Stations List -->
+                <div class="border-t pt-4 mt-4" x-show="pairedStations.length > 0">
+                    <h4 class="text-sm font-medium text-gray-700 mb-2">已配對站點</h4>
+                    <div class="space-y-2 max-h-40 overflow-y-auto">
+                        <template x-for="station in pairedStations" :key="station.id">
+                            <div class="flex items-center justify-between bg-gray-50 rounded-lg p-2 text-sm">
+                                <div class="flex items-center">
+                                    <span :class="station.station_type === 'PHARMACY' ? 'bg-indigo-100 text-indigo-700' : 'bg-teal-100 text-teal-700'"
+                                          class="px-2 py-0.5 rounded text-xs font-medium mr-2"
+                                          x-text="station.station_type === 'PHARMACY' ? '藥局' : '物資'"></span>
+                                    <span x-text="station.display_name || station.id"></span>
+                                </div>
+                                <span class="text-xs text-gray-400" x-text="station.paired_at?.split('T')[0]"></span>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex space-x-3 mt-4">
+                <button @click="showStationPairingModal = false"
+                        class="flex-1 px-4 py-2 border border-gray-200 rounded-lg">關閉</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Staff Join Modal (自助登錄) -->
     <div x-show="showStaffJoinModal" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" @click.self="showStaffJoinModal = false">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm">
@@ -2896,6 +3029,14 @@
                 satelliteQRUrl: '',
                 satellitePairingInfo: null,
                 satelliteAllowedRoles: 'volunteer,admin', // v1.3.1: Role control
+                // v2.3: Station/Pharmacy pairing
+                showStationPairingModal: false,
+                stationPairingType: 'SUPPLY',
+                stationPairingId: '',
+                stationPairingName: '',
+                stationPairingCode: null,
+                stationPairingQRData: null,
+                pairedStations: [],
                 showStaffJoinModal: false,
                 showStaffPendingModal: false,
                 editingEquipmentTemplate: null,
@@ -4098,6 +4239,67 @@
                     } catch (e) {
                         console.error('Pairing code refresh error:', e);
                         this.showToast('配對碼更新失敗', 'error');
+                    }
+                },
+
+                // v2.3: Station/Pharmacy pairing
+                async generateStationPairing() {
+                    if (!this.stationPairingId) {
+                        this.showToast('請輸入站點 ID', 'error');
+                        return;
+                    }
+
+                    try {
+                        const res = await this.apiCall('/api/satellite/stations/generate-pairing', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                station_id: this.stationPairingId,
+                                station_type: this.stationPairingType,
+                                display_name: this.stationPairingName || this.stationPairingId
+                            })
+                        });
+
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.stationPairingCode = data.pairing_code;
+                            this.stationPairingQRData = data.qr_payload;
+
+                            // Generate QR Code
+                            this.$nextTick(() => {
+                                const qrContainer = document.getElementById('station-pairing-qr');
+                                if (qrContainer && typeof qrcode !== 'undefined') {
+                                    qrContainer.innerHTML = '';
+                                    const qr = qrcode(0, 'M');
+                                    qr.addData(JSON.stringify(data.qr_payload));
+                                    qr.make();
+                                    qrContainer.innerHTML = qr.createImgTag(4, 8);
+                                }
+                            });
+
+                            this.showToast('配對碼已產生', 'success');
+
+                            // Reload paired stations
+                            this.loadPairedStations();
+                        } else {
+                            const err = await res.json();
+                            this.showToast(err.detail || '產生配對碼失敗', 'error');
+                        }
+                    } catch (e) {
+                        console.error('Station pairing error:', e);
+                        this.showToast('操作失敗', 'error');
+                    }
+                },
+
+                async loadPairedStations() {
+                    try {
+                        const res = await this.apiCall('/api/satellite/stations');
+                        if (res.ok) {
+                            const data = await res.json();
+                            this.pairedStations = data.stations || [];
+                        }
+                    } catch (e) {
+                        console.error('Load paired stations error:', e);
                     }
                 },
 
