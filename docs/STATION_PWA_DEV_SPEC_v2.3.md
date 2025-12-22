@@ -328,6 +328,57 @@ Hub 管理員可透過 Admin Console 產生 Station/Pharmacy 配對碼：
 3. 扣減 `local_inventory`
 4. 記錄 `DISPENSE` action
 
+### 4.1.1 處置領用單 (Consumption Ticket) - v2.3.1 新增
+
+> 整合 `xIRS_PROCEDURE_INVENTORY_BRIDGE_SPEC_v1.0.md`
+> 支援臨床處置 → 物資扣帳的鬆耦合連結
+
+**掃描類型擴充**:
+
+| 類型 | 說明 | 驗證方式 |
+|------|------|----------|
+| `RESTOCK_MANIFEST` | 進貨清單 | Ed25519 (Hub) |
+| `CONSUMPTION_TICKET` | 處置領用單 | HMAC (station_secret) |
+| `CONSUMPTION_RETURN` | 退還單 | HMAC (station_secret) |
+
+**CONSUMPTION_TICKET 處理流程**:
+
+1. 掃描 `CONSUMPTION_TICKET` QR
+2. 驗證 HMAC (使用 station_secret)
+3. 檢查 `ticket_id` 去重
+4. 顯示領用清單 (無病患資訊):
+   ```
+   ┌─────────────────────────────────────┐
+   │  領用單驗證                         │
+   │  Event: evt_a1b2***                 │
+   │  來源: NURSE-STATION-A              │
+   │                                     │
+   │  品項:                              │
+   │  ☑ DEV-ETTUBE-7.5 x 1              │
+   │  ☑ DEV-ETTUBE-7.0 x 1              │
+   │  ☑ DEV-LARYNGO-MAC3 x 1            │
+   │                                     │
+   │  [確認扣庫]  [取消]                 │
+   └─────────────────────────────────────┘
+   ```
+5. 確認後扣減 `local_inventory`
+6. 產生 `CONSUMPTION_RECORD`:
+   ```json
+   {
+     "type": "CONSUMPTION_RECORD",
+     "event_ref": "evt_a1b2c3d4",
+     "items_used": [...],
+     "variance": { "added": [], "removed": [] }
+   }
+   ```
+7. 加入回報佇列
+
+**隱私保護**:
+- ❌ 不顯示 `patient_ref`
+- ❌ 不顯示 `procedure_code`
+- ✅ 只顯示 `event_ref` (遮蔽) 和品項列表
+- ✅ 透過 `event_ref` 在 Hub 對帳
+
 **回報 (Report)**:
 1. 彙整待同步 `actions`
 2. 打包 `REPORT_PACKET`

@@ -154,6 +154,10 @@ To prevent scope creep into full HIS, we **explicitly exclude**:
 
 ### 3.2 RX_ORDER Structure
 
+> **Privacy Update (v1.0.1)**: QR payloads must NOT contain patient identifiable information.
+> Full patient details are stored only in Doctor PWA's encrypted IndexedDB.
+> See: `xIRS_PROCEDURE_INVENTORY_BRIDGE_SPEC_v1.0.md` Section 8.3
+
 ```json
 {
   "type": "RX_ORDER",
@@ -161,14 +165,8 @@ To prevent scope creep into full HIS, we **explicitly exclude**:
 
   "rx_id": "RX-DOC001-20251221-0042",
   "prescriber_id": "DOC-001",
-  "prescriber_name": "王大明醫師",
 
-  "patient": {
-    "id": "P0042",
-    "name": "陳小華",
-    "age_group": "adult",
-    "weight_kg": 65
-  },
+  "patient_ref": "***0042",
 
   "items": [
     {
@@ -239,9 +237,8 @@ To prevent scope creep into full HIS, we **explicitly exclude**:
   "rx_id": "RX-DOC001-20251221-0042",
 
   "pharmacist_id": "PHARM-001",
-  "pharmacist_name": "林藥師",
 
-  "patient_id": "P0042",
+  "patient_ref": "***0042",
 
   "status": "FILLED",
 
@@ -466,6 +463,69 @@ For Schedule II-IV medications:
 
   "double_count_verified": true
 }
+```
+
+### 4.6 Privacy Requirements (v1.0.1 Update)
+
+> **Critical**: QR payloads transported by Runners must NOT contain patient identifiable information.
+
+#### 4.6.1 Data Classification
+
+| Field | QR Payload | Doctor PWA | Pharmacy Display | Hub Storage |
+|-------|-----------|------------|------------------|-------------|
+| `patient.name` | ❌ Never | ✅ Encrypted | ❌ Never | ✅ Encrypted |
+| `patient.id` (full) | ❌ Never | ✅ Encrypted | ❌ Never | ✅ Encrypted |
+| `patient_ref` (masked) | ✅ Yes | ✅ Yes | ✅ Yes | ✅ Yes |
+| `prescriber_name` | ❌ Never | ✅ Yes | ✅ Via cert lookup | ✅ Yes |
+| `diagnosis_text` | ⚠️ Optional | ✅ Yes | ✅ Yes | ✅ Encrypted |
+
+#### 4.6.2 patient_ref Format
+
+```
+Full ID:    P0042
+Masked:     ***0042 (last 4 digits visible)
+
+Format:     *** + last 4 characters
+Purpose:    Enough for verbal confirmation, not enough for identification
+```
+
+#### 4.6.3 Storage Locations
+
+| Data | Storage Location | Encryption |
+|------|------------------|------------|
+| Full patient info | Doctor PWA IndexedDB | AES-256-GCM |
+| RX_ORDER (signed) | QR + Pharmacy IndexedDB | None (signed only) |
+| DISPENSE_RECORD | Pharmacy → Hub (encrypted packet) | NaCl SealedBox |
+| Audit logs | Hub SQLite | At rest encryption |
+
+#### 4.6.4 Migration Notes
+
+Existing implementations must update:
+
+```javascript
+// Before (WRONG)
+const rxOrder = {
+  patient: {
+    id: "P0042",
+    name: "陳小華",
+    age_group: "adult",
+    weight_kg: 65
+  }
+};
+
+// After (CORRECT)
+const rxOrder = {
+  patient_ref: "***0042"
+};
+
+// Store full patient info separately (encrypted)
+await doctorDB.patients.put({
+  id: "P0042",
+  name: "陳小華",
+  age_group: "adult",
+  weight_kg: 65,
+  // ... encrypted at rest
+});
 ```
 
 ---

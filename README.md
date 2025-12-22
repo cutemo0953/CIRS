@@ -485,6 +485,11 @@ curl http://localhost:8090/api/person/P0001/audit-log
 |------|------|
 | [CIRS_DEV_SPEC.md](./CIRS_DEV_SPEC.md) | CIRS 完整開發規格書 |
 | [SATELLITE_PWA_SPEC.md](./docs/SATELLITE_PWA_SPEC.md) | Satellite PWA 架構與開發規格 |
+| [STATION_PWA_DEV_SPEC_v2.3.md](./docs/STATION_PWA_DEV_SPEC_v2.3.md) | Station PWA 設計規格 v2.3 |
+| [xIRS_LITE_CPOE_SPEC_v1.0.md](./docs/xIRS_LITE_CPOE_SPEC_v1.0.md) | Lite CPOE 處方系統規格 |
+| [PHARMACY_RX_WORKFLOW_SPEC_v1.0.md](./docs/PHARMACY_RX_WORKFLOW_SPEC_v1.0.md) | 藥局處方工作流程規格 (含護理師) |
+| [xIRS_PROCEDURE_INVENTORY_BRIDGE_SPEC_v1.0.md](./docs/xIRS_PROCEDURE_INVENTORY_BRIDGE_SPEC_v1.0.md) | 處置-庫存橋接規格 (鬆耦合) |
+| [PATIENT_DATA_SECURITY_OVERVIEW.md](./docs/PATIENT_DATA_SECURITY_OVERVIEW.md) | 病患資訊安全架構說明 (管理層簡報) |
 | [volunteer-pwa-guide.md](./docs/volunteer-pwa-guide.md) | 志工 PWA 安裝指南 |
 
 ### CIRS_DEV_SPEC.md 包含：
@@ -519,6 +524,20 @@ curl http://localhost:8090/api/person/P0001/audit-log
   - 隱私模式（預設開啟）保護 PHI
   - 處方醫師憑證管理
   - **Indigo 配色** (#4f46e5)
+- **新增 Pharmacy Workflow Spec** (v1.0)：
+  - 完整臨床工作流程：醫師 → 藥師 → 護理師
+  - **護理師三讀五對驗證流程** (Right Patient/Drug/Dose/Time/Route)
+  - **緊急用藥協定** - 先用藥、後補單 (within 2 hours)
+  - Runner 運送協定 (Blind Carrier)
+  - 管制藥品雙人確認 (Double-Check)
+  - ADMIN_RECORD、EMERGENCY_ADMIN 資料結構
+- **新增 Procedure-Inventory Bridge Spec** (v1.0)：
+  - 解決「醫囑 ≠ 實際消耗」的變異問題 (Variance Problem)
+  - `event_ref` 鬆耦合連結：臨床端與物資端分離
+  - `CONSUMPTION_TICKET` / `CONSUMPTION_RECORD` 資料結構
+  - 處置包建議範本 (Bundle Templates)
+  - **隱私保護**：Station 永不接觸病患資訊
+  - Hub 對帳機制 (Reconciliation)
 - **Hub Admin 新功能**：
   - Station 配對介面（系統選單 → Station 配對）
   - 支援 物資站(SUPPLY) / 藥局站(PHARMACY) 兩種類型
